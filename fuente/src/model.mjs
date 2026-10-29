@@ -79,7 +79,7 @@ export function op(f) {
 }
 
 // Temperatura de metal de cada pieza en un punto de funcionamiento.
-const metal = {
+export const metal = {
   bellmouth: (o) => o.t1 + 3,
   nut: (o) => o.t1 + 12,
   shroud: (o) => o.t2 - 5,

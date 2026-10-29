@@ -1,0 +1,366 @@
+{
+ "SPEC": {
+  "diameter": 88,
+  "caseLength": 90.5,
+  "length": 167,
+  "compressor": 54,
+  "inducer": 38.2,
+  "turbine": 55,
+  "rpmMax": 160000,
+  "rpmIdle": 45000,
+  "thrustMax": 75,
+  "egtMax": 575,
+  "egtIdle": 450,
+  "prMax": 2.2,
+  "massFlowMax": 0.14,
+  "mass": 750,
+  "etaC": 0.72
+ },
+ "S": {
+  "nut": [
+   0,
+   16
+  ],
+  "intake": [
+   6,
+   24
+  ],
+  "throat": 16,
+  "wheel": [
+   16,
+   38
+  ],
+  "shroud": [
+   24,
+   38
+  ],
+  "caseFront": 28,
+  "diffuser": [
+   38,
+   52
+  ],
+  "tunnel": [
+   52,
+   104
+  ],
+  "shaft": [
+   38,
+   115
+  ],
+  "combustor": [
+   52,
+   104
+  ],
+  "ngv": [
+   104,
+   115
+  ],
+  "caseBack": 112,
+  "turbine": [
+   115,
+   127
+  ],
+  "nozzle": [
+   115,
+   167
+  ]
+ },
+ "COUNTS": {
+  "compressorBlades": [
+   6,
+   6
+  ],
+  "diffuserWedges": 11,
+  "diffuserVanes": 36,
+  "vaporisers": 6,
+  "swirlJets": 6,
+  "stickOutlets": 12,
+  "glowBosses": 2,
+  "ngvVanes": 13,
+  "outletVanes": 4,
+  "ballRaces": 2,
+  "shroudScrews": 8,
+  "caseScrews": 6,
+  "ngvScrews": 8,
+  "coneScrews": 6,
+  "holeRows": [
+   [
+    8,
+    6,
+    3.8
+   ],
+   [
+    14.5,
+    24,
+    1.5
+   ],
+   [
+    18.5,
+    12,
+    2.3
+   ],
+   [
+    27.5,
+    24,
+    3.25
+   ],
+   [
+    38,
+    12,
+    4.9
+   ],
+   [
+    42,
+    24,
+    1.5
+   ]
+  ],
+  "screws": 52
+ },
+ "PARTS": {
+  "bellmouth": {
+   "name": "Toma de aire",
+   "material": "Nailon (PA66)",
+   "melt": [
+    255,
+    265
+   ],
+   "service": 120
+  },
+  "nut": {
+   "name": "Tuerca del compresor",
+   "material": "Aleación de aluminio",
+   "melt": [
+    550,
+    640
+   ],
+   "service": 150
+  },
+  "shroud": {
+   "name": "Tapa delantera",
+   "material": "Aleación de aluminio",
+   "melt": [
+    555,
+    650
+   ],
+   "service": 150
+  },
+  "wheel": {
+   "name": "Rueda del compresor",
+   "material": "Aluminio fundido · Garrett 446335",
+   "melt": [
+    546,
+    621
+   ],
+   "service": 200
+  },
+  "diffuser": {
+   "name": "Difusor",
+   "material": "Aleación de aluminio",
+   "melt": [
+    555,
+    650
+   ],
+   "service": 150
+  },
+  "tunnel": {
+   "name": "Eje, túnel y rodamientos",
+   "material": "Túnel de aluminio · eje En24T · 2 × GRW 688 cerámicos",
+   "melt": [
+    555,
+    650
+   ],
+   "service": 180
+  },
+  "casing": {
+   "name": "Carcasa exterior",
+   "material": "Chapa de inox de 0,4 mm",
+   "melt": [
+    1400,
+    1450
+   ],
+   "service": 870
+  },
+  "combustor": {
+   "name": "Cámara de combustión",
+   "material": "Chapa de inox de 0,4 mm",
+   "melt": [
+    1400,
+    1450
+   ],
+   "service": 870
+  },
+  "ngv": {
+   "name": "Estátor (NGV) y tapa trasera",
+   "material": "Inox fundido · tapa de acero dulce",
+   "melt": [
+    1400,
+    1450
+   ],
+   "service": 870
+  },
+  "turbine": {
+   "name": "Rueda de turbina",
+   "material": "Inconel 713 fundido",
+   "melt": [
+    1260,
+    1290
+   ],
+   "service": 980
+  },
+  "nozzle": {
+   "name": "Cono de escape",
+   "material": "Chapa de inox · 4 aletas",
+   "melt": [
+    1400,
+    1450
+   ],
+   "service": 870
+  },
+  "fuel": {
+   "name": "Combustible, gas y engrase",
+   "material": "Latón · 6 vaporizadores de inox",
+   "melt": [
+    900,
+    940
+   ],
+   "service": 120
+  },
+  "ecu": {
+   "name": "ECU y sensores",
+   "material": "FR-4 · termopar tipo K",
+   "melt": [
+    1400,
+    1450
+   ],
+   "service": 85
+  }
+ },
+ "MOVES": {
+  "bellmouth": [
+   172,
+   0,
+   0
+  ],
+  "shroud": [
+   166,
+   0,
+   0
+  ],
+  "nut": [
+   123,
+   0,
+   0
+  ],
+  "wheel": [
+   118,
+   0,
+   0
+  ],
+  "diffuser": [
+   112,
+   0,
+   0
+  ],
+  "tunnel": [
+   92,
+   0,
+   0
+  ],
+  "nozzle": [
+   -96,
+   0,
+   0
+  ],
+  "turbine": [
+   -78,
+   0,
+   0
+  ],
+  "ngv": [
+   -72,
+   0,
+   0
+  ],
+  "combustor": [
+   -66,
+   0,
+   0
+  ]
+ },
+ "STAGGER": [
+  "bellmouth",
+  "nozzle",
+  "shroud",
+  "turbine",
+  "nut",
+  "ngv",
+  "wheel",
+  "combustor",
+  "diffuser",
+  "tunnel"
+ ],
+ "ASSEMBLY": [
+  "tunnel",
+  "diffuser",
+  "combustor",
+  "wheel",
+  "ngv",
+  "nut",
+  "turbine",
+  "shroud",
+  "nozzle",
+  "bellmouth"
+ ],
+ "PLANE": {
+  "span": 1900,
+  "length": 1800,
+  "fuselageR": 92,
+  "nacelleY": 330,
+  "dryMass": 8.5
+ },
+ "SYSTEMS": {
+  "airframe": {
+   "name": "Célula",
+   "say": "Bimotor de referencia · 1900 mm de envergadura · 1800 mm de largo"
+  },
+  "nacelles": {
+   "name": "Góndolas",
+   "say": "Góndolas abiertas: el aire entra libre por delante, sin bypass, como pide Wren"
+  },
+  "engines": {
+   "name": "Dos MW54",
+   "say": "2 × MW54 · 150 N entre las dos · 1500 g"
+  },
+  "mounts": {
+   "name": "Monturas",
+   "say": "Montura de dos piezas sobre la carcasa: dos abrazaderas y su soporte al pilón"
+  },
+  "fuel": {
+   "name": "Combustible",
+   "say": "Depósito de 3 L y hopper de 250 ml · Tygon hasta las bombas, Festo de 3 mm hasta los motores"
+  },
+  "pumps": {
+   "name": "Bombas y válvulas",
+   "say": "Una bomba por motor y una electroválvula de combustible y otra de gas por motor"
+  },
+  "gas": {
+   "name": "Gas de arranque",
+   "say": "Botella de propano-butano para el encendido con la bujía"
+  },
+  "ecu": {
+   "name": "ECU",
+   "say": "Una ECU por motor: arranque, bujía, temperatura y gas"
+  },
+  "radio": {
+   "name": "Radio",
+   "say": "Receptor con dos baterías y su interruptor"
+  },
+  "gear": {
+   "name": "Tren",
+   "say": "Tren triciclo: rueda de morro y dos principales bajo el ala"
+  }
+ },
+ "TANK_ML": 3000,
+ "HOPPER_ML": 250
+}
