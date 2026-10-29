@@ -1,12 +1,15 @@
 // Modelo de la MW54: la misma fuente para la geometría, el movimiento y cada número que muestra la figura.
-// Datos de la ficha de la GTBA (gtba.co.uk/engine_designs/mw54.php): Ø87 mm, carcasa de 150 mm, compresor de 54 mm,
-// 160.000 rpm, 75 N, 575 °C, 700–800 g. El resto (relación de presiones, caudal, temperaturas internas) son valores
-// típicos de una microturbina de compresor radial de esta clase, marcados como aproximados en la leyenda.
+// Cotas, piezas, cantidades y materiales: planos de Wren Turbines "MW54 Turbo-Jet, plans and building instructions"
+// (G.A. issue 4, lista de piezas issue 3/4). Prestaciones: ficha de la GTBA (160.000 rpm, 75 N, 575 °C, 700–800 g).
+// La relación de presiones, el caudal y las temperaturas internas son valores típicos aproximados de esta clase de motor.
 
 export const SPEC = {
-  diameter: 87,
-  caseLength: 150,
+  diameter: 88,
+  caseLength: 90.5,
+  length: 167,
   compressor: 54,
+  inducer: 38.2,
+  turbine: 55,
   rpmMax: 160000,
   rpmIdle: 45000,
   thrustMax: 75,
@@ -18,20 +21,43 @@ export const SPEC = {
   etaC: 0.72,
 };
 
-// Estaciones a lo largo del eje, en mm desde el labio de la toma (s = 0) hacia la tobera.
+// Estaciones a lo largo del eje, en mm desde la punta de la tuerca del compresor (s = 0) hacia el escape.
 export const S = {
-  lip: 0,
-  throat: 14,
-  nut: [8, 18],
-  wheel: [18, 34],
-  caseFront: 26,
-  diffuser: [34, 48],
-  tunnel: [48, 160],
-  combustor: [54, 152],
-  ngv: [152, 166],
-  turbine: [167, 176],
-  caseBack: 176,
-  nozzle: [176, 216],
+  nut: [0, 16],
+  intake: [6, 24],
+  throat: 16,
+  wheel: [16, 38],
+  shroud: [24, 38],
+  caseFront: 28,
+  diffuser: [38, 52],
+  tunnel: [52, 104],
+  shaft: [38, 115],
+  combustor: [52, 104],
+  ngv: [104, 115],
+  caseBack: 112,
+  turbine: [115, 127],
+  nozzle: [115, 167],
+};
+
+// Lo que dicen los planos, para contarlo en la figura y comprobar que el dibujo lo cumple.
+export const COUNTS = {
+  compressorBlades: [6, 6],
+  diffuserWedges: 11,
+  diffuserVanes: 36,
+  vaporisers: 6,
+  swirlJets: 6,
+  stickOutlets: 12,
+  glowBosses: 2,
+  ngvVanes: 13,
+  outletVanes: 4,
+  ballRaces: 2,
+  shroudScrews: 8,
+  caseScrews: 6,
+  ngvScrews: 8,
+  coneScrews: 6,
+  // 24 Ø1,5 · 12 Ø4,9 · 24 Ø3,25 · 12 Ø2,3 · 24 Ø1,5 · 6 Ø3,8, medidos desde la cara delantera de la envolvente (46 mm).
+  holeRows: [[8, 6, 3.8], [14.5, 24, 1.5], [18.5, 12, 2.3], [27.5, 24, 3.25], [38, 12, 4.9], [42, 24, 1.5]],
+  screws: 52,
 };
 
 const T1 = 15;
@@ -56,6 +82,7 @@ export function op(f) {
 const metal = {
   bellmouth: (o) => o.t1 + 3,
   nut: (o) => o.t1 + 12,
+  shroud: (o) => o.t2 - 5,
   wheel: (o) => o.t2 + 15,
   diffuser: (o) => o.t2 + 5,
   tunnel: (o) => o.t2 + 45,
@@ -68,19 +95,20 @@ const metal = {
   ecu: (o) => o.t1 + 15,
 };
 
-// Materiales: solidus–liquidus y temperatura de servicio continuo aproximada, en °C.
+// Materiales de la lista de piezas de Wren; solidus–liquidus y servicio continuo aproximados, en °C.
 export const PARTS = {
-  nut: { name: "Tuerca cónica", material: "Inox 303", melt: [1400, 1420], service: 800 },
-  bellmouth: { name: "Toma de aire", material: "Aluminio 6061-T6", melt: [582, 652], service: 150 },
-  wheel: { name: "Rueda del compresor", material: "Aluminio 2618-T61", melt: [549, 638], service: 230 },
-  diffuser: { name: "Difusor", material: "Aluminio 6082-T6", melt: [555, 650], service: 150 },
-  tunnel: { name: "Eje, túnel y rodamientos", material: "Acero plata · rodamientos híbridos Si₃N₄", melt: [1420, 1470], service: 180 },
-  casing: { name: "Carcasa exterior", material: "Inox 304", melt: [1400, 1450], service: 870 },
-  combustor: { name: "Cámara de combustión", material: "Inox 321", melt: [1400, 1425], service: 870 },
-  ngv: { name: "Estátor de turbina (NGV)", material: "Inconel 625", melt: [1290, 1350], service: 980 },
-  turbine: { name: "Rueda de turbina", material: "Inconel 713C", melt: [1260, 1290], service: 980 },
-  nozzle: { name: "Tobera y cono de cola", material: "Inox 321", melt: [1400, 1425], service: 870 },
-  fuel: { name: "Bomba y línea de combustible", material: "Latón · PTFE", melt: [900, 940], service: 120 },
+  bellmouth: { name: "Toma de aire", material: "Nailon (PA66)", melt: [255, 265], service: 120 },
+  nut: { name: "Tuerca del compresor", material: "Aleación de aluminio", melt: [550, 640], service: 150 },
+  shroud: { name: "Tapa delantera", material: "Aleación de aluminio", melt: [555, 650], service: 150 },
+  wheel: { name: "Rueda del compresor", material: "Aluminio fundido · Garrett 446335", melt: [546, 621], service: 200 },
+  diffuser: { name: "Difusor", material: "Aleación de aluminio", melt: [555, 650], service: 150 },
+  tunnel: { name: "Eje, túnel y rodamientos", material: "Túnel de aluminio · eje En24T · 2 × GRW 688 cerámicos", melt: [555, 650], service: 180 },
+  casing: { name: "Carcasa exterior", material: "Chapa de inox de 0,4 mm", melt: [1400, 1450], service: 870 },
+  combustor: { name: "Cámara de combustión", material: "Chapa de inox de 0,4 mm", melt: [1400, 1450], service: 870 },
+  ngv: { name: "Estátor (NGV) y tapa trasera", material: "Inox fundido · tapa de acero dulce", melt: [1400, 1450], service: 870 },
+  turbine: { name: "Rueda de turbina", material: "Inconel 713 fundido", melt: [1260, 1290], service: 980 },
+  nozzle: { name: "Cono de escape", material: "Chapa de inox · 4 aletas", melt: [1400, 1450], service: 870 },
+  fuel: { name: "Combustible, gas y engrase", material: "Latón · 6 vaporizadores de inox", melt: [900, 940], service: 120 },
   ecu: { name: "ECU y sensores", material: "FR-4 · termopar tipo K", melt: [1400, 1450], service: 85 },
 };
 
@@ -91,19 +119,22 @@ export function partAt(id, f) {
   return { ...p, temp, margin: p.melt[0] - temp, load: temp / p.service };
 }
 
-// Despiece: la carcasa se queda en las cunas; lo de delante sale por la toma y lo de detrás por la tobera.
+// Despiece en el orden real de desmontaje. La carcasa se queda en las cunas. Por delante: toma, tapa delantera
+// (la rueda no pasa por su boca, así que sale antes), tuerca, rueda, difusor y por último eje con su túnel.
+// Por detrás: cono, turbina, estátor con la tapa trasera (la cámara no cabe por su agujero) y la cámara.
 // Cada vector deja la pieza por delante de la siguiente, así nada atraviesa nada en ningún fotograma.
 export const MOVES = {
-  bellmouth: [205, 0, 0],
-  nut: [178, 0, 0],
-  wheel: [172, 0, 0],
-  diffuser: [166, 0, 0],
-  tunnel: [145, 0, 0],
-  nozzle: [-170, 0, 0],
-  turbine: [-152, 0, 0],
-  ngv: [-142, 0, 0],
-  combustor: [-130, 0, 0],
+  bellmouth: [172, 0, 0],
+  shroud: [166, 0, 0],
+  nut: [123, 0, 0],
+  wheel: [118, 0, 0],
+  diffuser: [112, 0, 0],
+  tunnel: [92, 0, 0],
+  nozzle: [-96, 0, 0],
+  turbine: [-78, 0, 0],
+  ngv: [-72, 0, 0],
+  combustor: [-66, 0, 0],
 };
-export const STAGGER = ["bellmouth", "nozzle", "nut", "turbine", "wheel", "ngv", "diffuser", "combustor", "tunnel"];
-// El montaje real es el despiece al revés: eje y túnel, difusor, cámara, estátor, compresor, turbina, tuerca, tobera, toma.
+export const STAGGER = ["bellmouth", "nozzle", "shroud", "turbine", "nut", "ngv", "wheel", "combustor", "diffuser", "tunnel"];
+// El montaje real es el despiece al revés.
 export const ASSEMBLY = [...STAGGER].reverse();

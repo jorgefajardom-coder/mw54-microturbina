@@ -11,7 +11,7 @@ const runLabel = root.querySelector("[data-run-label]");
 const apartButton = root.querySelector("[data-apart]");
 const assembleButton = root.querySelector("[data-assemble]");
 const throttleInput = root.querySelector("[data-throttle]");
-const rows = [...document.querySelectorAll(".mw-row")];
+const rows = [...document.querySelectorAll(".mw-row[data-part]")];
 const spinners = [...stage.querySelectorAll("[data-spin]")];
 const thru = stage.querySelector(".mw-thru");
 const still = matchMedia("(prefers-reduced-motion: reduce)");
@@ -163,7 +163,7 @@ function place() {
     engine.appendChild(fragment);
     order = next;
   }
-  const open = Math.max(shareOf("bellmouth"), shareOf("wheel"));
+  const open = Math.max(shareOf("bellmouth"), shareOf("shroud"), shareOf("wheel"));
   thru.style.opacity = (1 - Math.min(1, open * 4)).toFixed(3);
 }
 
