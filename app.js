@@ -45,63 +45,60 @@ sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.4, near: 0.5, far: 10 });
 sun.shadow.bias = -0.0004;
 scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.5));
-// ── piso del taller: losa de concreto pulido con juntas de corte, marcas de estacionamiento y borde que se funde
-// con el fondo ──
+// ── piso del taller: concreto pulido de una sola pieza, marcas de estacionamiento y borde que se funde con el fondo ──
 const FLOOR_Y = -0.18;
-const TILE = 4.8; // ocho losas de 0,6 m por textura, para que las juntas casen al repetir
+const TILE = 4; // metros que cubre una repetición de la textura
 function floorTextures() {
   const N = 2048;
-  const px = N / TILE;
+  // ruido de valor periódico, para que la textura case consigo misma al repetirse
+  const noise = (cells, seed) => {
+    const g = new Float32Array(cells * cells);
+    let h = seed;
+    for (let i = 0; i < g.length; i++) { h = (h * 1664525 + 1013904223) >>> 0; g[i] = h / 4294967296; }
+    return (x, y) => {
+      const fx = x * cells;
+      const fy = y * cells;
+      const i = Math.floor(fx);
+      const j = Math.floor(fy);
+      let tx = fx - i;
+      let ty = fy - j;
+      tx = tx * tx * (3 - 2 * tx);
+      ty = ty * ty * (3 - 2 * ty);
+      const at = (a, b) => g[(((b % cells) + cells) % cells) * cells + (((a % cells) + cells) % cells)];
+      return (at(i, j) * (1 - tx) + at(i + 1, j) * tx) * (1 - ty) + (at(i, j + 1) * (1 - tx) + at(i + 1, j + 1) * tx) * ty;
+    };
+  };
+  const octaves = [[5, 0.25], [12, 0.25], [30, 0.2], [80, 0.15], [200, 0.15]].map(([c, w], k) => [noise(c, 7 + k * 31), w]);
+  const sheen = [noise(3, 101), noise(11, 202)];
   const color = document.createElement("canvas");
   const rough = document.createElement("canvas");
   color.width = color.height = rough.width = rough.height = N;
   const c = color.getContext("2d");
   const r = rough.getContext("2d");
-  c.fillStyle = "#26292d";
-  c.fillRect(0, 0, N, N);
-  r.fillStyle = "#8a8a8a";
-  r.fillRect(0, 0, N, N);
-  // cada losa con su tono propio, como el concreto vaciado por tramos
-  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
-    c.fillStyle = `rgba(${Math.random() < 0.5 ? "255,255,255" : "0,0,0"},${0.012 + Math.random() * 0.025})`;
-    c.fillRect(i * 0.6 * px, j * 0.6 * px, 0.6 * px, 0.6 * px);
+  const ci = c.createImageData(N, N);
+  const ri = r.createImageData(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const u = x / N;
+    const v = y / N;
+    let m = 0;
+    for (const [f, w] of octaves) m += f(u, v) * w;
+    // grano del árido: puntos claros y poros oscuros, sueltos
+    const q = Math.random();
+    const grain = q > 0.985 ? 0.12 * Math.random() : q < 0.01 ? -0.16 * Math.random() : (Math.random() - 0.5) * 0.04;
+    const tone = 36 + (m - 0.5) * 12 + grain * 110;
+    const i = (y * N + x) * 4;
+    ci.data[i] = tone;
+    ci.data[i + 1] = tone + 2;
+    ci.data[i + 2] = tone + 5;
+    ci.data[i + 3] = 255;
+    // brillo del pulido: zonas amplias más lisas, y el árido algo más mate
+    const s = 0.5 * sheen[0](u, v) + 0.5 * sheen[1](u, v);
+    const g = 160 + (s - 0.5) * 60 + Math.abs(grain) * 300;
+    ri.data[i] = ri.data[i + 1] = ri.data[i + 2] = g;
+    ri.data[i + 3] = 255;
   }
-  // árido y poros: grano fino claro y oscuro
-  for (let k = 0; k < 90000; k++) {
-    const x = Math.random() * N;
-    const y = Math.random() * N;
-    const s = Math.random() < 0.9 ? 1 : 2;
-    c.fillStyle = Math.random() < 0.5 ? `rgba(255,255,255,${Math.random() * 0.06})` : `rgba(0,0,0,${Math.random() * 0.1})`;
-    c.fillRect(x, y, s, s);
-  }
-  // manchas suaves y zonas de brillo del pulido, que se repiten en la textura de rugosidad
-  for (let k = 0; k < 26; k++) {
-    const x = Math.random() * N;
-    const y = Math.random() * N;
-    const rad = 60 + Math.random() * 260;
-    for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) {
-      const g = c.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, rad);
-      g.addColorStop(0, `rgba(0,0,0,${0.03 + Math.random() * 0.05})`);
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      c.fillStyle = g;
-      c.fillRect(x + dx - rad, y + dy - rad, rad * 2, rad * 2);
-      const h = r.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, rad * 1.4);
-      h.addColorStop(0, `rgba(0,0,0,${0.15 + Math.random() * 0.2})`);
-      h.addColorStop(1, "rgba(0,0,0,0)");
-      r.fillStyle = h;
-      r.fillRect(x + dx - rad * 1.4, y + dy - rad * 1.4, rad * 2.8, rad * 2.8);
-    }
-  }
-  // juntas de corte: ranura oscura con un filo claro, y más rugosas que la losa
-  for (let i = 0; i < 8; i++) {
-    const a = Math.round(i * 0.6 * px);
-    for (const [ctx, dark, lit] of [[c, "rgba(8,9,11,0.6)", "rgba(255,255,255,0.04)"], [r, "#d0d0d0", null]]) {
-      ctx.fillStyle = dark;
-      ctx.fillRect(a - 1, 0, 3, N);
-      ctx.fillRect(0, a - 1, N, 3);
-      if (lit) { ctx.fillStyle = lit; ctx.fillRect(a + 2, 0, 1, N); ctx.fillRect(0, a + 2, N, 1); }
-    }
-  }
+  c.putImageData(ci, 0, 0);
+  r.putImageData(ri, 0, 0);
   const out = [color, rough].map((cv) => {
     const t = new THREE.CanvasTexture(cv);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -125,12 +122,10 @@ function fadeToBackground(material, inner, outer) {
   };
 }
 const [floorMap, floorRough] = floorTextures();
-const FLOOR_SIZE = TILE * 3;
-floorMap.repeat.set(3, 3);
-floorRough.repeat.set(3, 3);
-floorMap.offset.set(0.0625, 0.0625);
-floorRough.offset.copy(floorMap.offset);
-const floorMat = new THREE.MeshStandardMaterial({ map: floorMap, roughnessMap: floorRough, roughness: 0.62, metalness: 0, envMapIntensity: 0.6 });
+const FLOOR_SIZE = TILE * 4;
+floorMap.repeat.set(4, 4);
+floorRough.repeat.set(4, 4);
+const floorMat = new THREE.MeshStandardMaterial({ map: floorMap, roughnessMap: floorRough, roughness: 0.7, metalness: 0, envMapIntensity: 0.7 });
 fadeToBackground(floorMat, 2.4, 6.2);
 const ground = new THREE.Group();
 const slab = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), floorMat);
@@ -169,7 +164,7 @@ function standDecal() {
   g.globalCompositeOperation = "destination-out";
   for (let k = 0; k < 14000; k++) {
     g.fillStyle = `rgba(0,0,0,${Math.random() * 0.6})`;
-    g.fillRect(Math.random() * cv.width, Math.random() * cv.height, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    g.fillRect(Math.random() * cv.width, Math.random() * cv.height, 1 + Math.random(), 1 + Math.random());
   }
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
