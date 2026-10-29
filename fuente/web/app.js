@@ -45,14 +45,162 @@ sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.4, near: 0.5, far: 10 });
 sun.shadow.bias = -0.0004;
 scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.5));
-const ground = new THREE.Mesh(new THREE.CircleGeometry(4, 64), new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.85 }));
-ground.rotation.x = -Math.PI / 2;
-ground.position.y = -0.18;
-ground.receiveShadow = true;
+// ── piso del taller: losa de concreto pulido con juntas de corte, marcas de estacionamiento y borde que se funde
+// con el fondo ──
+const FLOOR_Y = -0.18;
+const TILE = 4.8; // ocho losas de 0,6 m por textura, para que las juntas casen al repetir
+function floorTextures() {
+  const N = 2048;
+  const px = N / TILE;
+  const color = document.createElement("canvas");
+  const rough = document.createElement("canvas");
+  color.width = color.height = rough.width = rough.height = N;
+  const c = color.getContext("2d");
+  const r = rough.getContext("2d");
+  c.fillStyle = "#26292d";
+  c.fillRect(0, 0, N, N);
+  r.fillStyle = "#8a8a8a";
+  r.fillRect(0, 0, N, N);
+  // cada losa con su tono propio, como el concreto vaciado por tramos
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+    c.fillStyle = `rgba(${Math.random() < 0.5 ? "255,255,255" : "0,0,0"},${0.012 + Math.random() * 0.025})`;
+    c.fillRect(i * 0.6 * px, j * 0.6 * px, 0.6 * px, 0.6 * px);
+  }
+  // árido y poros: grano fino claro y oscuro
+  for (let k = 0; k < 90000; k++) {
+    const x = Math.random() * N;
+    const y = Math.random() * N;
+    const s = Math.random() < 0.9 ? 1 : 2;
+    c.fillStyle = Math.random() < 0.5 ? `rgba(255,255,255,${Math.random() * 0.06})` : `rgba(0,0,0,${Math.random() * 0.1})`;
+    c.fillRect(x, y, s, s);
+  }
+  // manchas suaves y zonas de brillo del pulido, que se repiten en la textura de rugosidad
+  for (let k = 0; k < 26; k++) {
+    const x = Math.random() * N;
+    const y = Math.random() * N;
+    const rad = 60 + Math.random() * 260;
+    for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) {
+      const g = c.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, rad);
+      g.addColorStop(0, `rgba(0,0,0,${0.03 + Math.random() * 0.05})`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      c.fillStyle = g;
+      c.fillRect(x + dx - rad, y + dy - rad, rad * 2, rad * 2);
+      const h = r.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, rad * 1.4);
+      h.addColorStop(0, `rgba(0,0,0,${0.15 + Math.random() * 0.2})`);
+      h.addColorStop(1, "rgba(0,0,0,0)");
+      r.fillStyle = h;
+      r.fillRect(x + dx - rad * 1.4, y + dy - rad * 1.4, rad * 2.8, rad * 2.8);
+    }
+  }
+  // juntas de corte: ranura oscura con un filo claro, y más rugosas que la losa
+  for (let i = 0; i < 8; i++) {
+    const a = Math.round(i * 0.6 * px);
+    for (const [ctx, dark, lit] of [[c, "rgba(8,9,11,0.6)", "rgba(255,255,255,0.04)"], [r, "#d0d0d0", null]]) {
+      ctx.fillStyle = dark;
+      ctx.fillRect(a - 1, 0, 3, N);
+      ctx.fillRect(0, a - 1, N, 3);
+      if (lit) { ctx.fillStyle = lit; ctx.fillRect(a + 2, 0, 1, N); ctx.fillRect(0, a + 2, N, 1); }
+    }
+  }
+  const out = [color, rough].map((cv) => {
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return t;
+  });
+  out[0].colorSpace = THREE.SRGBColorSpace;
+  return out;
+}
+// El borde se funde con el color de fondo ya en la salida sRGB, así el piso no termina en un canto.
+function fadeToBackground(material, inner, outer) {
+  material.onBeforeCompile = (sh) => {
+    sh.uniforms.uFade = { value: new THREE.Vector2(inner, outer) };
+    sh.uniforms.uBg = { value: new THREE.Color(0x0d0f12).convertLinearToSRGB() };
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vFloor;")
+      .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvFloor = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vFloor;\nuniform vec2 uFade;\nuniform vec3 uBg;")
+      .replace("#include <dithering_fragment>", "gl_FragColor.rgb = mix(gl_FragColor.rgb, uBg, smoothstep(uFade.x, uFade.y, length(vFloor)));\n#include <dithering_fragment>");
+  };
+}
+const [floorMap, floorRough] = floorTextures();
+const FLOOR_SIZE = TILE * 3;
+floorMap.repeat.set(3, 3);
+floorRough.repeat.set(3, 3);
+floorMap.offset.set(0.0625, 0.0625);
+floorRough.offset.copy(floorMap.offset);
+const floorMat = new THREE.MeshStandardMaterial({ map: floorMap, roughnessMap: floorRough, roughness: 0.62, metalness: 0, envMapIntensity: 0.6 });
+fadeToBackground(floorMat, 2.4, 6.2);
+const ground = new THREE.Group();
+const slab = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), floorMat);
+slab.rotation.x = -Math.PI / 2;
+slab.receiveShadow = true;
+ground.add(slab);
+// marcas pintadas del puesto: esquinas del recuadro, eje de rodaje con flecha y topes para las ruedas
+function standDecal() {
+  const W = 2.6;
+  const D = 1.8;
+  const px = 512;
+  const cv = document.createElement("canvas");
+  cv.width = W * px;
+  cv.height = D * px;
+  const g = cv.getContext("2d");
+  const X = (m) => (m + W / 2) * px;
+  const Z = (m) => (m + D / 2) * px;
+  const paint = "#d9a93a";
+  g.fillStyle = paint;
+  const box = { x0: -0.95, x1: 1.2, z0: -0.78, z1: 0.78, arm: 0.24, w: 0.028 };
+  for (const [x, sx] of [[box.x0, 1], [box.x1, -1]]) for (const [z, sz] of [[box.z0, 1], [box.z1, -1]]) {
+    g.fillRect(Math.min(X(x), X(x + sx * box.arm)), Math.min(Z(z), Z(z + sz * box.w)), box.arm * px, box.w * px);
+    g.fillRect(Math.min(X(x), X(x + sx * box.w)), Math.min(Z(z), Z(z + sz * box.arm)), box.w * px, box.arm * px);
+  }
+  for (let x = box.x0 + 0.1; x < box.x1 - 0.3; x += 0.2) g.fillRect(X(x), Z(-0.01), 0.11 * px, 0.02 * px);
+  g.beginPath();
+  g.moveTo(X(box.x1 - 0.06), Z(0));
+  g.lineTo(X(box.x1 - 0.2), Z(-0.055));
+  g.lineTo(X(box.x1 - 0.2), Z(0.055));
+  g.closePath();
+  g.fill();
+  // topes de rueda: tren principal y rueda de morro
+  g.fillStyle = "#e6e2d6";
+  for (const [x, z] of [[-0.04, 0.238], [-0.04, -0.238], [0.6, 0]]) g.fillRect(X(x - 0.07), Z(z - 0.045), 0.03 * px, 0.09 * px);
+  // desgaste: la pintura se pierde donde pisan las ruedas y en granos sueltos
+  g.globalCompositeOperation = "destination-out";
+  for (let k = 0; k < 14000; k++) {
+    g.fillStyle = `rgba(0,0,0,${Math.random() * 0.6})`;
+    g.fillRect(Math.random() * cv.width, Math.random() * cv.height, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(W, D),
+    new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.receiveShadow = true;
+  return m;
+}
+ground.add(standDecal());
+// sombra de contacto: penumbra amplia bajo la célula que asienta el avión aunque el sol esté alto
+{
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 256;
+  const g = cv.getContext("2d");
+  const grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grd.addColorStop(0, "rgba(0,0,0,0.55)");
+  grd.addColorStop(0.5, "rgba(0,0,0,0.22)");
+  grd.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 256, 256);
+  const ao = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.5), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  ao.rotation.x = -Math.PI / 2;
+  ao.position.x = 0.12;
+  ground.add(ao);
+}
+ground.position.y = FLOOR_Y;
 scene.add(ground);
-const grid = new THREE.GridHelper(8, 80, 0x3a3f46, 0x24272c);
-grid.position.y = -0.1798;
-scene.add(grid);
 
 // ── modelo ──
 const loader = new GLTFLoader();
@@ -416,8 +564,8 @@ $("fly").onclick = () => {
   document.body.toggleAttribute("data-flying", flying);
   $("fly").toggleAttribute("data-on", flying);
   $("fly").textContent = flying ? "Volver al taller" : "Volar";
-  if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = grid.visible = false; flight.enter(); }
-  else { flight.exit(); controls.enabled = true; ground.visible = grid.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; }
+  if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; flight.enter(); }
+  else { flight.exit(); controls.enabled = true; ground.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; }
 };
 $("cam").onclick = () => { const on = $("pip").style.display !== "block"; $("pip").style.display = on ? "block" : "none"; $("cam").toggleAttribute("data-on", on); };
 
