@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://jorgefajardom-coder.github.io/mw54-microturbina/sitemap.xml
