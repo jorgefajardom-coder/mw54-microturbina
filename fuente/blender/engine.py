@@ -86,7 +86,7 @@ def build_engine(prefix, M, parent=None, location=(0, 0, 0), meta=None):
     part("bellmouth", [lathe(f"{prefix}.intake.body", F, intake, M["nylon"], steps=96, sharp=50)] + screws_on_face(f"{prefix}.intake.screw", F, 19, 34.2, 6, M, 1.3, 0.26), 0)
 
     # ── tapa delantera de aluminio (envuelve la rueda) con 8 tornillos M2,5 ──
-    shroud = [(24, 22.9), (24, 49), (28, 49), (28, 43.8), (38, 43.8), (38, 28.5), (35.6, 27.6), (32, 26.1), (28, 24.5)]
+    shroud = [(24, 22.9), (24, 49), (28, 49), (28, 43.8), (34.6, 43.8), (34.6, 27.4), (32, 26.1), (28, 24.5)]
     part("shroud", [lathe(f"{prefix}.shroud.body", F, shroud, M["alu"], steps=96)] + screws_on_face(f"{prefix}.shroud.screw", F, 24, 46.4, 8, M, 1.5, 0.2), 0)
 
     # ── difusor: 11 cuñas y 36 álabes, Ø88 ──
@@ -128,7 +128,7 @@ def build_engine(prefix, M, parent=None, location=(0, 0, 0), meta=None):
             lathe(f"{prefix}.comb.rear", F, [(102, 28), (102, 38), (C1, 38), (C1, 28)], M["hot"], steps=96, uv_len=L)]
     for i in range(6):
         th = TAU * i / 6 + 0.52
-        comb.append(cylinder_between(f"{prefix}.comb.jet{i}", point(F, C0 - 2.2, 27, th), point(F, C0, 27, th), 1.1, M["steel"], steps=12))
+        comb.append(cylinder_between(f"{prefix}.comb.jet{i}", point(F, C0 + 0.4, 27, th), point(F, C0 + 2.6, 27, th), 1.1, M["steel"], steps=12))
         # vaporizador "bastón": entra por la cúpula, recorre el anillo y se curva hacia atrás
         pts = [point(F, C0 + 0.5, 27, th), point(F, WRAP0 + 18, 27, th), point(F, WRAP0 + 30, 31, th + 0.3), point(F, WRAP0 + 36, 22, th + 0.5)]
         comb.append(tube_path(f"{prefix}.comb.stick{i}", pts, 1.6, M["hot"], bend=6))
@@ -167,7 +167,7 @@ def build_engine(prefix, M, parent=None, location=(0, 0, 0), meta=None):
         th = TAU * i / 4 + math.pi / 4
         grid = [[point(F, s, r, th) for r in (17.5, 29.6)] for s in (134, 138, 142)]
         cone.append(surface_grid(f"{prefix}.cone.vane{i}", grid, M["hot"], thickness=0.5))
-    cone += screws_on_face(f"{prefix}.cone.screw", F, Z0, 35.5, 6, M, 1.8, 0.26)
+    cone += screws_on_face(f"{prefix}.cone.screw", F, Z0 + 2, 35.5, 6, M, 1.8, 0.26, facing=1)
     part("nozzle", cone, 7)
 
     # ── carcasa exterior: chapa de inox de 0,4 mm, Ø88 por dentro, 6 tornillos en cada extremo; bujías, latones y sonda ──

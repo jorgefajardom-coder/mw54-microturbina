@@ -47,6 +47,8 @@ def run(frames_dir=None, caption=None):
         eroot, eparts, fit = engine.build_engine("MW54", EM, parent=root, location=tuple(EF[0]), meta=meta)
         lib.tag(eroot, part="MW54", group="engine", order=40, explode=[0, 0, 300], label="Wren MW54", system="engines")
         log("MW54 instalada en el fuselaje")
+        world_fit = {k: (EF[0] + p, n) for k, (p, n) in fit.items()}
+        parts += hawk.install_systems(AM, root, world_fit, log)
         root.scale = (0.001, 0.001, 0.001)
     return {"parts": len(parts), "objects": len(sc.objects), "shots": shots[0]}
 
@@ -58,9 +60,12 @@ def export(path=None):
     root = bpy.data.objects["Avion_MW54"]
     obs = [root] + list(root.children_recursive)
     path = path or os.path.join(os.path.dirname(HERE), "web", "mw54.glb")
+    # nada seleccionado en otras escenas (el cubo de la escena de inicio se colaba en el GLB)
+    for other in bpy.data.scenes:
+        for vl in other.view_layers:
+            for o in other.objects:
+                o.select_set(other == sc and o in obs, view_layer=vl)
     with bpy.context.temp_override(window=win, scene=sc, selected_objects=obs, selected_editable_objects=obs, active_object=root):
-        for o in sc.objects:
-            o.select_set(o in obs)
         bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_extras=True, export_apply=True, export_yup=True,
                                   export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6, export_image_format="AUTO", export_cameras=False, export_lights=False)
     return {"path": path, "bytes": os.path.getsize(path)}

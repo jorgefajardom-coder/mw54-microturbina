@@ -43,6 +43,11 @@
   #steps { left: 50%; transform: translateX(-50%); bottom: 64px; font: 12px ui-monospace, Menlo, monospace; color: var(--text); padding: 6px 12px; border-radius: 999px; background: #15181dcc; display: none; }
   #tip { position: fixed; z-index: 7; pointer-events: none; padding: 4px 9px; border-radius: 6px; background: #000c; font-size: 12px; display: none; white-space: nowrap; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); font: 12px ui-monospace, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; }
+  #hud { left: 50%; transform: translateX(-50%); top: 64px; padding: 10px 16px; border-radius: 12px; background: #000a; font: 12.5px/1.6 ui-monospace, Menlo, monospace; color: #cfd6dd; text-align: center; display: none; }
+  #hud b { color: #fff; }
+  #keys { left: 50%; transform: translateX(-50%); bottom: 64px; font: 11px ui-monospace, Menlo, monospace; color: #cfd6dd; background: #000a; padding: 6px 12px; border-radius: 999px; display: none; white-space: nowrap; }
+  body[data-flying] #hud, body[data-flying] #keys { display: block; }
+  body[data-flying] #card, body[data-flying] #legend, body[data-flying] #steps, body[data-flying] #assemble, body[data-flying] #explode, body[data-flying] #heat, body[data-flying] #cam, body[data-flying] #pip, body[data-flying] #surfaces { display: none !important; }
   footer { position: fixed; z-index: 5; right: 20px; top: 18px; font-size: 12px; color: var(--muted); }
   footer a { color: var(--text); }
   nav.sections { position: fixed; z-index: 6; left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 6px; }
@@ -53,7 +58,7 @@
 </head>
 <body>
 <header><h1>Wren MW54 en un entrenador a reacción</h1><p>Maqueta 1:7 · pasa el cursor por las piezas, móntala o arráncala</p></header>
-<nav class="sections"><a href="./" aria-current="page">Hawk + MW54</a><a href="./sr72/">SR-72</a><a href="./anatomia/">Anatomía técnica</a></nav>
+<nav class="sections"><a href="./" aria-current="page">Hawk + MW54</a><a href="./anatomia/">Anatomía técnica</a></nav>
 <footer>Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></footer>
 <div id="view"></div>
 <div id="loading">Cargando el modelo…</div>
@@ -62,6 +67,8 @@
 <div class="ui" id="pip"><div class="head"><span>Cámara de combustión</span><span id="pipT"></span></div><div class="frame" id="pipFrame"></div><div class="chem" id="chem"></div></div>
 <div class="ui" id="steps"></div>
 <div id="tip"></div>
+<div class="ui" id="hud"></div>
+<div class="ui" id="keys">E arrancar · Mayús/Ctrl gas · W/S cabeceo · A/D alabeo · Z/X timón · G tren · F flaps · B frenos · T giróscopo · C cámara · R reiniciar</div>
 <div class="ui" id="controls">
   <button id="assemble">Montaje</button>
   <button id="explode">Despiece</button>
@@ -69,6 +76,9 @@
   <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="60" aria-label="Palanca de gas"></label>
   <button id="heat">Mapa de calor</button>
   <button id="cam">Cámara de combustión</button>
+  <button id="gear">Tren</button>
+  <button id="surfaces">Mandos</button>
+  <button id="fly">Volar</button>
 </div>
 <div class="ui" id="readout"></div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>

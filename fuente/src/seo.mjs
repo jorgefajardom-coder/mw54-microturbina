@@ -9,13 +9,13 @@ const TITLE = `Microturbina Wren MW54 · anatomía interactiva · ${AUTHOR}`;
 const DESCRIPTION = `Figura isométrica interactiva de la microturbina Wren MW54 por ${AUTHOR}: despiece en el orden real de los planos, simulación de montaje, arranque con flujo de aire, análisis de materiales con puntos de fusión y dos motores instalados en un reactor bimotor de aeromodelismo.`;
 const esc = (text) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
-export function seoHead() {
+export function seoHead({ title = TITLE, description = DESCRIPTION, url = SITE, name = "Microturbina Wren MW54 · anatomía interactiva" } = {}) {
   const ld = {
     "@context": "https://schema.org",
     "@type": "CreativeWork",
-    name: "Microturbina Wren MW54 · anatomía interactiva",
-    description: DESCRIPTION,
-    url: SITE,
+    name,
+    description,
+    url,
     inLanguage: "es",
     image: `${SITE}og.png`,
     author: { "@type": "Person", name: AUTHOR, url: PORTFOLIO, jobTitle: "Technical Product Manager & Mechatronics Engineer" },
@@ -23,19 +23,19 @@ export function seoHead() {
     keywords: "MW54, Wren Turbines, microturbina, turbojet, aeromodelismo, análisis de materiales, punto de fusión, despiece, Jorge Andres Fajardo Mora",
   };
   return (
-    `<title>${esc(TITLE)}</title>` +
-    `<meta name="description" content="${esc(DESCRIPTION)}">` +
+    `<title>${esc(title)}</title>` +
+    `<meta name="description" content="${esc(description)}">` +
     `<meta name="author" content="${AUTHOR}">` +
-    `<link rel="canonical" href="${SITE}">` +
+    `<link rel="canonical" href="${url}">` +
     `<meta property="og:type" content="article">` +
-    `<meta property="og:title" content="${esc(TITLE)}">` +
-    `<meta property="og:description" content="${esc(DESCRIPTION)}">` +
-    `<meta property="og:url" content="${SITE}">` +
+    `<meta property="og:title" content="${esc(title)}">` +
+    `<meta property="og:description" content="${esc(description)}">` +
+    `<meta property="og:url" content="${url}">` +
     `<meta property="og:image" content="${SITE}og.png">` +
     `<meta property="article:author" content="${PORTFOLIO}">` +
     `<meta name="twitter:card" content="summary_large_image">` +
-    `<meta name="twitter:title" content="${esc(TITLE)}">` +
-    `<meta name="twitter:description" content="${esc(DESCRIPTION)}">` +
+    `<meta name="twitter:title" content="${esc(title)}">` +
+    `<meta name="twitter:description" content="${esc(description)}">` +
     `<meta name="twitter:image" content="${SITE}og.png">` +
     `<script type="application/ld+json">${JSON.stringify(ld)}</script>`
   );

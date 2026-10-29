@@ -5,7 +5,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { op, metal, PARTS, SPEC } from "./model.mjs";
+import { op, metal, PARTS, SPEC } from "./model.js";
+import { createFlight } from "./flight.js";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString("es-ES");
@@ -46,11 +47,11 @@ sun.shadow.bias = -0.0004;
 scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.5));
 const ground = new THREE.Mesh(new THREE.CircleGeometry(4, 64), new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.85 }));
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = -0.235;
+ground.position.y = -0.18;
 ground.receiveShadow = true;
 scene.add(ground);
 const grid = new THREE.GridHelper(8, 80, 0x3a3f46, 0x24272c);
-grid.position.y = -0.2348;
+grid.position.y = -0.1798;
 scene.add(grid);
 
 // ── modelo ──
@@ -81,6 +82,27 @@ model.traverse((o) => {
   }
 });
 for (const e of parts) for (const m of e.materials) m.userData.realMaterial = m.material;
+
+// ── mandos y tren: cada pieza gira alrededor de su bisagra real (el eje viene del modelo de Blender) ──
+const controlParts = parts.filter((e) => e.data.control).map((e) => ({ e, axis: fromBlender(e.data.hinge).normalize(), range: e.data.range, kind: e.data.control, sign: e.data.sign ?? 1, rest: e.quat.clone(), angle: 0 }));
+const gearState = { t: 0, target: 0 };
+const surf = { roll: 0, pitch: 0, yaw: 0, flap: 0 };
+const smooth01 = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+function setSurfaces(c) { Object.assign(surf, c); }
+function poseControls() {
+  const D = Math.PI / 180;
+  for (const c of controlParts) {
+    let a = 0;
+    if (c.kind === "gear") a = -c.range[1] * smooth01((gearState.t - 0.1) / 0.65);
+    else if (c.kind === "door") a = -c.range[1] * smooth01((gearState.t - 0.78) / 0.22);
+    else if (c.kind === "aileron") a = surf.roll * c.range[1] * c.sign;
+    else if (c.kind === "elevator") a = surf.pitch * (surf.pitch > 0 ? c.range[1] : -c.range[0]);
+    else if (c.kind === "rudder") a = surf.yaw * c.range[1];
+    else if (c.kind === "flap") a = surf.flap * c.range[1];
+    c.angle = a;
+    c.e.quat.copy(c.rest).multiply(new THREE.Quaternion().setFromAxisAngle(c.axis, a * D));
+  }
+}
 spinners = ["wheel", "turbine", "nut"].map((k) => engineParts[k]).filter(Boolean);
 $("loading").remove();
 
@@ -168,7 +190,7 @@ function stop() {
 }
 
 // ── combustible: mezcla de queroseno con un 5 % de aceite de turbina, del hopper a la bomba y al motor ──
-const FUEL_PATH = [[195, 0, -32], [240, 0, -18], [400, -28, -29], [452, -28, -26], [452, 22, -26], [409, 22, -33], [300, 52, -30], [109.5, 2, 55]].map((p) => fromBlender(p).multiplyScalar(0.001));
+const FUEL_PATH = [[177, -22, -20], [177, -50, -20], [350, -50, -31], [380, -28, -31], [432, -28, -28], [444, -28, -28], [444, 30, -35], [421, 24, -35], [399, 24, -35], [386, 32, -35], [384, 34, 60], [220, 34, 62], [109.5, 1.8, 68], [109.5, 1.6, 58.4]].map((p) => fromBlender(p).multiplyScalar(0.001));
 const fuelCurve = new THREE.CatmullRomCurve3(FUEL_PATH, false, "centripetal", 0.3);
 const DROPS = 90;
 const dropGeo = new THREE.SphereGeometry(0.0022, 10, 8);
@@ -180,7 +202,7 @@ drops.visible = oil.visible = false;
 scene.add(drops, oil);
 const tmp = new THREE.Object3D();
 function stepFuel(dt) {
-  const show = motor.heat > 0.05 && !timeline && parts.every((e) => e.t < 0.02);
+  const show = motor.heat > 0.05 && !timeline && !flying && parts.every((e) => e.t < 0.02);
   drops.visible = oil.visible = show;
   if (!show) return;
   motor.t += dt * (0.05 + 0.25 * motor.f);
@@ -203,6 +225,7 @@ function stepFuel(dt) {
 
 // ── escape: núcleo caliente, cono de calima y diamantes tenues, en el sistema de la tobera ──
 const EXIT = fromBlender([-796, 0, 20]).multiplyScalar(0.001);
+const plumeHolder = new THREE.Group();
 const plumeGeo = new THREE.CylinderGeometry(0.06, 0.022, 0.55, 48, 32, true);
 plumeGeo.rotateZ(Math.PI / 2);
 plumeGeo.translate(-0.275, 0, 0);
@@ -233,7 +256,9 @@ const plumeMat = new THREE.ShaderMaterial({
 const plume = new THREE.Mesh(plumeGeo, plumeMat);
 plume.position.copy(EXIT);
 plume.visible = false;
-scene.add(plume);
+plumeHolder.add(plume);
+model.add(plumeHolder);
+plumeHolder.scale.setScalar(1 / model.scale.x || 1);
 
 // ── cámara de combustión: un segundo punto de vista con el motor cortado por la mitad y la llama dentro ──
 const pipCam = new THREE.PerspectiveCamera(38, 340 / 220, 0.005, 5);
@@ -380,6 +405,20 @@ $("run").onclick = () => {
 };
 $("throttle").oninput = (e) => (motor.target = e.target.value / 100);
 $("heat").onclick = () => { heatOn = !heatOn; $("heat").toggleAttribute("data-on", heatOn); $("legend").style.display = heatOn ? "block" : "none"; paintHeat(); };
+$("gear").onclick = () => { gearState.target = gearState.target ? 0 : 1; $("gear").toggleAttribute("data-on", !!gearState.target); };
+$("surfaces").onclick = () => { demoSurfaces = !demoSurfaces; $("surfaces").toggleAttribute("data-on", demoSurfaces); if (!demoSurfaces) setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); };
+let demoSurfaces = false;
+let flying = false;
+const flight = createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState });
+window.__sim = { flight, motor, gearState };
+$("fly").onclick = () => {
+  flying = !flying;
+  document.body.toggleAttribute("data-flying", flying);
+  $("fly").toggleAttribute("data-on", flying);
+  $("fly").textContent = flying ? "Volver al taller" : "Volar";
+  if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = grid.visible = false; flight.enter(); }
+  else { flight.exit(); controls.enabled = true; ground.visible = grid.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; }
+};
 $("cam").onclick = () => { const on = $("pip").style.display !== "block"; $("pip").style.display = on ? "block" : "none"; $("cam").toggleAttribute("data-on", on); };
 
 // ── bucle ──
@@ -388,8 +427,13 @@ let heatTick = 0;
 function frame() {
   const dt = Math.min(clock.getDelta(), 1 / 30);
   const now = performance.now() / 1000;
-  stepTimeline(now);
+  if (!flying) stepTimeline(now);
+  if (demoSurfaces && !flying) setSurfaces({ roll: Math.sin(now * 1.3), pitch: Math.sin(now * 0.9) * 0.8, yaw: Math.sin(now * 0.7), flap: 0.5 + 0.5 * Math.sin(now * 0.5) });
+  gearState.t += (gearState.target - gearState.t) * Math.min(1, dt * 0.9);
+  if (Math.abs(gearState.target - gearState.t) < 0.002) gearState.t = gearState.target;
+  poseControls();
   applyPose(now);
+  if (flying) flight.update(dt);
   // motor: arranque con la bujía, ralentí, y la palanca; el calor llega y se va con inercia térmica
   const fT = motor.on ? motor.target : 0;
   motor.f += (fT - motor.f) * (1 - Math.exp(-dt / (fT > motor.f ? 1.6 : 1.1)));
@@ -404,7 +448,7 @@ function frame() {
   plumeMat.uniforms.uFlow.value = motor.f * motor.spin;
   stepFuel(dt);
   stepFlames(dt);
-  stepFocus(dt);
+  if (!flying) stepFocus(dt);
   if (heatOn && (heatTick += dt) > 0.2) { heatTick = 0; paintHeat(); }
   if (hovered && (heatTick % 0.2) < dt) showCard(hovered);
   const rpm = o.n * motor.spin;
@@ -416,7 +460,7 @@ function frame() {
   const fuelKg = (o.thrust * 0.15) / 3600;
   $("chem").innerHTML = `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`;
   $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
-  controls.update();
+  if (!flying) controls.update();
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, innerWidth, innerHeight);
   renderer.clippingPlanes = [];
