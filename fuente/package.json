@@ -1,0 +1,13 @@
+{
+  "name": "mw54-anatomy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=20.10" },
+  "scripts": {
+    "build": "node src/build.mjs && node src/build.mjs --light",
+    "audit": "node src/build.mjs --audit",
+    "lines": "node .claude/skills/anatomy/scripts/lines.mjs dist/index.html --out shots/lines.png",
+    "shot": "node .claude/skills/anatomy/scripts/capture.mjs dist/index.html --out shots"
+  }
+}
