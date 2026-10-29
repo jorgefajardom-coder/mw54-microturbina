@@ -15,6 +15,9 @@ SPAN = 9390 / 7.0
 GROUND = -180.0
 ENGINE_TIP = (150.0, 0.0, 4.0)
 WZ = -52.0
+# Insignia en la deriva, en el UV de la deriva (u = (−x − 400)/300, v = (z − 60)/190): 150 × 45 mm, la proporción de
+# la imagen, centrada en x = −548 y z = 110, donde la cuerda es más ancha y queda lejos del borde de ataque y del timón.
+FIN_DECAL = ((548 - 75 - 400) / 300, (548 + 75 - 400) / 300, (110 - 22.5 - 60) / 190, (110 + 22.5 - 60) / 190)
 
 # Fuselaje: (x, ancho, alto, centro z) de secciones superelípticas.
 ST = [
@@ -73,36 +76,71 @@ def naca_cut(chord, t, a=0.0, b=1.0, n=22):
     return up + lo
 
 
-def panel_texture(name, base, size=512, seed=3, decal=None):
-    """Pintura negra con líneas de panel y remaches; con `decal`, la insignia horneada en la propia textura."""
-    import random
-    random.seed(seed)
-    img = bpy.data.images.new(name, size, size)
-    px = [0.0] * (size * size * 4)
-    for y in range(size):
-        for x in range(size):
-            n = (random.random() - 0.5) * 0.006
-            line = (x % 128 < 2) or (y % 96 < 2)
-            rivet = (x % 128 == 6 and y % 12 == 0) or (y % 96 == 6 and x % 16 == 0)
-            k = 1.9 if line else (1.4 if rivet else 1.0)
-            i = (y * size + x) * 4
-            px[i:i + 4] = [base[0] * k + n, base[1] * k + n, base[2] * k + n, 1.0]
+def panel_texture(name, base, size=1024, seed=3, decal=None, place=None):
+    """Pintura negra con líneas de panel y remaches; con `decal`, la insignia horneada en la propia textura.
+
+    El periodo de los paneles es el de siempre (1/4 de u y 3/16 de v); las líneas son ranuras finas con su filo
+    iluminado, los remaches puntos redondos, y la laca tiene un moteado suave para que el negro no quede plano.
+    `place` = (u0, u1, v0, v1) es el rectángulo de la insignia en el espacio UV."""
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    n = size
+    u = (np.arange(n) + 0.5) / n
+    U, V = np.meshgrid(u, u)
+
+    def smooth_noise(cells):
+        g = rng.random((cells + 1, cells + 1))
+        g[-1, :] = g[0, :]
+        g[:, -1] = g[:, 0]
+        x = U * cells
+        y = V * cells
+        i, j = x.astype(int), y.astype(int)
+        fx, fy = x - i, y - j
+        fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        a = g[j, i] * (1 - fx) + g[j, i + 1] * fx
+        b = g[j + 1, i] * (1 - fx) + g[j + 1, i + 1] * fx
+        return a * (1 - fy) + b * fy
+
+    def line(t, period, width):
+        d = np.abs(((t / period + 0.5) % 1.0) - 0.5) * period * n
+        return np.clip(width - d, 0, 1)
+
+    mottle = 0.55 * smooth_noise(6) + 0.3 * smooth_noise(16) + 0.15 * smooth_noise(48)
+    k = 1.0 + 0.35 * (mottle - 0.5)
+    groove = np.maximum(line(U, 0.25, 1.2), line(V, 0.1875, 1.2))
+    lit = np.maximum(line(U - 1.6 / n, 0.25, 0.8), line(V - 1.6 / n, 0.1875, 0.8)) * (1 - groove)
+    k = k * (1 - 0.45 * groove) + 2.6 * lit
+    # remaches: una fila a lo largo de cada línea, cada 12 px en v y cada 16 px en u (como antes, a doble resolución)
+    def rivets(along, across, period_along, step, offset):
+        da = np.abs(((across - offset) / period_along + 0.5) % 1.0 - 0.5) * period_along * n
+        db = np.abs(((along * n / step) + 0.5) % 1.0 - 0.5) * step
+        return np.clip(1.6 - np.hypot(da, db), 0, 1)
+    r = np.maximum(rivets(V, U, 0.25, 24, 12 / n), rivets(U, V, 0.1875, 32, 12 / n))
+    k = k + 1.3 * r
+    k = k + rng.normal(0, 0.03, (n, n))
+    px = np.ones((n, n, 4), dtype=np.float32)
+    for c in range(3):
+        px[..., c] = base[c] * k
     if decal is not None:
         dw, dh = decal.size
-        dpx = list(decal.pixels)
-        u0, u1, v0, v1 = 0.18, 0.82, 0.30, 0.50
-        for y in range(size):
-            for x in range(size):
-                u, v = x / size, y / size
-                if u0 <= u <= u1 and v0 <= v <= v1:
-                    du = int((u - u0) / (u1 - u0) * (dw - 1))
-                    dv = int((v - v0) / (v1 - v0) * (dh - 1))
-                    j = (dv * dw + du) * 4
-                    a = dpx[j + 3]
-                    i = (y * size + x) * 4
-                    for c in range(3):
-                        px[i + c] = px[i + c] * (1 - a) + dpx[j + c] * a
-    img.pixels = px
+        d = np.array(decal.pixels[:], dtype=np.float32).reshape(dh, dw, 4)
+        u0, u1, v0, v1 = place
+        su = (U - u0) / (u1 - u0) * (dw - 1)
+        sv = (V - v0) / (v1 - v0) * (dh - 1)
+        inside = (su >= 0) & (su <= dw - 1) & (sv >= 0) & (sv <= dh - 1)
+        su, sv = np.clip(su, 0, dw - 1.001), np.clip(sv, 0, dh - 1.001)
+        i, j = su.astype(int), sv.astype(int)
+        fx, fy = (su - i)[..., None], (sv - j)[..., None]
+        s = (d[j, i] * (1 - fx) + d[j, i + 1] * fx) * (1 - fy) + (d[j + 1, i] * (1 - fx) + d[j + 1, i + 1] * fx) * fy
+        a = s[..., 3] * inside
+        # el halo blanco del recorte no debe quedar como un filo claro sobre el negro: donde la imagen es casi
+        # blanca y poco opaca, se apaga
+        white = np.clip((s[..., :3].min(axis=-1) - 0.55) / 0.35, 0, 1)
+        a = a * (1 - white * (1 - a))
+        for c in range(3):
+            px[..., c] = px[..., c] * (1 - a) + s[..., c] * a
+    img = bpy.data.images.new(name, n, n)
+    img.pixels.foreach_set(px.ravel())
     img.pack()
     return img
 
@@ -113,7 +151,7 @@ def materials():
     hole = bpy.data.images.load(os.path.join(os.path.dirname(__file__), "assets", "stack-hole.png"), check_existing=True)
     return {
         "paint": material("Negro brillante", (1, 1, 1), 0.0, 0.3, coat=1.0, coat_rough=0.06, image=panel_texture("panel_ink", ink)),
-        "fin": material("Negro con insignia", (1, 1, 1), 0.0, 0.3, coat=1.0, coat_rough=0.06, image=panel_texture("panel_fin", ink, decal=hole)),
+        "fin": material("Negro con insignia", (1, 1, 1), 0.0, 0.3, coat=1.0, coat_rough=0.06, image=panel_texture("panel_fin", ink, decal=hole, place=FIN_DECAL)),
         "orange": material("Naranja del disco", (1.0, 0.144, 0.006), 0.0, 0.32, coat=1.0, coat_rough=0.05),
         "ember": material("Rojo del borde", (0.71, 0.032, 0.0024), 0.0, 0.32, coat=1.0, coat_rough=0.05),
         "glow": material("Brasa", (1.0, 0.32, 0.045), 0.0, 0.32, coat=1.0, coat_rough=0.05),
