@@ -9,4 +9,6 @@ Se hace con la skill **anatomy**, que viene incluida en `.claude/skills/anatomy`
 
 Comandos: `npm run build`, `npm run audit` (debe terminar en `audit passed`), `npm run lines` (debe dar `line ends: 0`), `npm run shot`. Las comprobaciones necesitan Chrome o Chromium.
 
+Reglas del repo: los commits y PR van **sin** líneas de coautoría ni atribución de Claude; el README es bilingüe (español primero, luego inglés).
+
 Textos de la figura en español. Para publicarla en el portafolio se copia `dist/` a `portfolio-3d/public/lab/mw54/`.

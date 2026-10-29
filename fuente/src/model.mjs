@@ -91,5 +91,19 @@ export function partAt(id, f) {
   return { ...p, temp, margin: p.melt[0] - temp, load: temp / p.service };
 }
 
-// Orden real de montaje: de dentro hacia fuera, del eje a la carcasa.
-export const ASSEMBLY = ["tunnel", "diffuser", "wheel", "nut", "combustor", "ngv", "turbine", "casing", "bellmouth", "nozzle"];
+// Despiece: la carcasa se queda en las cunas; lo de delante sale por la toma y lo de detrás por la tobera.
+// Cada vector deja la pieza por delante de la siguiente, así nada atraviesa nada en ningún fotograma.
+export const MOVES = {
+  bellmouth: [205, 0, 0],
+  nut: [178, 0, 0],
+  wheel: [172, 0, 0],
+  diffuser: [166, 0, 0],
+  tunnel: [145, 0, 0],
+  nozzle: [-170, 0, 0],
+  turbine: [-152, 0, 0],
+  ngv: [-142, 0, 0],
+  combustor: [-130, 0, 0],
+};
+export const STAGGER = ["bellmouth", "nozzle", "nut", "turbine", "wheel", "ngv", "diffuser", "combustor", "tunnel"];
+// El montaje real es el despiece al revés: eje y túnel, difusor, cámara, estátor, compresor, turbina, tuerca, tobera, toma.
+export const ASSEMBLY = [...STAGGER].reverse();
