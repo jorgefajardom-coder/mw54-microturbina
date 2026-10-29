@@ -90,6 +90,7 @@ function metalOf(id, o) {
 }
 
 function describe() {
+  if (assembling) return;
   if (selected && D.parts[selected]) {
     const p = partNow(selected);
     say(`${p.name} · ${p.material} · funde ${fmt(p.melt[0])} °C · ahora ${fmt(p.temp)} °C`);
@@ -198,7 +199,7 @@ vec4 inkOf(vec3 col,vec3 ink){
   float n=(hash12(gl_FragCoord.xy+fract(uClock*.61)*91.)-.5)/255.;
   m=max(m+n*smoothstep(0.,2./255.,m),0.);
   vec4 dark=vec4(col,m);
-  vec4 light=vec4(ink*m*.85,m*.85);
+  vec4 light=vec4(ink*m*.42,m*.42);
   return mix(dark,light,uLight);
 }
 void main(){
@@ -230,14 +231,16 @@ void main(){
       vec2 q=vec2(p.y,p.z-ZC);
       float w=RX+.16*L;
       float core=exp(-pow(length(q)/w,2.)*2.2);
-      float turb=fbm3(vec3(p.x*.035+uClock*(1.5+3.*uFlow),q*.05));
-      float life=smoothstep(0.,8.,L)*(1.-smoothstep(120.,320.,L));
-      float temp=exp(-L/140.);
-      vec3 c=mix(vec3(.55,.42,.38),vec3(1.,.48,.16),temp);
-      hot+=c*core*(.35+.9*turb)*life*seen*uHeat*(.45+.55*uFlow);
+      // Remolinos estirados a lo largo del chorro: se lee como calima caliente, no como humo.
+      float turb=fbm3(vec3(p.x*.022+uClock*(1.2+3.*uFlow),q*.07));
+      float wisp=smoothstep(.35,.85,turb);
+      float life=smoothstep(0.,8.,L)*(1.-smoothstep(90.,280.,L));
+      float temp=exp(-L/120.);
+      vec3 c=mix(vec3(.5,.42,.4),vec3(1.,.5,.18),temp);
+      hot+=c*core*(.12+1.1*wisp)*life*seen*uHeat*(.45+.55*uFlow);
     }
   }
-  vec3 col=(cold+hot)*dt*.055;
+  vec3 col=(cold+hot)*dt*.04;
   vec3 ink=normalize(cold*vec3(.2,.38,.8)+hot*vec3(.75,.33,.08)+1e-4);
   gl_FragColor=inkOf(col,ink);
 }`;

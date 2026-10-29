@@ -67,7 +67,7 @@ const record = R.solid;
 // Piezas alojadas dentro de la carcasa o de la toma. Una carcasa abierta "ve" su interior por la boca, y el
 // orden por pares no puede saber que la toma y el difusor tapan esa boca: esos pares se ordenan a mano (más abajo).
 const HOUSED = new Set(["nut", "wheel", "diffuser", "tunnel", "combustor", "ngv", "turbine"]);
-const OPEN_SHELLS = new Set(["casing.body", "bellmouth.body"]);
+const OPEN_SHELLS = new Set(["casing.body", "casing.flange-front", "casing.flange-back", "bellmouth.body", "bellmouth.flange"]);
 // Último s de cada pieza alojada: sale de la carcasa cuando ese extremo cruza la cara delantera.
 const REAR_S = { nut: S.nut[1], wheel: S.wheel[1], diffuser: S.diffuser[1], tunnel: S.turbine[0] };
 
@@ -221,8 +221,9 @@ for (const s of [56, 150]) {
   for (const side of [-1, 1]) {
     const c = rollerAt(s, side);
     for (const dx of [-11, 8]) {
-      const cheek = { x: cx + dx, y: c[1] - 8, w: 3, d: 16, r: 0.8 };
-      boxAt("stand", cheek, 10, c[2] + 6 - 10, { tone: "mid" }, { bevel: 0.3, name: "stand.cheek", extra: Dots([at([cx + dx + (dx > 0 ? 3 : 0), c[1], c[2]])], { size: 0.6, tone: "hi" }) });
+      // Las mejillas acaban por debajo de la carcasa: sujetan el eje del rodillo sin tocar el motor.
+      const cheek = { x: cx + dx, y: c[1] - 6, w: 3, d: 12, r: 0.8 };
+      boxAt("stand", cheek, 10, c[2] + 2 - 10, { tone: "mid" }, { bevel: 0.3, name: "stand.cheek", extra: Dots([at([cx + dx + (dx > 0 ? 3 : 0), c[1], c[2]])], { size: 0.6, tone: "hi" }) });
     }
     const F = G.frameAlong([cx - 8, c[1], c[2]], [1, 0, 0]);
     put("stand", c, Sv(G.disc(0, 16, ROLLER, F, P, { bevel: 0.4 }), { tone: "hi" }) + Ln(G.circleOf(F, 16, 2, P, 14), { tone: "faint" }), { name: nameFor("stand.roller"), shapes: [record(A.disc(F, 0, 16, ROLLER, { name: "stand.roller" }))] });
@@ -231,22 +232,20 @@ for (const s of [56, 150]) {
 
 // ───────────────────────── carcasa (se queda en las cunas) ─────────────────────────
 const CASE_IN = R_CASE - 0.8;
-const CASING = shell(
-  "casing",
-  [[S.caseFront, CASE_IN], [S.caseFront, R_FLANGE], [S.caseFront + 4, R_FLANGE], [S.caseFront + 4, R_CASE], [S.caseBack - 4, R_CASE], [S.caseBack - 4, R_FLANGE], [S.caseBack, R_FLANGE], [S.caseBack, CASE_IN]],
-  {},
-  {
-    name: "casing.body",
-    inner: [64, 100, 138].map((s) => G.arcOf(E, s, R_CASE, P)).join(""),
-    extra:
-      `<path class="mw-void" d="${G.circleOf(E, S.caseFront, CASE_IN, P)}"/>` +
-      Ln(G.arcOf(E, S.caseFront + 10, CASE_IN, P, { inward: true, least: -1 }), { tone: "lo" }) +
-      Dots(G.dotsOf(E, S.caseFront, (R_FLANGE + R_CASE) / 2 + 0.6, 12, P, { all: true, phase: 0.13 }), { size: 0.5, tone: "mid" }),
-  },
-);
-// Placa grabada en la carcasa: una banda que sigue al cilindro.
-const TAG_S = [92, 112];
-put("casing", pt(102, R_CASE, 40), Ln(G.arcOf(E, TAG_S[0], R_CASE + 0.01, P, { from: 22 * DEG, to: 58 * DEG }) + G.arcOf(E, TAG_S[1], R_CASE + 0.01, P, { from: 22 * DEG, to: 58 * DEG }), { tone: "lo" }) + Dots([pt(TAG_S[0] + 2.5, R_CASE, 26), pt(TAG_S[1] - 2.5, R_CASE, 26), pt(TAG_S[0] + 2.5, R_CASE, 54), pt(TAG_S[1] - 2.5, R_CASE, 54)].map(at), { size: 0.45 }), { bias: 0.3, name: "casing.tag", shapes: [A.ball(pt(102, R_CASE, 40), 0.4)] });
+// Brida: un anillo aparte del cuerpo, así el contorno del cuerpo sigue su radio real y cada costura acaba en él.
+function flange(piece, s0, s1, rIn, rOut, { name, extra = "", tone = "hi" } = {}) {
+  const id = nameFor(name);
+  const shape = record(A.ring(E, s0, s1, rIn, rOut, { name: id }));
+  put(piece, ex((s0 + s1) / 2), Sv(G.ringBand(s0, s1, rIn, rOut, E, P, { bevel: 0.4 }), { tone }) + extra, { name: id, shapes: [shape] });
+  return shape;
+}
+const CASING = shell("casing", [[S.caseFront + 4, CASE_IN], [S.caseFront + 4, R_CASE], [S.caseBack - 4, R_CASE], [S.caseBack - 4, CASE_IN]], {}, {
+  name: "casing.body",
+  inner: [64, 100, 138].map((s) => G.arcOf(E, s, R_CASE, P)).join(""),
+});
+const FLANGE_BOLTS = (s) => Dots(G.dotsOf(E, s, (R_FLANGE + R_CASE) / 2 + 0.6, 12, P, { all: true, phase: 0.13 }), { size: 0.5, tone: "mid" });
+flange("casing", S.caseFront, S.caseFront + 4, CASE_IN, R_FLANGE, { name: "casing.flange-front", extra: `<path class="mw-void" d="${G.circleOf(E, S.caseFront, CASE_IN, P)}"/>` + FLANGE_BOLTS(S.caseFront) });
+flange("casing", S.caseBack - 4, S.caseBack, CASE_IN, R_FLANGE, { name: "casing.flange-back" });
 const FUEL_DEG = 140;
 const TAP_DEG = 125;
 const FUEL_BOSS = boss("casing", pt(44, R_CASE, FUEL_DEG), radial(FUEL_DEG), 3.6, 5, { host: CASING, name: "casing.fuel-boss" });
@@ -262,8 +261,7 @@ const GLOW_TIP = G.add3(GLOW_BOSS, G.mul3(radial(115), 8.4));
 
 // ───────────────────────── toma de aire ─────────────────────────
 const LIP = [
-  [S.caseFront, 28.5],
-  [S.throat, 28.6, 1],
+  [S.throat, 28.6],
   [8, 32.5, 1],
   [4, 37, 1],
   [1.4, 40.6, 1],
@@ -271,8 +269,7 @@ const LIP = [
   [1.4, 45.2, 1],
   [4, 46.2],
   [20, 46.2],
-  [20, R_FLANGE],
-  [S.caseFront, R_FLANGE],
+  [20, 28.5],
 ];
 const SPIN_S = S.throat;
 const thruBlades = (() => {
@@ -297,12 +294,12 @@ const THRU =
   `</g><circle class="mw-nut" r="6.8"/><circle class="mw-nut-ring" r="3.2"/><path class="mw-nut-ring" d="M-6.8 0L6.8 0M0 -6.8L0 6.8"/></g></g>`;
 const BELLMOUTH = shell("bellmouth", LIP, {}, {
   name: "bellmouth.body",
-  inner: G.arcOf(E, 20, 46.2, P),
   extra:
     `<path class="mw-void" d="${G.circleOf(E, 0.7, 41.4, P)}"/>` +
-    Ln(G.arcOf(E, 6, 34.6, P, { inward: true, least: -1 }) + G.arcOf(E, S.throat, 28.6, P, { inward: true, least: -1 }), { tone: "lo" }) +
+    Ln(G.circleOf(E, S.throat, 28.6, P), { tone: "lo" }) +
     THRU,
 });
+flange("bellmouth", 20, S.caseFront, 28.5, R_FLANGE, { name: "bellmouth.flange" });
 const BOLT_R = (R_FLANGE + 46.2) / 2;
 for (let i = 0; i < 8; i++) {
   const deg = 22.5 + i * 45;
@@ -340,8 +337,8 @@ for (let i = 0; i < 12; i++) {
 {
   const id = "wheel.body";
   const paths = G.solidOf(HUB, E, P, { smooth: { slope: hubSlope, rows: 4 } });
-  const env = record(A.solid(E, [[S.wheel[0], 26], [S.wheel[0] + HUB_L, 27], [S.wheel[1], 27]], { name: "wheel.blades" }));
-  const body = record(A.solid(E, HUB, { name: id }));
+  const env = record(A.solid(E, [[S.wheel[0], 26], [S.wheel[0] + HUB_L, 27], [S.wheel[1], 27]], { name: "wheel.blades", owner: id }));
+  const body = record(A.solid(E, HUB, { name: id, owner: id }));
   put("wheel", ex(26), Sv(paths, { tone: "hi", inner: Ln(G.arcOf(E, S.wheel[0] + HUB_L, 27, P), { tone: "faint" }) }) + Faded(bladeLines, { tone: "hi" }), { name: id, shapes: [body, env] });
 }
 
@@ -360,13 +357,19 @@ shell("diffuser", [[S.diffuser[0], 7], [S.diffuser[0], DIFF_OUT], [S.diffuser[1]
 
 // ───────────────────────── eje, túnel y rodamientos ─────────────────────────
 const [T0, T1] = S.tunnel;
-shell("tunnel", [[T0, 5], [T0, 10.5], [T0 + 8, 10.5], [T0 + 8, 9], [T1 - 8, 9], [T1 - 8, 10.5], [T1, 10.5], [T1, 5]], { tone: "mid" }, {
-  name: "tunnel.body",
-  extra: Dots(G.dotsOf(E, T0, 7.75, 9, P, { all: true }), { size: 0.75, tone: "hi" }) + Ln(G.circleOf(E, T0, 9.3, P) + G.circleOf(E, T0, 6.2, P), { tone: "faint" }),
-});
-turned("tunnel", [[S.diffuser[0], 4], [S.turbine[0], 4]], { tone: "hi" }, { name: "tunnel.shaft", inner: G.arcOf(E, T0 - 3, 4, P) });
-// Tubo de engrase sobre el túnel, de rodamiento a rodamiento.
-tubeItems("tunnel", [pt(T0 + 8, 10.4, 60), pt(T1 - 8, 10.4, 60)], 0.75, { name: "tunnel.oil", tone: "mid", maxLength: 40, spacing: 1 });
+// El eje atraviesa el túnel: una sola pieza dibujada de atrás adelante (cola del eje, túnel, punta del eje),
+// porque eje y túnel se ven el uno por dentro del otro y ningún orden por pares los separa.
+{
+  const TUNNEL = [[T0, 5], [T0, 10.5], [T0 + 8, 10.5], [T0 + 8, 9], [T1 - 8, 9], [T1 - 8, 10.5], [T1, 10.5], [T1, 5]];
+  const id = "tunnel.body";
+  const svg =
+    Sv(G.disc(T1, S.turbine[0], 4, E, P), { tone: "hi" }) +
+    Sv(G.lathe(TUNNEL, E, P, {}), { tone: "mid" }) +
+    Dots(G.dotsOf(E, T0, 7.75, 9, P, { all: true }), { size: 0.75, tone: "hi" }) +
+    Ln(G.circleOf(E, T0, 9.3, P) + G.circleOf(E, T0, 6.2, P), { tone: "faint" }) +
+    Sv(G.disc(S.diffuser[0], T0, 4, E, P), { tone: "hi" });
+  put("tunnel", ex((T0 + T1) / 2), svg, { name: id, shapes: [record(A.lathe(E, TUNNEL, { name: id, owner: id })), record(A.disc(E, S.diffuser[0], S.turbine[0], 4, { name: "tunnel.shaft", owner: id }))] });
+}
 
 // ───────────────────────── cámara de combustión ─────────────────────────
 const [C0, C1] = S.combustor;
@@ -392,39 +395,48 @@ const COMBUSTOR = shell("combustor", [[C0 - 2, 13], [C0 - 2, 36], [C1, 36], [C1,
 
 // ───────────────────────── estátor de turbina (NGV) ─────────────────────────
 const [N0, N1] = S.ngv;
-shell("ngv", [[N0, 8], [N0, 36], [N1, 36], [N1, 8]], {}, {
+// El aro exterior del estátor apoya en la carcasa y sostiene la cámara, que descansa sobre su cara.
+shell("ngv", [[N0, 11.2], [N0, CASE_IN - 0.1], [N1, CASE_IN - 0.1], [N1, 11.2]], {}, {
   name: "ngv.body",
   extra:
     `<path class="mw-void" fill-rule="evenodd" d="${G.circleOf(E, N0, 33, P)}${G.circleOf(E, N0, 14, P)}"/>` +
     `<path class="mw-vane" d="${G.spokesOf(E, N0, 14, 33, 15, P, { sweep: 0.5 })}"/>` +
-    `<path class="mw-void" d="${G.circleOf(E, N0, 8, P)}"/>` +
-    Dots(G.dotsOf(E, N0, 34.6, 15, P, { all: true }), { size: 0.4, tone: "mid" }) +
-    Dots(G.dotsOf(E, N0, 11, 5, P, { all: true }), { size: 0.45, tone: "mid" }),
+    `<path class="mw-void" d="${G.circleOf(E, N0, 11.2, P)}"/>` +
+    Ln(G.circleOf(E, N0, 36, P), { tone: "faint" }) +
+    Dots(G.dotsOf(E, N0, 39, 15, P, { all: true }), { size: 0.4, tone: "mid" }) +
+    Dots(G.dotsOf(E, N0, 12.6, 5, P, { all: true }), { size: 0.45, tone: "mid" }),
 });
 
 // ───────────────────────── rueda de turbina ─────────────────────────
 const [U0, U1] = S.turbine;
-turned("turbine", [[U0, 6], [U0 + 1, 15, 1], [U0 + 3, 20.5, 1], [U0 + 4.5, 22.4], [U1, 22.4]], { tone: "hi" }, { name: "turbine.hub", extra: Ln(G.circleOf(E, U0, 6, P), { tone: "lo" }) });
-shell("turbine", [[U0 + 1, 22.4], [U0 + 1, 31], [U1 - 1, 31], [U1 - 1, 22.4]], { tone: "mid" }, {
-  name: "turbine.blades",
-  extra: Ln(G.spokesOf(E, U0 + 1, 22.4, 31, 27, P, { sweep: -0.32 }), { tone: "hi" }) + Faded(G.ribsOf(E, U0 + 1, U1 - 1, 31, 27, P, { twist: -0.5, fade: [0.1, 0.55] }), { tone: "lo" }),
+// Cubo y corona de álabes en un solo perfil: la cara delantera lleva los álabes, la punta sus aristas torcidas.
+turned("turbine", [[U0, 6], [U0 + 1, 15], [U0 + 1, 31], [U1 - 1, 31], [U1 - 1, 22.4], [U1, 22.4]], { tone: "hi" }, {
+  name: "turbine.wheel",
+  extra:
+    Ln(G.circleOf(E, U0, 6, P) + G.circleOf(E, U0 + 1, 22.4, P), { tone: "lo" }) +
+    Ln(G.spokesOf(E, U0 + 1, 22.4, 31, 27, P, { sweep: -0.32 }), { tone: "hi" }) +
+    Faded(G.ribsOf(E, U0 + 1, U1 - 1, 31, 27, P, { twist: -0.5, fade: [0.1, 0.55] }), { tone: "lo" }),
 });
 
 // ───────────────────────── tobera y cono de cola ─────────────────────────
 const [Z0, Z1] = S.nozzle;
 const nozIn = (s) => 41.8 - ((s - (Z0 + 4)) * (41.8 - 32.5)) / (Z1 - Z0 - 4);
-const NOZZLE = shell("nozzle", [[Z0, 40.6], [Z0, R_FLANGE], [Z0 + 4, R_FLANGE], [Z0 + 4, R_CASE], [Z1, 34], [Z1, 32.5], [Z0 + 4, 41.8]], {}, {
-  name: "nozzle.body",
-  inner: G.arcOf(E, Z0 + 16, R_CASE - (12 * (R_CASE - 34)) / (Z1 - Z0 - 4), P, { slope: -(R_CASE - 34) / (Z1 - Z0 - 4) }),
+flange("nozzle", Z0, Z0 + 4, 40.6, R_FLANGE, {
+  name: "nozzle.flange",
   extra:
     `<path class="mw-void" d="${G.circleOf(E, Z0, 40.6, P)}"/>` +
     `<clipPath id="mw-noz"><path d="${G.circleOf(E, Z0, 40.6, P)}"/></clipPath><g clip-path="url(#mw-noz)">` +
     Sv(G.solidOf([[Z0 + 4, 14], [Z0 + 10, 14], [Z1 - 2, 3]], E, P), { tone: "mid" }) +
     [30, 150, 270].map((deg) => Sv(G.disc(14, nozIn(Z0 + 8) - 0.1, 1.3, G.frameAlong(pt(Z0 + 8, 0, 0), radial(deg)), P), { tone: "mid" })).join("") +
     `</g>` +
-    Dots(G.dotsOf(E, Z0, (R_FLANGE + R_CASE) / 2 + 0.6, 12, P, { all: true, phase: 0.13 }), { size: 0.5, tone: "mid" }),
+    FLANGE_BOLTS(Z0),
 });
-const TC_BOSS = boss("nozzle", pt(196, nozIn(196) + 1.5 + (R_CASE - 34) * 0, 100), radial(100), 2.2, 3, { host: NOZZLE, name: "nozzle.tc-boss" });
+const NOZ_SLOPE = -(R_CASE - 34) / (Z1 - Z0 - 4);
+const NOZZLE = shell("nozzle", [[Z0 + 4, 41.8], [Z0 + 4, R_CASE], [Z1, 34], [Z1, 32.5]], {}, {
+  name: "nozzle.cone",
+  inner: G.arcOf(E, Z0 + 16, R_CASE + 12 * NOZ_SLOPE, P, { slope: NOZ_SLOPE }),
+});
+
 
 // ───────────────────────── ECU y bomba de combustible (detrás) ─────────────────────────
 const ECU = { x: 10, y: -88, w: 56, d: 32, r: 2 };
@@ -437,20 +449,26 @@ boxAt("ecu", ECU, 0, ECU_H, { tone: "mid", inner: Ln(k.sideSeam(ECU, 4, P, 3), {
     Ln([0, 1, 2].map((row) => k.onTop([[ECU.x + 6, ECU.y + 7 + row * 3], [ECU.x + (row === 1 ? 26 : 34), ECU.y + 7 + row * 3]], ECU_H, P)).join(""), { tone: "lo", free: true }) +
     Dots(k.corners(ECU, 3).map(([x, y]) => at([x, y, ECU_H])), { size: 0.45 }),
 });
+// Puertos de izquierda a derecha en el orden en que sus cables se alejan: termopar, bujía, toma de presión.
 const ecuPort = (i) => [ECU.x + 40 + i * 6, ECU.y + 24, ECU_H];
+const PORT = { tc: 0, glow: 1, tap: 2 };
 for (let i = 0; i < 3; i++) {
   const F = G.frameAlong(ecuPort(i), [0, 0, 1]);
   put("ecu", G.add3(ecuPort(i), [0, 0, 1.5]), Sv(G.disc(0, 3, 2.1, F, P), { tone: "hi" }) + Ln(G.circleOf(F, 3, 1, P, 12), { tone: "faint" }), { bias: 0.3, name: nameFor("ecu.connector"), shapes: [record(A.disc(F, 0, 3, 2.1, { name: "ecu.connector" }))] });
 }
 const plugTop = (i) => G.add3(ecuPort(i), [0, 0, 3]);
-cable("ecu", [plugTop(0), G.add3(plugTop(0), [0, 0, 70]), G.add3(GLOW_TIP, G.mul3(radial(115), 14)), GLOW_TIP], { name: "ecu.glow-cable", bend: 8, shells: [false, true] });
+cable("ecu", [plugTop(PORT.glow), G.add3(plugTop(PORT.glow), [0, 0, 70]), G.add3(GLOW_TIP, G.mul3(radial(115), 14)), GLOW_TIP], { name: "ecu.glow-cable", bend: 8, shells: [false, true] });
 {
   const near = G.add3(TAP_BOSS, G.mul3(radial(TAP_DEG), 10));
-  cable("ecu", [plugTop(1), [plugTop(1)[0], plugTop(1)[1], near[2]], [near[0], plugTop(1)[1], near[2]], near, TAP_BOSS], { name: "ecu.tap-line", bend: 7, r: 0.9, shells: [false, true] });
+  // Primero a lo largo, pegada a la ECU, y luego sube lejos de la línea de combustible.
+  const [px, py, pz] = plugTop(PORT.tap);
+  cable("ecu", [[px, py, pz], [px, py, pz + 9], [near[0], py, pz + 9], [near[0], py, near[2]], near, TAP_BOSS], { name: "ecu.tap-line", bend: 7, r: 0.9, shells: [false, true] });
 }
+// Sonda de EGT a la salida de la turbina, en la carcasa: no se va con la tobera, así su cable nunca se suelta.
+const TC_BOSS = boss("casing", pt(165, R_CASE, 100), radial(100), 2.2, 3, { host: CASING, name: "casing.tc-boss" });
 const TC_TIP = G.add3(TC_BOSS, G.mul3(radial(100), 3));
-put("nozzle", TC_TIP, Sv(G.disc(0, 3, 1.3, G.frameAlong(TC_BOSS, radial(100)), P), { tone: "hi" }), { bias: 0.3, name: "nozzle.tc", shapes: [record(A.disc(G.frameAlong(TC_BOSS, radial(100)), 0, 3, 1.3, { name: "nozzle.tc" }))] });
-cable("ecu", [plugTop(2), G.add3(plugTop(2), [0, 0, 14]), [-60, -54, ZC + 56], G.add3(TC_TIP, G.mul3(radial(100), 10)), TC_TIP], { name: "ecu.tc-cable", bend: 8, shells: [false, true], free: [false, true] });
+put("casing", G.add3(TC_BOSS, G.mul3(radial(100), 1.5)), Sv(G.disc(0, 3, 1.3, G.frameAlong(TC_BOSS, radial(100)), P), { tone: "hi" }), { bias: 0.3, name: "casing.tc", shapes: [record(A.disc(G.frameAlong(TC_BOSS, radial(100)), 0, 3, 1.3, { name: "casing.tc" }))] });
+cable("ecu", [plugTop(PORT.tc), G.add3(plugTop(PORT.tc), [0, 0, 14]), [-40, -54, ZC + 50], G.add3(TC_TIP, G.mul3(radial(100), 10)), TC_TIP], { name: "ecu.tc-cable", bend: 8, shells: [false, true] });
 
 const PUMP = { x: 80, y: -86, w: 22, d: 20, r: 1.6 };
 boxAt("fuel", PUMP, 0, 16, { tone: "mid" }, { name: "fuel.head", extra: Dots(k.corners(PUMP, 2.6).map(([x, y]) => at([x, y, 16])), { size: 0.45 }) + Ln(k.planOutline(k.insetPlan(PUMP, 1.6), 16, P, 2), { tone: "faint" }) });
@@ -465,34 +483,49 @@ const PUMP_OUT = [PUMP.x + 6, PUMP.y + PUMP.d / 2, 16];
 }
 
 // ───────────────────────── orden y salida ─────────────────────────
-const openPair = (a, b) => (OPEN_SHELLS.has(a.name) && b.housed) || (OPEN_SHELLS.has(b.name) && a.housed);
+// Una carcasa abierta "ve" su interior por la boca, y el orden por pares no sabe que la toma y el difusor tapan
+// esa boca. Se descartan sólo esas medidas imposibles: una pieza alojada "delante" de su carcasa mientras sigue
+// dentro de ella (en la toma, siempre: todo lo de dentro sale por detrás de ella). Lo demás lo resuelve el kit.
+const isOpen = (item) => OPEN_SHELLS.has(item.name);
+function stillInside(shell, item, state) {
+  if (shell.piece === "bellmouth") return true;
+  if (item.move[0] <= 0) return true;
+  return A.offsetOf(item, state)[0] < REAR_S[item.ride] - S.caseFront - 0.5;
+}
+// Piezas coaxiales que se ven una por dentro de la otra (el eje por el agujero de la cámara, del difusor y del
+// estátor): mientras sigan encajadas, la de fuera tapa a la de dentro; todo eso queda además dentro de la carcasa.
+const AXIAL = { tunnel: [S.diffuser[0], S.turbine[0]], combustor: [S.combustor[0] - 2, S.combustor[1]], diffuser: S.diffuser, ngv: S.ngv };
+const NESTED = new Set(["tunnel>combustor", "tunnel>diffuser", "tunnel>ngv"]);
+function nested(inner, outer, state) {
+  if (!NESTED.has(`${inner.ride}>${outer.ride}`)) return false;
+  const [a0, a1] = AXIAL[inner.ride].map((s) => s - A.offsetOf(inner, state)[0]);
+  const [b0, b1] = AXIAL[outer.ride].map((s) => s - A.offsetOf(outer, state)[0]);
+  return Math.max(a0, b0) < Math.min(a1, b1);
+}
+function settle() {
+  const states = A.explodeStates(R.order, R.spring).depth;
+  const overlaps = A.overlapsOf(items, P, { states, skip: A.sameRun });
+  for (const pair of overlaps.pairs) {
+    const [a, b] = [items[pair.a], items[pair.b]];
+    if (isOpen(a) && b.housed && stillInside(a, b, pair.state)) pair.front[1].area = 0;
+    if (isOpen(b) && a.housed && stillInside(b, a, pair.state)) pair.front[0].area = 0;
+    if (nested(a, b, pair.state)) pair.front[0].area = 0;
+    if (nested(b, a, pair.state)) pair.front[1].area = 0;
+  }
+  const solved = A.orderKeys(items, overlaps);
+  items.forEach((item, index) => (item.key = solved.keys[index]));
+  R.settled = { items: items.slice(), overlaps, solved, states };
+}
 // --reuse toma el orden del último build si la geometría no ha cambiado (para iterar en la página sin esperar al cálculo).
 const KEYS = join(HERE, "..", ".tmp", `keys-${AZIMUTH}-${ELEVATION}.json`);
 const cached = process.argv.includes("--reuse") && existsSync(KEYS) ? JSON.parse(readFileSync(KEYS, "utf8")) : null;
 if (cached && cached.length === items.length && cached.every(([name], index) => name === items[index].name)) {
   items.forEach((item, index) => (item.key = cached[index][1]));
-  R.settled = undefined;
   console.log("orden reutilizado de", KEYS);
 } else {
-  A.settle(R, P, { skip: (a, b) => A.sameRun(a, b) || openPair(a, b) });
+  settle();
   mkdirSync(dirname(KEYS), { recursive: true });
   writeFileSync(KEYS, JSON.stringify(items.map((item) => [item.name, item.key])));
-}
-{
-  const keyOf = (name) => items.find((item) => item.name === name).key;
-  const caseKey = keyOf("casing.body");
-  const bellKey = keyOf("bellmouth.body");
-  for (const item of items) {
-    if (!item.housed) continue;
-    const lift = G.dot3(item.move, V);
-    if (lift <= 0) {
-      item.key = Math.min(item.key, caseKey - 0.05);
-      continue;
-    }
-    // Detrás de la carcasa mientras sigue dentro; delante en cuanto su extremo trasero sale por la boca.
-    const exit = Math.max(0, (REAR_S[item.ride] - S.caseFront) / item.move[0]);
-    item.key = Math.min(caseKey - lift * exit - 0.05, bellKey - 0.5 - (item.ride === "nut" ? 0 : 0.5));
-  }
 }
 items.sort((a, b) => a.key - b.key);
 const groups = items.map((item, index) => {
@@ -581,4 +614,4 @@ const name = THEME === "light" ? "light.html" : "index.html";
 writeFileSync(join(OUT, name), page);
 console.log("wrote", name, `${(page.length / 1024).toFixed(0)} KB`, `${items.length} items`);
 
-A.auditOrExit(R, P, { allow: [["casing.body", "diffuser*"], ["casing.body", "tunnel*"], ["casing.body", "combustor*"], ["casing.body", "ngv*"], ["casing.body", "turbine*"], ["casing.body", "wheel*"], ["casing.body", "nut*"], ["bellmouth.body", "wheel*"], ["bellmouth.body", "nut*"], ["bellmouth.body", "diffuser*"], ["bellmouth.body", "tunnel*"]] });
+A.auditOrExit(R, P, { allow: ["diffuser*", "tunnel*", "combustor*", "ngv*", "turbine*", "wheel*", "nut*"].flatMap((inner) => [["casing.body", inner], ["casing.flange*", inner], ["bellmouth.body", inner], ["bellmouth.flange", inner]]) });
