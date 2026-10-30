@@ -1,7 +1,7 @@
 :root { --bg: #0d0f12; --panel: #15181d; --line: #ffffff14; --text: #e9ecef; --muted: #8b939c; --accent: #ff8a3c; --cool: #7fb2ff; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-header { position: fixed; top: 0; left: 0; right: 0; z-index: 5; display: flex; align-items: baseline; gap: 14px; padding: 16px 20px; pointer-events: none; }
+header { position: fixed; top: 0; left: 0; right: 0; z-index: 5; display: flex; flex-direction: column; gap: 2px; padding: 14px 20px; pointer-events: none; }
 header h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: .01em; }
 header p { margin: 0; color: var(--muted); font-size: 12.5px; }
 #view { position: fixed; inset: 0; }
@@ -15,7 +15,7 @@ button[data-on] { box-shadow: inset 0 0 0 1px var(--accent); }
 button[data-on] .lamp { background: var(--accent); box-shadow: 0 0 10px 2px #ff7a2a88; }
 label.chip { display: inline-flex; gap: 10px; align-items: center; cursor: default; }
 input[type=range] { width: 120px; accent-color: var(--accent); }
-#readout { right: 20px; bottom: 22px; font: 12px ui-monospace, Menlo, monospace; color: var(--muted); text-align: right; }
+#readout { right: 20px; top: 44px; font: 12px ui-monospace, Menlo, monospace; color: var(--muted); text-align: right; }
 #readout b { color: var(--text); font-weight: 600; }
 #card { right: 20px; top: 64px; width: 300px; padding: 14px 16px; border-radius: 12px; background: #15181dee; box-shadow: inset 0 0 0 1px var(--line); backdrop-filter: blur(8px); display: none; }
 #card h2 { margin: 0 0 2px; font-size: 15px; }
@@ -63,7 +63,7 @@ nav.sections a[aria-current] { color: var(--text); box-shadow: inset 0 0 0 1px v
   #pip .frame { height: 180px; }
   #legend { top: 70px; }
   #legend .ramp { width: 200px; }
-  header p, footer { display: none; }
+  header p, footer, header .wide { display: none; }
   #hud { top: 8px; font-size: 11px; padding: 6px 10px; width: max-content; max-width: calc(100% - 16px); }
   body[data-flying] #keys, body[data-flying] #readout { display: none; }
   body[data-flying] nav.sections, body[data-flying] header { display: none; }
