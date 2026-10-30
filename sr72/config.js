@@ -1,4 +1,4 @@
-// El SR-72 para el visor común: su modelo, sus piezas, su física y cómo se mueven sus mecanismos.
+// El SR-72 con la forma del Darkstar para el visor común: modelo, piezas, física y mecanismos.
 import * as sim from "./sim.js";
 import { fmt } from "../jet/core.js";
 
@@ -15,22 +15,22 @@ export default {
   throttle: 0.85,
   heatMax: 1600,
   doubleSided: /^Góndola/,
-  view: { home: [30, 14, 36], target: [-1, -1.6, 0], max: 110 },
-  shadow: 24,
+  view: { home: [21, 9, 25], target: [0, -1, 0], max: 80 },
+  shadow: 16,
   floor: {
-    y: -3.6,
-    fade: [34, 85],
-    stand: { W: 44, D: 32, box: { x0: -17.5, x1: 17.5, z0: -14, z1: 14, arm: 3.6, w: 0.32 }, dash: [1.6, 2.8, 0.26], stops: [[9.6, 0], [-3.4, 3.3], [-3.4, -3.3]], stop: [0.35, 1.6] },
-    ao: { w: 34, d: 22, x: -1 },
+    y: -2.3,
+    fade: [24, 60],
+    stand: { W: 32, D: 22, box: { x0: -12.5, x1: 12.5, z0: -9.5, z1: 9.5, arm: 2.6, w: 0.24 }, dash: [1.15, 2, 0.18], stops: [[6.8, 0], [-1.5, 1.6], [-1.5, -1.6]], stop: [0.28, 1.2] },
+    ao: { w: 24, d: 14, x: 0 },
   },
   late: ["gondola"],
-  say: { install: "El TBCC sube a su bahía bajo el ala", engines: "dos TBCC" },
+  say: { install: "El TBCC sube a su bahía bajo el ala, detrás de la toma", engines: "dos TBCC" },
   // la piel se queda en el equilibrio radiativo, muy por debajo de T₀, salvo morro y bordes de ataque
   skin(part, o) {
     const T0 = o.T0 - sim.K;
     const amb = o.T - sim.K;
     if (part.startsWith("fuselaje.morro")) return amb + 0.85 * (T0 - amb);
-    if (part.startsWith("ala") || part.startsWith("deriva")) return amb + 0.78 * (T0 - amb);
+    if (part.startsWith("deriva") || part.startsWith("elevon")) return amb + 0.78 * (T0 - amb);
     if (part.startsWith("tren")) return amb + 0.25 * (T0 - amb);
     return amb + 0.62 * (T0 - amb);
   },
@@ -40,9 +40,10 @@ export default {
     elevon: (o, s, c) => clamp1(s.pitch - s.roll * c.sign) * c.range[1],
     rudder: (o, s, c) => s.yaw * c.range[1],
   },
-  plumes: [1350, -1350].map((y) => ({ at: [-11200, y, -1050], length: 14, r: 0.85, h: 1.05, w: 0.62 })),
-  cut: { z: 1.35, pos: [-6, -3.4, 22.35], target: [-6, -1.8, 1.35] },
+  plumes: [1600, -1600].map((y) => ({ at: [-9200, y, -850], length: 9, r: 0.55, h: 0.7, w: 0.5 })),
+  cut: { z: 1.6, pos: [-3, -2.4, 15], target: [-3.5, -0.9, 1.6] },
   flow: {
+    size: 0.08,
     paths: {
       turbo: [[2600, -850], [0, -850], [-1500, -820], [-3200, -700], [-4300, -560], [-5900, -560], [-6800, -600], [-7400, -620], [-12500, -650], [-13300, -900], [-16500, -800]],
       ram: [[2600, -1720], [0, -1720], [-1500, -1725], [-5200, -1725], [-11500, -1760], [-12800, -1500], [-16500, -1250]],
