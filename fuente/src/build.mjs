@@ -12,6 +12,7 @@ import { kitOf } from "./parts.mjs";
 import { engine, R_CASE, R_FLANGE } from "./engine.mjs";
 import { settleOrder, mw54Impossible } from "./order.mjs";
 import { seoHead, SIGNATURE } from "./seo.mjs";
+import { navHtml, NAV_CSS } from "./nav.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, "..", "dist");
@@ -243,7 +244,7 @@ export const FIG1 =
 const CSS = readFileSync(join(HERE, "mw54.css"), "utf8");
 const MODEL = readFileSync(join(HERE, "model.mjs"), "utf8").replace(/^export /gm, "");
 const LIVE = readFileSync(join(HERE, "live.js"), "utf8").replace("__DATA__", JSON.stringify(DATA));
-let page = k.pageHtml({ title: "Wren MW54", theme: THEME, body: `<style>${CSS}</style><h1 class="mw-h1">Microturbina Wren MW54 · anatomía interactiva</h1>${FIG1}${SIGNATURE}`, script: glScript() + MODEL + LIVE, width: 1120 });
+let page = k.pageHtml({ title: "Wren MW54", theme: THEME, body: `<style>${CSS}${NAV_CSS}</style>${navHtml("index.html")}<h1 class="mw-h1">Microturbina Wren MW54 · anatomía interactiva</h1>${FIG1}${SIGNATURE}`, script: glScript() + MODEL + LIVE, width: 1120 });
 page = page.replace('<html lang="en">', '<html lang="es">').replace(/<title>[^<]*<\/title>/, seoHead());
 mkdirSync(OUT, { recursive: true });
 const name = THEME === "light" ? "light.html" : "index.html";

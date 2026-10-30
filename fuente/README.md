@@ -2,7 +2,7 @@
 
 **Español** · [English](#english)
 
-Figura isométrica interactiva de la microturbina Wren MW54: despiece, simulación de montaje, funcionamiento con flujo de aire y análisis de materiales con sus puntos de fusión.
+Figura isométrica interactiva de la microturbina Wren MW54: despiece, simulación de montaje, funcionamiento con flujo de aire y análisis de materiales con sus puntos de fusión. `src/engines.mjs` dibuja con el mismo kit los motores de los cuatro aviones (J58, F119, F110 y TBCC), con despiece pieza por pieza y su tabla de materiales; todas las figuras tienen una barra para volver al visor 3D.
 
 ```bash
 npm run build   # dist/index.html y dist/light.html
@@ -37,7 +37,7 @@ Reflejos: HDRI *Empty Warehouse 01* de [Poly Haven](https://polyhaven.com/a/empt
 
 ## English
 
-Interactive isometric figure of the Wren MW54 micro-turbine: exploded view, assembly simulation, running engine with airflow, and a materials analysis with melting points.
+Interactive isometric figure of the Wren MW54 micro-turbine: exploded view, assembly simulation, running engine with airflow, and a materials analysis with melting points. `src/engines.mjs` draws the engines of the four aircraft (J58, F119, F110 and TBCC) with the same kit, with a part-by-part exploded view and their materials table; every figure has a bar to go back to the 3D viewer.
 
 ```bash
 npm run build   # dist/index.html and dist/light.html

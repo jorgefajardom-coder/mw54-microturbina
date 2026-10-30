@@ -52,11 +52,16 @@ def body_width(x):
     return 1150 * smooth(NOSE, 2500, x) ** 0.55 if x > 2500 else 1150
 
 
+# el espesor del borde se afina hacia el morro: la punta acaba en un filo fino, como la del Darkstar, en vez de en una
+# lámina vertical del mismo alto que el borde del ala
+NOSE_TAPER = lambda x: 0.06 + 0.94 * smooth(NOSE, NOSE - 3200, x) ** 0.7
+
+
 def z_top(x, y):
     a, half, rb = abs(y), half_width(x), body_width(x)
     hb = 720 * smooth(NOSE, 4500, x) ** 0.8 - 470 * smooth(4500, TAIL, x)
     body = hb * max(0.0, 1 - (a / rb) ** 2) ** 0.6 if a < rb else 0.0
-    wing = 170 * max(0.0, 1 - a / half) ** 0.85 if half > 1 else 0.0
+    wing = 170 * NOSE_TAPER(x) * max(0.0, 1 - a / half) ** 0.85 if half > 1 else 0.0
     hump = (430 * smooth(-200, -3200, x) - 250 * smooth(-7600, TAIL, x)) * math.exp(-(((a - 1600) / 760) ** 2)) * max(0.0, 1 - a / half) ** 0.3 if half > 1 else 0.0
     cockpit = 260 * math.exp(-(((x - 4300) / 1500) ** 2)) * max(0.0, 1 - (a / 650) ** 2) ** 0.7 if a < 650 else 0.0
     return max(body, wing) + hump + cockpit
@@ -66,7 +71,7 @@ def z_bottom(x, y):
     a, half, rb = abs(y), half_width(x), body_width(x)
     hl = 420 * smooth(NOSE, 4000, x) ** 0.8 - 200 * smooth(-3000, TAIL, x)
     body = hl * max(0.0, 1 - (a / rb) ** 2) ** 0.5 if a < rb else 0.0
-    wing = 110 * max(0.0, 1 - a / half) ** 0.85 if half > 1 else 0.0
+    wing = 110 * NOSE_TAPER(x) * max(0.0, 1 - a / half) ** 0.85 if half > 1 else 0.0
     return -max(body, wing)
 
 
