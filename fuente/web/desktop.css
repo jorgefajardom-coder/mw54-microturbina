@@ -1,0 +1,17 @@
+/* Escritorio: barra de botones abajo a la izquierda, lectura arriba a la derecha, atajos de teclado al volar. */
+#controls { left: 20px; bottom: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: calc(100% - 40px); }
+button:hover, button[data-on] { background: #232830; }
+#readout { right: 20px; top: 44px; font: 12px ui-monospace, Menlo, monospace; color: var(--muted); text-align: right; }
+#keys { left: 50%; transform: translateX(-50%); bottom: 64px; font: 11px ui-monospace, Menlo, monospace; color: #cfd6dd; background: #000a; padding: 6px 12px; border-radius: 999px; display: none; white-space: nowrap; }
+body[data-flying] #hud, body[data-flying] #keys { display: block; }
+body[data-flying] #card, body[data-flying] #legend, body[data-flying] #steps, body[data-flying] #assemble, body[data-flying] #explode, body[data-flying] #heat, body[data-flying] #cam, body[data-flying] #pip, body[data-flying] #surfaces, body[data-flying] #cockpit { display: none !important; }
+#tip { display: none; }
+body[data-hover] #tip { display: block; }
+/* ventana de escritorio estrecha: la barra se desliza en una sola fila */
+@media (max-width: 900px) {
+  #controls { left: 0; right: 0; bottom: 0; max-width: none; flex-wrap: nowrap; overflow-x: auto; padding: 10px 12px; background: linear-gradient(transparent, #0d0f12ee 35%); }
+  #controls > * { flex: none; }
+  header p, footer, header .wide { display: none; }
+  nav.sections { top: auto; bottom: 62px; left: 12px; transform: none; }
+  #card { left: 12px; right: 12px; width: auto; top: auto; bottom: 110px; }
+}

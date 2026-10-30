@@ -1,0 +1,466 @@
+.mw,
+.mw-materials {
+  --mw-blend: screen;
+  --mw-ring: #ffffff14;
+  --mw-hover: #ffffff0a;
+  --mw-lamp-off: #4a4a4a;
+  --mw-lamp-on: #ff8a3c;
+  --mw-lamp-glow: #ff7a2a88;
+  --mw-hot: #ff8a3c;
+  --mw-cool: #7fb2ff;
+}
+
+[data-theme="light"] .mw,
+[data-theme="light"] .mw-materials {
+  --mw-blend: normal;
+  --mw-ring: #0000001a;
+  --mw-hover: #0000000a;
+  --mw-lamp-off: #c4c4c4;
+  --mw-lamp-on: #d9480f;
+  --mw-lamp-glow: #d9480f55;
+  --mw-hot: #c2410c;
+  --mw-cool: #1d4ed8;
+}
+
+.mw .iso-plate {
+  padding: 52px 24px 64px;
+  overflow: hidden;
+}
+
+.mw-stage {
+  position: relative;
+  border-radius: 10px;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mw-stage:focus-visible {
+  outline: 1px solid var(--anatomy-muted);
+  outline-offset: 6px;
+}
+
+.mw-stage > svg,
+.mw-stage > canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.mw-front,
+.mw-air {
+  position: absolute;
+  inset: 0;
+  height: 100% !important;
+}
+
+.mw-front {
+  pointer-events: none;
+  overflow: visible;
+}
+
+.mw-front .it {
+  pointer-events: visiblePainted;
+}
+
+.mw-air {
+  pointer-events: none;
+  mix-blend-mode: var(--mw-blend);
+}
+
+.tb-body {
+  fill: var(--anatomy-shade-2);
+  stroke: none;
+}
+
+.tb-shine {
+  fill: var(--anatomy-top);
+  stroke: none;
+}
+
+.tb-shade {
+  fill: var(--anatomy-shade-0);
+  stroke: none;
+}
+
+.mw-void {
+  fill: var(--anatomy-shade-0);
+  stroke: none;
+}
+
+.mw-streams {
+  --anatomy-lo: var(--mw-cool);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.mw-streamline,
+.mw-streams .iso-line {
+  opacity: 0.32;
+}
+
+.mw-particle {
+  fill: none;
+  stroke: var(--mw-cool);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+
+.mw-hole {
+  fill: var(--anatomy-shade-0);
+  stroke: var(--anatomy-lo);
+  stroke-width: 0.5;
+}
+
+.mw-vane {
+  fill: none;
+  stroke: var(--anatomy-hi);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+/* La vista a través de la toma: el cubo, los álabes y la tuerca dibujados en el plano de la garganta. */
+.mw-thru path,
+.mw-thru circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.mw-hub {
+  fill: var(--anatomy-shade-2);
+  stroke: var(--anatomy-lo);
+  stroke-width: 0.5;
+}
+
+.mw-blade {
+  fill: none;
+  stroke: var(--anatomy-hi);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  opacity: calc(1 - var(--blur, 0) * 0.75);
+}
+
+.mw-split {
+  stroke: var(--anatomy-mid);
+}
+
+.mw-blur {
+  fill: none;
+  stroke: var(--anatomy-mid);
+  stroke-width: 12;
+  opacity: calc(var(--blur, 0) * 0.35);
+  vector-effect: none !important;
+}
+
+.mw-nut {
+  fill: var(--anatomy-top);
+  stroke: var(--anatomy-hi);
+  stroke-width: 0.6;
+}
+
+.mw-nut-ring {
+  fill: none;
+  stroke: var(--anatomy-lo);
+  stroke-width: 0.5;
+}
+
+.mw-stage[data-focus] .it:not([data-on]):not([data-piece="stand"]) {
+  --anatomy-hi: var(--anatomy-mid);
+  --anatomy-mid: var(--anatomy-lo);
+}
+
+.mw-stage[data-focus] .it[data-piece="stand"] {
+  --anatomy-mid: var(--anatomy-lo);
+}
+
+.it[data-on] {
+  --anatomy-hi: var(--anatomy-lit);
+  --anatomy-mid: var(--anatomy-hi);
+}
+
+.it[data-on] .iso-top,
+.it[data-on] .tb-shine {
+  fill: var(--anatomy-lit-top);
+}
+
+.it[data-on] .iso-shade,
+.it[data-on] .tb-body {
+  fill: var(--anatomy-lit-shade);
+}
+
+.it[data-on] [data-seamless] > .iso-shade {
+  stroke: var(--anatomy-lit-shade);
+}
+
+.it[data-on] [data-seamless] > .iso-top {
+  stroke: var(--anatomy-lit-top);
+}
+
+/* La bujía se pone al rojo durante el arranque. */
+.mw-stage[data-glow] .it[data-piece="casing"] [data-seamless],
+.mw-stage[data-glow] .it[data-piece="casing"]:nth-last-child(n) .iso-solid:last-child {
+  transition: none;
+}
+
+.mw-controls {
+  position: absolute;
+  left: 20px;
+  bottom: 16px;
+  right: 330px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  font-family: var(--anatomy-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--anatomy-muted);
+}
+
+.mw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--anatomy-face);
+  color: var(--anatomy-strong);
+  font: inherit;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--mw-ring);
+  transition: background 200ms var(--anatomy-ease), transform 160ms var(--anatomy-ease);
+}
+
+.mw-btn:hover,
+.mw-btn[data-on] {
+  background: var(--mw-hover);
+}
+
+.mw-btn:active {
+  transform: scale(0.97);
+}
+
+.mw-btn:focus-visible,
+.mw-throttle input:focus-visible {
+  outline: 1px solid var(--anatomy-muted);
+  outline-offset: 3px;
+}
+
+.mw-lamp {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mw-lamp-off);
+  transition: background 240ms var(--anatomy-ease), box-shadow 240ms var(--anatomy-ease);
+}
+
+.mw-btn[data-state="starting"] .mw-lamp,
+.mw-btn[data-state="running"] .mw-lamp {
+  background: var(--mw-lamp-on);
+  box-shadow: 0 0 10px 2px var(--mw-lamp-glow);
+}
+
+.mw-throttle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mw-throttle input {
+  width: 110px;
+  accent-color: var(--mw-hot);
+}
+
+.mw-hint {
+  margin-left: 6px;
+}
+
+@media (max-width: 1100px) {
+  .mw-hint {
+    display: none;
+  }
+}
+
+.mw-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── análisis de materiales ── */
+.mw-materials {
+  margin-top: 28px;
+  color: var(--anatomy-strong);
+  font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.mw-materials h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.mw-note {
+  margin: 0 0 12px;
+  color: var(--anatomy-muted);
+  font-size: 12.5px;
+}
+
+.mw-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.mw-table th {
+  padding: 0 10px 8px 0;
+  text-align: left;
+  font: 500 10px/1.2 var(--anatomy-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--anatomy-muted);
+}
+
+.mw-row td {
+  padding: 7px 10px 7px 0;
+  border-top: 1px solid var(--mw-ring);
+  vertical-align: middle;
+}
+
+.mw-row {
+  cursor: default;
+  transition: background 160ms var(--anatomy-ease);
+}
+
+.mw-row:hover,
+.mw-row:focus-visible,
+.mw-row[data-on] {
+  background: var(--mw-hover);
+  outline: none;
+}
+
+.mw-num {
+  width: 26px;
+  font: 10px var(--anatomy-mono);
+  color: var(--anatomy-muted);
+}
+
+.mw-name {
+  display: block;
+}
+
+.mw-mat {
+  display: block;
+  color: var(--anatomy-muted);
+  font-size: 12px;
+}
+
+.mw-melt,
+.mw-serv {
+  font: 11.5px var(--anatomy-mono);
+  white-space: nowrap;
+}
+
+.mw-temp {
+  width: 34%;
+  font: 11.5px var(--anatomy-mono);
+}
+
+.mw-temp [data-temp] {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.mw-bar {
+  position: relative;
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--mw-ring);
+}
+
+.mw-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 3px;
+  background: var(--mw-cool);
+  transition: width 120ms linear;
+}
+
+.mw-row[data-hot] .mw-fill {
+  background: var(--mw-hot);
+}
+
+.mw-svc {
+  position: absolute;
+  top: -3px;
+  width: 1.5px;
+  height: 11px;
+  background: var(--anatomy-strong);
+  opacity: 0.7;
+}
+
+@media (max-width: 720px) {
+  .mw .iso-plate {
+    padding: 48px 8px 120px;
+  }
+
+  .mw-controls {
+    right: 16px;
+    bottom: 44px;
+  }
+
+  .mw .iso-plate-corner[data-corner="readout"] {
+    max-width: calc(100% - 16px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mw-serv,
+  .mw-table th:nth-child(4) {
+    display: none;
+  }
+
+  .mw-temp {
+    width: 40%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mw * {
+    transition: none !important;
+  }
+}
+
+.mw-wedge {
+  fill: var(--anatomy-top);
+  stroke: var(--anatomy-hi);
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.mw-h1 {
+  margin: 0 0 18px;
+  color: var(--anatomy-strong);
+  font: 600 20px/1.3 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.mw-signature {
+  margin: 36px 0 12px;
+  color: var(--anatomy-muted);
+  font: 12.5px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.mw-signature a {
+  color: var(--anatomy-strong);
+}

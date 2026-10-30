@@ -1,0 +1,4 @@
+node_modules/
+shots/
+.tmp/
+__pycache__/
