@@ -10,7 +10,7 @@ export const FIGURES = [
 
 export function navHtml(current) {
   const links = FIGURES.map(([href, label]) => `<a href="./${href === "index.html" ? "" : href}"${href === current ? ' aria-current="page"' : ""}>${label}</a>`).join("");
-  return `<nav class="an-nav"><a class="an-back" href="../">Volver al visor 3D</a><span class="an-tabs">${links}</span></nav>`;
+  return `<nav class="an-nav"><a class="an-back" href="../">Volver al visor 3D</a><a href="../aero/">Aerodinámica</a><span class="an-tabs">${links}</span></nav>`;
 }
 
 export const NAV_CSS = `

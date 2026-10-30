@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12">
+<!--SEO-->
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preload" href="../draco/draco_decoder.wasm" as="fetch" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="./aero.css">
+</head>
+<body>
+<header><h1>Aerodinámica</h1><p>Cada avión en vuelo: el aire que lo rodea, el cono de Mach, la sustentación y la resistencia</p></header>
+<nav class="sections"><a href="../">Hawk</a><a href="../sr72/">SR-72</a><a href="../f22/">F-22</a><a href="../f14/">F-14</a><a href="../sr71/">SR-71</a><a href="./" aria-current="page">Aero</a><a href="../anatomia/">Anatomía</a></nav>
+<footer>Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></footer>
+<div id="view"></div>
+<div id="loading">Cargando el modelo…</div>
+<aside id="panel">
+  <div class="planes">
+    <button type="button" class="chip" data-plane="hawk">Hawk</button>
+    <button type="button" class="chip" data-plane="sr71">SR-71</button>
+    <button type="button" class="chip" data-plane="f22">F-22</button>
+    <button type="button" class="chip" data-plane="f14">F-14</button>
+    <button type="button" class="chip" data-plane="sr72">SR-72</button>
+  </div>
+  <label class="mach">Mach <output id="machOut">0</output><input id="mach" type="range" min="0.05" max="3" step="0.01" value="0.8" aria-label="Número de Mach"></label>
+  <p id="regime"></p>
+  <p id="verdict"></p>
+  <canvas id="chart" aria-label="Finura (azul) y resistencia (naranja) según el Mach"></canvas>
+  <p class="key"><span class="ld">Finura L/D</span><span class="dr">Resistencia</span></p>
+  <dl id="data"></dl>
+  <p id="note"></p>
+  <p class="by">Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></p>
+</aside>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
+<script type="module" src="./aero.js"></script>
+</body>
+</html>

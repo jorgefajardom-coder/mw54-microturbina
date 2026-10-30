@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12">
+<title>Aerodinámica del Hawk, el SR-71, el F-22, el F-14 y el SR-72 · Jorge Andres Fajardo Mora</title><meta name="description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: cada avión en vuelo con las líneas de corriente del aire, el cono de Mach, la atmósfera a su altitud, la presión dinámica, la temperatura de remanso, la sustentación, la resistencia de forma, de onda e inducida y la finura, del Mach 0,1 al Mach 6."><meta name="author" content="Jorge Andres Fajardo Mora"><link rel="canonical" href="https://jorgefajardom-coder.github.io/mw54-microturbina/aero/"><meta property="og:type" content="article"><meta property="og:title" content="Aerodinámica del Hawk, el SR-71, el F-22, el F-14 y el SR-72 · Jorge Andres Fajardo Mora"><meta property="og:description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: cada avión en vuelo con las líneas de corriente del aire, el cono de Mach, la atmósfera a su altitud, la presión dinámica, la temperatura de remanso, la sustentación, la resistencia de forma, de onda e inducida y la finura, del Mach 0,1 al Mach 6."><meta property="og:url" content="https://jorgefajardom-coder.github.io/mw54-microturbina/aero/"><meta property="og:image" content="https://jorgefajardom-coder.github.io/mw54-microturbina/og.png"><meta property="article:author" content="https://jorgefajardom-coder.github.io/singularity/"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Aerodinámica del Hawk, el SR-71, el F-22, el F-14 y el SR-72 · Jorge Andres Fajardo Mora"><meta name="twitter:description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: cada avión en vuelo con las líneas de corriente del aire, el cono de Mach, la atmósfera a su altitud, la presión dinámica, la temperatura de remanso, la sustentación, la resistencia de forma, de onda e inducida y la finura, del Mach 0,1 al Mach 6."><meta name="twitter:image" content="https://jorgefajardom-coder.github.io/mw54-microturbina/og.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"CreativeWork","name":"Aerodinámica de los aviones del visor","description":"Visor 3D interactivo por Jorge Andres Fajardo Mora: cada avión en vuelo con las líneas de corriente del aire, el cono de Mach, la atmósfera a su altitud, la presión dinámica, la temperatura de remanso, la sustentación, la resistencia de forma, de onda e inducida y la finura, del Mach 0,1 al Mach 6.","url":"https://jorgefajardom-coder.github.io/mw54-microturbina/aero/","inLanguage":"es","image":"https://jorgefajardom-coder.github.io/mw54-microturbina/og.png","author":{"@type":"Person","name":"Jorge Andres Fajardo Mora","url":"https://jorgefajardom-coder.github.io/singularity/","jobTitle":"Technical Product Manager & Mechatronics Engineer"},"creator":{"@type":"Person","name":"Jorge Andres Fajardo Mora","url":"https://jorgefajardom-coder.github.io/singularity/"},"keywords":"MW54, Wren Turbines, microturbina, turbojet, aeromodelismo, análisis de materiales, punto de fusión, despiece, Jorge Andres Fajardo Mora"}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preload" href="../draco/draco_decoder.wasm" as="fetch" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="./aero.css">
+</head>
+<body>
+<header><h1>Aerodinámica</h1><p>Cada avión en vuelo: el aire que lo rodea, el cono de Mach, la sustentación y la resistencia</p></header>
+<nav class="sections"><a href="../">Hawk</a><a href="../sr72/">SR-72</a><a href="../f22/">F-22</a><a href="../f14/">F-14</a><a href="../sr71/">SR-71</a><a href="./" aria-current="page">Aero</a><a href="../anatomia/">Anatomía</a></nav>
+<footer>Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></footer>
+<div id="view"></div>
+<div id="loading">Cargando el modelo…</div>
+<aside id="panel">
+  <div class="planes">
+    <button type="button" class="chip" data-plane="hawk">Hawk</button>
+    <button type="button" class="chip" data-plane="sr71">SR-71</button>
+    <button type="button" class="chip" data-plane="f22">F-22</button>
+    <button type="button" class="chip" data-plane="f14">F-14</button>
+    <button type="button" class="chip" data-plane="sr72">SR-72</button>
+  </div>
+  <label class="mach">Mach <output id="machOut">0</output><input id="mach" type="range" min="0.05" max="3" step="0.01" value="0.8" aria-label="Número de Mach"></label>
+  <p id="regime"></p>
+  <p id="verdict"></p>
+  <canvas id="chart" aria-label="Finura (azul) y resistencia (naranja) según el Mach"></canvas>
+  <p class="key"><span class="ld">Finura L/D</span><span class="dr">Resistencia</span></p>
+  <dl id="data"></dl>
+  <p id="note"></p>
+  <p class="by">Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></p>
+</aside>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
+<script type="module" src="./aero.js"></script>
+</body>
+</html>

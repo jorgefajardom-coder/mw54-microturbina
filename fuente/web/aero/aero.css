@@ -1,0 +1,31 @@
+/* Aerodinámica: el avión a la izquierda y el panel de datos a la derecha; en el celular, el panel abajo y desplazable. */
+#view { position: fixed; inset: 0 380px 0 0; }
+#view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#loading { position: fixed; left: calc((100% - 380px) / 2); top: 50%; transform: translate(-50%, -50%); color: var(--muted); font-size: 13px; }
+#loading[hidden] { display: none; }
+#panel { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; padding: 64px 22px 28px; overflow-y: auto; background: var(--panel); box-shadow: inset 1px 0 0 var(--line); z-index: 5; }
+.planes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.planes .chip[aria-pressed] { box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
+.mach { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 12px; font: 600 11px ui-monospace, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.mach output { justify-self: end; font-size: 22px; color: var(--text); letter-spacing: 0; }
+.mach input { grid-column: 1 / -1; width: 100%; }
+#regime, #verdict, #note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+#regime b, #verdict b { color: var(--text); }
+#chart { display: block; width: 100%; height: 120px; margin-top: 16px; border-radius: 8px; background: #0d0f12; }
+.key { display: flex; gap: 16px; margin: 6px 0 0; font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 2px; margin-right: 6px; vertical-align: middle; }
+.key .ld::before { background: #7fb2ff; }
+.key .dr::before { background: #ff8a3c; }
+#data { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; margin: 18px 0 0; font-size: 13px; }
+#data dt { color: var(--muted); }
+#data dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+footer { display: none; }
+#panel .by { margin-top: 18px; font-size: 12px; color: var(--muted); }
+#panel .by a { color: var(--text); }
+@media (max-width: 760px) {
+  #view { inset: 0 0 46% 0; }
+  #loading { left: 50%; top: 27%; }
+  #panel { top: 54%; width: auto; left: 0; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); box-shadow: inset 0 1px 0 var(--line); }
+  nav.sections { top: auto; bottom: auto; left: 0; right: 0; transform: none; top: 64px; overflow-x: auto; padding: 0 16px; justify-content: flex-start; }
+  footer { display: none; }
+}
