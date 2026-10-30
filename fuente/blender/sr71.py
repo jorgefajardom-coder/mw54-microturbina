@@ -71,12 +71,12 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
     O = (0, 0, 0)
     # cono de entrada: punta 4,5 m por delante de la cara del compresor; se desliza 660 mm hacia atrás con el Mach
     spike = lathe("spike", F, [(-4500, 0), (-3600, 260), (-2700, 560), (-2300, 640), (-1200, 520), (-400, 330), (0, 300), (0, 0)], M["ti"], steps=64)
-    part("cono", [spike], 1, (3500, 0, 0), control="spike", slide=[-1.0, 0.0, 0.0], range=[0, 660])
+    part("cono", [spike], 1, (3500, 0, 0), out=1, control="spike", slide=[-1.0, 0.0, 0.0], range=[0, 660])
     comp = [lathe("drum", F, [(0, 0), (0, 300), (1600, 330), (1600, 0)], M["wasp"], steps=48)]
     for k in range(9):
         s = 80 + k * 175
         comp.append(blade_ring(f"c{k}", F, s, 305 + k * 3, 640 - k * 22, 32 + 5 * k, 110 - k * 5, 30, 55, 6, M["ti"] if k < 4 else M["wasp"], phase=k * 0.1))
-    part("compresor", comp, 10, (2000, 0, 0), pivot=O, spin=1)
+    part("compresor", comp, 10, (2000, 0, 0), pivot=O, spin=1, out=9)
     tubes = []
     for i in range(6):
         th = TAU * i / 6 + 0.26
@@ -85,22 +85,22 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
         c = point(F, 2900, 720, th)
         d = point(F, 3100, 640, th)
         tubes.append(tube_path(f"bt{i}", [tuple(a), tuple(b), tuple(c), tuple(d)], 70, M["steel"], bend=120))
-    part("tubos", tubes, 11, (0, 0, 1600))
+    part("tubos", tubes, 11, (0, 0, 1600), out=5)
     comb = [lathe("cmbcase", F, [(1700, 330), (1700, 600), (2350, 600), (2350, 330)], M["hast"], steps=64)]
     for i in range(8):
         th = TAU * i / 8
         Fc = frame(point(F, 1720, 465, th), (-1, 0, 0))
         comb.append(lathe(f"can{i}", Fc, [(0, 0), (0, 95), (600, 95), (600, 0)], M["hot"], steps=24))
-    part("camara", comb, 12, (0, 0, -1500))
+    part("camara", comb, 12, (-500, 0, 0), out=8)
     turb = [lathe("tdisc", F, [(2400, 0), (2400, 330), (2750, 340), (2750, 0)], M["wasp"], steps=48)]
     for k, s in enumerate((2470, 2660)):
         turb.append(blade_ring(f"t{k}", F, s, 335, 560 + k * 30, 68 + 8 * k, 105, -40, -56, 10, M["blade"], phase=k * 0.05))
-    part("turbina", turb, 13, (-1200, 0, 0), pivot=O, spin=1)
-    part("eje", [cylinder_between("shaft", point(F, -200, 0, 0), point(F, 2800, 0, 0), 75, M["steel"], steps=24)], 14, (0, 0, -2200), pivot=O, spin=1)
+    part("turbina", turb, 13, (-1200, 0, 0), pivot=O, spin=1, out=7)
+    part("eje", [cylinder_between("shaft", point(F, -200, 0, 0), point(F, 2800, 0, 0), 75, M["steel"], steps=24)], 14, (0, 0, -2200), pivot=O, spin=1, out=10)
     case = [lathe("case", F, [(-60, 640), (-60, 690), (2950, 690), (2950, 640)], M["inco"], steps=64)]
     for k in range(3):
         case.append(blade_ring(f"igv{k}", F, -40 + k * 700, 310, 640, 30, 90, -15, -8, 7, M["inco"], phase=0.03))
-    part("carcasa", case, 15, (0, 0, 2000))
+    part("carcasa", case, 15, (0, 0, 2000), out=6)
     ab = [lathe("abl", F, [(2950, 640), (2950, 690), (8000, 690), (8000, 640)], M["hast"], steps=64),
           lathe("cone", F, [(2800, 0), (2800, 330), (3900, 150), (4200, 0)], M["inco"], steps=48)]
     for r in (260, 470):
@@ -108,15 +108,15 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
     for i in range(12):
         th = TAU * i / 12
         ab.append(cylinder_between(f"sb{i}", point(F, 3150, 140, th), point(F, 3150, 630, th), 9, M["inco"], steps=8))
-    part("postquemador", ab, 16, (-3000, 0, 0))
-    part("tobera", [lathe("cd", F, [(8000, 640), (8000, 690), (8600, 560), (8800, 600), (8800, 570), (8600, 530)], M["inco"], steps=48)], 17, (-4200, 0, 0))
+    part("postquemador", ab, 16, (-3000, 0, 0), out=4)
+    part("tobera", [lathe("cd", F, [(8000, 640), (8000, 690), (8600, 560), (8800, 600), (8800, 570), (8600, 530)], M["inco"], steps=48)], 17, (-4200, 0, 0), out=3)
     flaps = []
     for i in range(16):
         th = TAU * i / 16
         a0, a1 = point(F, 8900, 760, th), point(F, 8900, 760, th + TAU / 16 * 0.9)
         b0, b1 = point(F, 11400, 610, th), point(F, 11400, 610, th + TAU / 16 * 0.9)
         flaps.append(hull(f"ej{i}", [tuple(a0), tuple(a1), tuple(b0), tuple(b1), tuple(a0 * 1.0 + (a0 - Vector((a0.x, 0, 0))).normalized() * 30), tuple(b0 + (b0 - Vector((b0.x, 0, 0))).normalized() * 30)], M["hot"]))
-    part("eyector", flaps, 18, (-5400, 0, 0))
+    part("eyector", flaps, 18, (-5400, 0, 0), out=2)
     return root, parts
 
 
@@ -184,7 +184,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         prof = [(-2300, 800), (-2300, 840), (-1000, 960), (2000, 980), (6000, 950), (8800, 880), (8800, 840), (2000, 940), (-1000, 920), (-2250, 805)]
         F = frame((FACE_X, side * NAC_Y, NAC_Z), (-1, 0, 0))
         nac = lathe(f"nac{side}", F, prof, M["skin"], steps=64)
-        part(f"gondola.{tagname}", [nac], "airframe", 7, (0, side * 2600, -1400), f"Góndola {tagname} con el labio de la toma")
+        part(f"gondola.{tagname}", [nac], "airframe", 7, (12000, 0, 0), f"Góndola {tagname} con el labio de la toma")
 
     # ── derivas enterizas sobre las góndolas, inclinadas 15° hacia dentro ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
@@ -210,15 +210,15 @@ def build_sr71(M, root, meta, log=lambda msg: None):
     part("tren.morro", nose, "airframe", 8, (3000, 0, 0), "Tren de morro")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         y = side * 1900
-        g = [cylinder_between(f"ms{side}", (-3200, y, NAC_Z - 50), (-3200, y, GROUND + 450), 130, M["steel"], steps=20)]
+        g = [cylinder_between(f"ms{side}", (-3200, y, -480), (-3200, y, GROUND + 450), 130, M["steel"], steps=20)]
         for dy in (-330, 0, 330):
             g += wheel(f"mw{side}{dy}", (-3200, y + dy, GROUND + 450), 450, 260)
-        part(f"tren.{tagname}", g, "airframe", 9, (0, side * 1200, 0), f"Tren principal {tagname}")
+        part(f"tren.{tagname}", g, "airframe", 9, (5500, 0, 0), f"Tren principal {tagname}")
 
     eng = {}
     for side, prefix, detailed in ((-1, "J58", True), (1, "J58.L", False)):
         er, ep = build_j58(prefix, M, root, (FACE_X, side * NAC_Y, NAC_Z), meta, detailed)
-        tag(er, part=prefix, group="engine", order=40, explode=[-1000, -9000, 1200] if detailed else [0, 0, 0], label="J58 derecho" if detailed else "J58 izquierdo", system="engines")
+        tag(er, part=prefix, group="engine", order=40, explode=[-1000, -9000, -1200] if detailed else [0, 0, 0], label="J58 derecho" if detailed else "J58 izquierdo", system="engines", path="v")
         eng[prefix] = (er, ep)
         log(f"Motor {prefix}")
     return parts, eng

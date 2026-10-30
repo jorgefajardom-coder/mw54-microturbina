@@ -176,16 +176,16 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
     # entrada: rampa de compresión con bisagra delantera y labio de la capota (C/SiC)
     ramp = hull("ramp", [(900, -HALF_W + 10, RAMP_Z), (900, HALF_W - 10, RAMP_Z), (-1300, -HALF_W + 10, RAMP_Z), (-1300, HALF_W - 10, RAMP_Z),
                          (900, -HALF_W + 10, RAMP_Z + 50), (900, HALF_W - 10, RAMP_Z + 50), (-1300, -HALF_W + 10, RAMP_Z + 40), (-1300, HALF_W - 10, RAMP_Z + 40)], M["cmc"])
-    part("rampa", [ramp], 1, (1800, 0, 600), pivot=(900, 0, RAMP_Z + 25), control="ramp", hinge=[0.0, 1.0, 0.0], range=[3, 14])
+    part("rampa", [ramp], 1, (1800, 0, 600), out=1, pivot=(900, 0, RAMP_Z + 25), control="ramp", hinge=[0.0, 1.0, 0.0], range=[3, 14])
     lip = hull("lip", [(0, -HALF_W, COWL_Z), (0, HALF_W, COWL_Z), (-900, -HALF_W, COWL_Z - 100), (-900, HALF_W, COWL_Z - 100),
                        (-900, -HALF_W, COWL_Z + 20), (-900, HALF_W, COWL_Z + 20)], M["cmc"])
-    part("labio", [lip], 2, (1500, 0, -700))
+    part("labio", [lip], 2, (1500, 0, -700), out=2)
 
     # compuerta divisora: a baja velocidad cierra el estatorreactor; hacia Mach 3 sube y cierra la turbina
     flap = hull("splitter", [(SPLIT[0], -HALF_W + 15, SPLIT[1] - 30), (SPLIT[0], HALF_W - 15, SPLIT[1] - 30), (SPLIT[0], -HALF_W + 15, SPLIT[1] + 30), (SPLIT[0], HALF_W - 15, SPLIT[1] + 30),
                              (SPLIT[0] + 1150, -HALF_W + 15, SPLIT[1] - 6), (SPLIT[0] + 1150, HALF_W - 15, SPLIT[1] - 6), (SPLIT[0] + 1150, -HALF_W + 15, SPLIT[1] + 6), (SPLIT[0] + 1150, HALF_W - 15, SPLIT[1] + 6)], M["cmc"])
     hinge = cylinder_between("split_pin", (SPLIT[0], -HALF_W + 15, SPLIT[1]), (SPLIT[0], HALF_W - 15, SPLIT[1]), 40, M["inco"], steps=24)
-    part("compuerta", [flap, hinge], 3, (900, 0, 900), pivot=(SPLIT[0], 0, SPLIT[1]), control="splitter", hinge=[0.0, 1.0, 0.0], range=[-62, 31])
+    part("compuerta", [flap, hinge], 3, (900, 0, 900), out=3, pivot=(SPLIT[0], 0, SPLIT[1]), control="splitter", hinge=[0.0, 1.0, 0.0], range=[-62, 31])
 
     # conducto en S de la turbina: de la boca rectangular a la cara redonda del fan (titanio)
     rows = []
@@ -197,7 +197,7 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
         p = 8 * (1 - f) + 2 * f
         rows.append([(x, w * math.copysign(abs(math.cos(t)) ** (2 / p), math.cos(t)), (zt + zb) / 2 + (zt - zb) / 2 * math.copysign(abs(math.sin(t)) ** (2 / p), math.sin(t)))
                      for t in [TAU * j / 48 for j in range(48)]])
-    part("conducto", [loft("sduct", rows, M["dark"], uvscale=4000)], 4, (0, 0, 1600))
+    part("conducto", [loft("sduct", rows, M["dark"], uvscale=4000)], 4, (0, 0, 1600), out=4)
 
     # ── turbofán (clase F100/F110): fan de 3 etapas, compresor de 10, cámara anular, turbinas, postquemador ──
     if detailed:
@@ -205,30 +205,30 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
         fan = [spinner, lathe("fanhub", F, [(0, 0), (0, 268), (900, 300), (900, 0)], M["ti"], steps=48)]
         for k, (s, n) in enumerate(((120, 26), (430, 34), (720, 42))):
             fan.append(blade_ring(f"fan{k}", F, s, 270 + k * 12, 556, n, 230 - k * 30, 28, 62, 9, M["ti"], phase=k * 0.07))
-        part("fan", fan, 10, (2600, 0, 0), pivot=(FAN_X, 0, AX_Z), spin=1)
+        part("fan", fan, 10, (2600, 0, 0), pivot=(FAN_X, 0, AX_Z), spin=1, out=14)
         comp = [lathe("hpc", F, [(980, 0), (980, 240), (2600, 280), (2600, 0)], M["ti_dark"], steps=48)]
         for k in range(10):
             s = 1060 + k * 155
             tip = 440 - k * 13
             comp.append(blade_ring(f"hpc{k}", F, s, 245 + k * 3.5, tip, 40 + 4 * k, 90 - k * 3, 30, 55, 5, M["ti_dark"] if k < 6 else M["inco"], phase=k * 0.11))
-        part("compresor", comp, 11, (1300, 0, 0), pivot=(FAN_X, 0, AX_Z), spin=1)
+        part("compresor", comp, 11, (1300, 0, 0), pivot=(FAN_X, 0, AX_Z), spin=1, out=15)
         comb = [lathe("liner", F, [(2700, 300), (2700, 440), (3500, 440), (3500, 425), (2715, 425), (2715, 315), (3500, 315), (3500, 300)], M["hast"], steps=64)]
         for i in range(20):
             th = TAU * i / 20
             comb.append(cylinder_between(f"nozzle{i}", point(F, 2640, 370, th), point(F, 2760, 370, th), 16, M["inco"], steps=10))
-        part("camara", comb, 12, (0, 0, -1600))
+        part("camara", comb, 12, (-700, 0, 0), out=13)
         turb = [lathe("hptdisc", F, [(3560, 0), (3560, 280), (3700, 280), (3700, 0)], M["inco"], steps=48),
                 lathe("lptdisc", F, [(3850, 0), (3850, 280), (4350, 300), (4350, 0)], M["inco"], steps=48)]
         turb.append(blade_ring("hpt", F, 3630, 285, 425, 66, 100, -40, -55, 10, M["sx"]))
         for k, s in enumerate((3930, 4170)):
             turb.append(blade_ring(f"lpt{k}", F, s, 305, 480 + k * 30, 72 + 6 * k, 110, -35, -58, 9, M["sx"], phase=k * 0.05))
-        part("turbina", turb, 13, (-1700, 0, 0), pivot=(FAN_X, 0, AX_Z), spin=1)
-        part("eje", [cylinder_between("shaft", point(F, -100, 0, 0), point(F, 4450, 0, 0), 70, M["steel"], steps=24)], 14, (0, 0, -2400), pivot=(FAN_X, 0, AX_Z), spin=1)
+        part("turbina", turb, 13, (-1700, 0, 0), pivot=(FAN_X, 0, AX_Z), spin=1, out=12)
+        part("eje", [cylinder_between("shaft", point(F, -100, 0, 0), point(F, 4450, 0, 0), 70, M["steel"], steps=24)], 14, (0, 0, -2400), pivot=(FAN_X, 0, AX_Z), spin=1, out=16)
         case = [lathe("case", F, [(-40, 580), (-40, 612), (4600, 612), (4600, 580)], M["inco"], steps=64),
                 lathe("splitcase", F, [(950, 452), (950, 462), (3550, 462), (3550, 452)], M["ti"], steps=64)]
         for k, s in enumerate((280, 575, 860)):
             case.append(blade_ring(f"ogv{k}", F, s, 300, 578, 44, 120, -20, -10, 7, M["ti"], phase=0.04))
-        part("carcasa", case, 15, (0, 0, 2200))
+        part("carcasa", case, 15, (0, 0, 2200), out=9)
         ab = [lathe("abliner", F, [(4600, 545), (4600, 600), (8500, 600), (8500, 545)], M["inco"], steps=64),
               lathe("tailcone", F, [(4400, 0), (4400, 290), (5600, 120), (5900, 0)], M["inco"], steps=48)]
         for r in (230, 400):
@@ -236,35 +236,35 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
         for i in range(12):
             th = TAU * i / 12
             ab.append(cylinder_between(f"spray{i}", point(F, 4900, 130, th), point(F, 4900, 540, th), 9, M["inco"], steps=8))
-        part("postquemador", ab, 16, (-3600, 0, 0))
+        part("postquemador", ab, 16, (-3600, 0, 0), out=11)
         petals = lathe("cdnozzle", F, [(8500, 545), (8500, 600), (9200, 470), (9500, 520), (9500, 490), (9200, 440)], M["inco"], steps=48)
-        part("tobera_turbina", [petals], 17, (-4800, 0, 0))
+        part("tobera_turbina", [petals], 17, (-4800, 0, 0), out=10)
     else:
         core = [lathe("core", F, [(-560, 0), (0, 262), (0, 612), (9300, 560), (9300, 0)], M["inco"], steps=48)]
         part("turbofan", core, 10, (0, 0, 0))
 
     # ── estatorreactor de modo dual: aislador, inyectores con cavidad, cámara refrigerada con combustible ──
     iso = rect_duct("iso", SPLIT[0], -5200, -600, 600, COWL_Z, RAM_TOP, 40, M["inco"])
-    part("aislador", iso, 20, (0, 0, -1300))
+    part("aislador", iso, 20, (0, 0, -1300), out=8)
     inj = []
     for y in (-400, 0, 400):
         inj.append(hull(f"strut{y}", [(-5300, y, COWL_Z), (-5300, y, RAM_TOP), (-5800, y - 45, COWL_Z), (-5800, y + 45, COWL_Z), (-5800, y - 45, RAM_TOP), (-5800, y + 45, RAM_TOP)], M["nb"]))
         for z in (-1880, -1720, -1580):
             inj.append(cylinder_between(f"port{y}{z}", (-5800, y, z), (-5815, y, z), 14, M["dark"], steps=8))
     inj.append(box("cavity", (-6200, 0, COWL_Z - 60), (700, 1180, 40), M["nb"]))
-    part("inyectores", inj, 21, (0, 0, -2000))
+    part("inyectores", inj, 21, (0, 0, -2000), out=7)
     scram = rect_duct("scram", -5200, THROAT_X + 1300, -600, 600, COWL_Z, RAM_TOP, 50, M["cmc"], y0b=-700, y1b=700, z0b=COWL_Z - 60)
     for k in range(13):
         y = -620 + k * 103
         scram.append(box(f"rib{k}", ((-5200 + THROAT_X + 1300) / 2, y, COWL_Z - 70), (6200, 20, 30), M["inco"]))
-    part("camara_scram", scram, 22, (0, 0, -2700))
+    part("camara_scram", scram, 22, (0, 0, -2700), out=6)
 
     # tobera de rampa única (SERN), compartida: rampa superior larga y faldón inferior corto, de carbono-carbono
     ramp_up = hull("sern_up", [(THROAT_X, -HALF_W, RAMP_Z), (THROAT_X, HALF_W, RAMP_Z), (NOZZLE_END, -HALF_W, RAMP_Z + 250), (NOZZLE_END, HALF_W, RAMP_Z + 250),
                                (THROAT_X, -HALF_W, RAMP_Z + 60), (THROAT_X, HALF_W, RAMP_Z + 60), (NOZZLE_END, -HALF_W, RAMP_Z + 300), (NOZZLE_END, HALF_W, RAMP_Z + 300)], M["cc"])
     flap_lo = hull("sern_lo", [(THROAT_X + 1300, -HALF_W, COWL_Z - 60), (THROAT_X + 1300, HALF_W, COWL_Z - 60), (THROAT_X - 2000, -HALF_W, COWL_Z + 380), (THROAT_X - 2000, HALF_W, COWL_Z + 380),
                                (THROAT_X + 1300, -HALF_W, COWL_Z - 110), (THROAT_X + 1300, HALF_W, COWL_Z - 110), (THROAT_X - 2000, -HALF_W, COWL_Z + 330), (THROAT_X - 2000, HALF_W, COWL_Z + 330)], M["cc"])
-    part("tobera", [ramp_up, flap_lo], 23, (-3000, 0, 0))
+    part("tobera", [ramp_up, flap_lo], 23, (-3000, 0, 0), out=5)
     return root, parts
 
 
@@ -358,7 +358,7 @@ def build_sr72(M, root, meta, log=lambda msg: None):
     part("tren.morro", nose, "airframe", 8, (3000, 0, 0), "Tren de morro")
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         y = side * ENGINE_Y
-        g = [cylinder_between(f"mstrut{side}", (-1500, y, ENGINE_Z + (COWL_Z - 80) * S + 40), (-1500, y, GROUND + 420), 120, M["steel"], steps=24)]
+        g = [cylinder_between(f"mstrut{side}", (-1500, y, ENGINE_Z + (COWL_Z - 80) * S - 15), (-1500, y, GROUND + 420), 120, M["steel"], steps=24)]
         for dy in (-260, 260):
             g += wheel(f"mw{side}{dy}", (-1500, y + dy, GROUND + 420), 420, 300)
         part(f"tren.{tagname}", g, "airframe", 9, (0, side * 2600, 0), f"Tren principal {tagname}")

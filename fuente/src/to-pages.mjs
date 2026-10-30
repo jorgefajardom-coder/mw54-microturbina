@@ -12,7 +12,7 @@ const OUT = resolve(process.argv[2] ?? join(ROOT, "..", "mw54-microturbina"));
 mkdirSync(join(OUT, "anatomia"), { recursive: true });
 for (const d of ["sr72", "f22", "f14", "sr71", "jet"]) mkdirSync(join(OUT, d), { recursive: true });
 copyFileSync(join(ROOT, "src", "model.mjs"), join(ROOT, "web", "model.js"));
-for (const f of ["app.js", "core.js", "desktop.js", "mobile.js", "device.js", "flight.js", "controls.js", "floor.js", "base.css", "desktop.css", "mobile.css", "model.js", "mw54.glb", "hangar.hdr"]) copyFileSync(join(ROOT, "web", f), join(OUT, f));
+for (const f of ["app.js", "core.js", "desktop.js", "mobile.js", "device.js", "flight.js", "controls.js", "floor.js", "look.js", "flame.js", "base.css", "desktop.css", "mobile.css", "model.js", "mw54.glb", "hangar.hdr"]) copyFileSync(join(ROOT, "web", f), join(OUT, f));
 const head = seoHead({
   title: `Wren MW54 en un entrenador a reacción · visor 3D interactivo · ${AUTHOR}`,
   description: `Visor 3D interactivo por ${AUTHOR}: la microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador tipo Hawk. Montaje y despiece, tren retráctil con compuertas, mandos de vuelo, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo.`,

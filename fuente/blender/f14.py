@@ -65,28 +65,28 @@ def build_f110(prefix, M, parent, location, meta, detailed=True):
            lathe("fhub", F, [(0, 0), (0, 235), (780, 275), (780, 0)], M["ti"], steps=48)]
     for k, (s, n) in enumerate(((110, 24), (390, 32), (660, 40))):
         fan.append(blade_ring(f"fan{k}", F, s, 240 + k * 14, 500 - k * 12, n, 190 - k * 25, 30, 62, 8, M["ti"], phase=k * 0.07))
-    part("fan", fan, 10, (2400, 0, 0), pivot=O, spin=1)
+    part("fan", fan, 10, (2400, 0, 0), pivot=O, spin=1, out=7)
     hpc = [lathe("drum", F, [(900, 0), (900, 240), (2100, 270), (2100, 0)], M["ti_dark"], steps=48)]
     for k in range(9):
         hpc.append(blade_ring(f"hpc{k}", F, 950 + k * 125, 245 + k * 3, 395 - k * 10, 40 + 5 * k, 80 - k * 3, 30, 55, 5, M["ti_dark"] if k < 5 else M["inco"], phase=k * 0.11))
-    part("compresor", hpc, 11, (1300, 0, 0), pivot=O, spin=1)
+    part("compresor", hpc, 11, (1300, 0, 0), pivot=O, spin=1, out=8)
     comb = [lathe("liner", F, [(2180, 285), (2180, 400), (2650, 400), (2650, 388), (2192, 388), (2192, 297), (2650, 297), (2650, 285)], M["hast"], steps=64)]
     for i in range(20):
         th = TAU * i / 20
         comb.append(cylinder_between(f"fn{i}", point(F, 2130, 342, th), point(F, 2220, 342, th), 13, M["inco"], steps=10))
-    part("camara", comb, 12, (0, 0, -1300))
+    part("camara", comb, 12, (-600, 0, 0), out=6)
     part("turbina_alta", [lathe("hptd", F, [(2700, 0), (2700, 270), (2820, 270), (2820, 0)], M["inco"], steps=48), blade_ring("hpt", F, 2760, 275, 410, 66, 90, -40, -55, 9, M["sx"])],
-         13, (-900, 0, 0), pivot=O, spin=1)
+         13, (-900, 0, 0), pivot=O, spin=1, out=5)
     lpt = [lathe("lptd", F, [(2920, 0), (2920, 280), (3300, 300), (3300, 0)], M["inco"], steps=48)]
     for k, s in enumerate((2990, 3200)):
         lpt.append(blade_ring(f"lpt{k}", F, s, 290, 460 + 20 * k, 70 + 6 * k, 100, -35, -56, 9, M["sx"], phase=k * 0.05))
-    part("turbina_baja", lpt, 14, (-1500, 0, 0), pivot=O, spin=1)
-    part("eje", [cylinder_between("shaft", point(F, -100, 0, 0), point(F, 3350, 0, 0), 60, M["steel"], steps=24)], 15, (0, 0, -2000), pivot=O, spin=1)
+    part("turbina_baja", lpt, 14, (-1500, 0, 0), pivot=O, spin=1, out=4)
+    part("eje", [cylinder_between("shaft", point(F, -100, 0, 0), point(F, 3350, 0, 0), 60, M["steel"], steps=24)], 15, (0, 0, -2000), pivot=O, spin=1, out=9)
     case = [lathe("case", F, [(-40, 545), (-40, 585), (3450, 585), (3450, 545)], M["inco"], steps=64),
             lathe("split", F, [(850, 405), (850, 415), (2700, 415), (2700, 405)], M["ti"], steps=64)]
     for k, s in enumerate((250, 525)):
         case.append(blade_ring(f"vane{k}", F, s, 270, 540, 40, 110, -20, -10, 7, M["ti"], phase=0.04))
-    part("carcasa", case, 16, (0, 0, 1700))
+    part("carcasa", case, 16, (0, 0, 1700), out=3)
     ab = [lathe("abl", F, [(3450, 505), (3450, 560), (5300, 560), (5300, 505)], M["inco"], steps=64),
           lathe("cone", F, [(3350, 0), (3350, 280), (4100, 110), (4300, 0)], M["inco"], steps=48)]
     for r in (210, 380):
@@ -94,7 +94,7 @@ def build_f110(prefix, M, parent, location, meta, detailed=True):
     for i in range(12):
         th = TAU * i / 12
         ab.append(cylinder_between(f"sb{i}", point(F, 3520, 120, th), point(F, 3520, 500, th), 8, M["inco"], steps=8))
-    part("postquemador", ab, 17, (-2600, 0, 0))
+    part("postquemador", ab, 17, (-2600, 0, 0), out=2)
     # tobera de pétalos: la garganta se cierra en seco y se abre con el postquemador (la controla el núcleo)
     petals = []
     for i in range(18):
@@ -103,7 +103,7 @@ def build_f110(prefix, M, parent, location, meta, detailed=True):
         b0, b1 = point(F, 5900, 470, th), point(F, 5900, 470, th + TAU / 18 * 0.92)
         n = Vector((0, math.cos(th), math.sin(th))) * 18
         petals.append(hull(f"pt{i}", [tuple(a0), tuple(a1), tuple(b0), tuple(b1), tuple(a0 + n), tuple(a1 + n), tuple(b0 + n), tuple(b1 + n)], M["petal"]))
-    part("tobera", petals, 18, (-3600, 0, 0))
+    part("tobera", petals, 18, (-3600, 0, 0), out=1)
     return root, parts
 
 
@@ -169,7 +169,7 @@ def build_f14(M, root, meta, log=lambda msg: None):
             x = 2300 + (FAN_X - 2300) * f
             w, h, p = 520 * (1 - f) + 500 * f, 600 * (1 - f) + 500 * f, 6 * (1 - f) + 2 * f
             duct.append([(x, side * NAC_Y + w * math.copysign(abs(math.cos(t)) ** (2 / p), math.cos(t)), AX_Z + h * math.copysign(abs(math.sin(t)) ** (2 / p), math.sin(t))) for t in [TAU * j / 40 for j in range(40)]])
-        part(f"gondola.{tagname}", [loft(f"nac{side}", rows, M["skin"], uvscale=4000), loft(f"duct{side}", duct, M["dark"], uvscale=4000)], "airframe", 7, (0, side * 2600, -1300), f"Góndola {tagname} con su toma")
+        part(f"gondola.{tagname}", [loft(f"nac{side}", rows, M["skin"], uvscale=4000), loft(f"duct{side}", duct, M["dark"], uvscale=4000)], "airframe", 7, (0, side * 2600, -1000), f"Góndola {tagname} con su toma", path="v")
         ramp = hull(f"ramp{side}", [(2300, side * NAC_Y - 480, AX_Z + 560), (2300, side * NAC_Y + 480, AX_Z + 560), (700, side * NAC_Y - 480, AX_Z + 560), (700, side * NAC_Y + 480, AX_Z + 560),
                                     (2300, side * NAC_Y - 480, AX_Z + 610), (2300, side * NAC_Y + 480, AX_Z + 610), (700, side * NAC_Y - 480, AX_Z + 600), (700, side * NAC_Y + 480, AX_Z + 600)], M["skin"])
         ob = part(f"rampa.{tagname}", [ramp], "airframe", 8, (1500, side * 1200, 900), f"Rampas de la toma {tagname}", control="ramp", hinge=[0.0, 1.0, 0.0], range=[0, 18])
@@ -233,7 +233,7 @@ def build_f14(M, root, meta, log=lambda msg: None):
     eng = {}
     for side, prefix, detailed in ((-1, "F110", True), (1, "F110.L", False)):
         er, ep = build_f110(prefix, M, root, (FAN_X, side * NAC_Y, AX_Z), meta, detailed)
-        tag(er, part=prefix, group="engine", order=40, explode=[-1500, -9000, 800] if detailed else [0, 0, 0], label="F110 derecho" if detailed else "F110 izquierdo", system="engines")
+        tag(er, part=prefix, group="engine", order=40, explode=[-1500, -9000, -900] if detailed else [0, 0, 0], label="F110 derecho" if detailed else "F110 izquierdo", system="engines", path="v")
         eng[prefix] = (er, ep)
         log(f"Motor {prefix}")
     return parts, eng

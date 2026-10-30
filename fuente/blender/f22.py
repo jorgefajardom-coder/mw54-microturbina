@@ -80,26 +80,26 @@ def build_f119(prefix, M, parent, location, meta, side, detailed=True):
            lathe("fhub", F, [(0, 0), (0, 230), (760, 270), (760, 0)], M["ti"], steps=48)]
     for k, (s, n) in enumerate(((100, 22), (380, 30), (640, 38))):
         fan.append(blade_ring(f"fan{k}", F, s, 235 + k * 14, 520 - k * 10, n, 200 - k * 30, 30, 62, 8, M["ti"], phase=k * 0.07))
-    part("fan", fan, 10, (2400, 0, 0), pivot=O, spin=1)
+    part("fan", fan, 10, (2400, 0, 0), pivot=O, spin=1, out=9)
     hpc = [lathe("drum", F, [(880, 0), (880, 240), (1680, 270), (1680, 0)], M["ti_dark"], steps=48)]
     for k in range(6):
         hpc.append(blade_ring(f"hpc{k}", F, 940 + k * 135, 245 + k * 4, 400 - k * 15, 40 + 6 * k, 85 - k * 4, 30, 55, 5, M["ti_dark"] if k < 4 else M["inco"], phase=k * 0.11))
-    part("compresor", hpc, 11, (1200, 0, 0), pivot=O, spin=1)
+    part("compresor", hpc, 11, (1200, 0, 0), pivot=O, spin=1, out=10)
     comb = [lathe("liner", F, [(1750, 290), (1750, 410), (2250, 410), (2250, 398), (1762, 398), (1762, 302), (2250, 302), (2250, 290)], M["hast"], steps=64)]
     for i in range(20):
         th = TAU * i / 20
         comb.append(cylinder_between(f"fn{i}", point(F, 1700, 350, th), point(F, 1790, 350, th), 13, M["inco"], steps=10))
-    part("camara", comb, 12, (0, 0, -1300))
+    part("camara", comb, 12, (-650, 0, 0), out=8)
     part("turbina_alta", [lathe("hptd", F, [(2300, 0), (2300, 270), (2420, 270), (2420, 0)], M["inco"], steps=48), blade_ring("hpt", F, 2360, 275, 415, 64, 90, -40, -55, 9, M["sx"])],
-         13, (-900, 0, 0), pivot=O, spin=1)
+         13, (-900, 0, 0), pivot=O, spin=1, out=7)
     part("turbina_baja", [lathe("lptd", F, [(2540, 0), (2540, 280), (2680, 290), (2680, 0)], M["inco"], steps=48), blade_ring("lpt", F, 2610, 295, 470, 70, 100, 40, 58, 9, M["sx"])],
-         14, (-1500, 0, 0), pivot=O, spin=-1)
-    part("eje", [cylinder_between("shaft", point(F, -100, 0, 0), point(F, 2700, 0, 0), 60, M["steel"], steps=24)], 15, (0, 0, -2000), pivot=O, spin=1)
+         14, (-1500, 0, 0), pivot=O, spin=-1, out=6)
+    part("eje", [cylinder_between("shaft", point(F, -100, 0, 0), point(F, 2700, 0, 0), 60, M["steel"], steps=24)], 15, (0, 0, -2000), pivot=O, spin=1, out=11)
     case = [lathe("case", F, [(-40, 545), (-40, 585), (2900, 585), (2900, 545)], M["burn"], steps=64),
             lathe("split", F, [(820, 405), (820, 415), (2300, 415), (2300, 405)], M["ti"], steps=64)]
     for k, s in enumerate((240, 510)):
         case.append(blade_ring(f"vane{k}", F, s, 270, 540, 40, 110, -20, -10, 7, M["ti"], phase=0.04))
-    part("carcasa", case, 16, (0, 0, 1700))
+    part("carcasa", case, 16, (0, 0, 1700), out=5)
     ab = [lathe("abl", F, [(2900, 505), (2900, 560), (4300, 560), (4300, 505)], M["inco"], steps=64),
           lathe("cone", F, [(2750, 0), (2750, 270), (3500, 110), (3700, 0)], M["inco"], steps=48)]
     for r in (210, 380):
@@ -107,7 +107,7 @@ def build_f119(prefix, M, parent, location, meta, side, detailed=True):
     for i in range(12):
         th = TAU * i / 12
         ab.append(cylinder_between(f"sb{i}", point(F, 2920, 120, th), point(F, 2920, 500, th), 8, M["inco"], steps=8))
-    part("postquemador", ab, 17, (-2600, 0, 0))
+    part("postquemador", ab, 17, (-2600, 0, 0), out=4)
     # transición de redondo a rectangular y paredes laterales de la tobera 2D
     rows = []
     for k in range(7):
@@ -119,11 +119,11 @@ def build_f119(prefix, M, parent, location, meta, side, detailed=True):
     walls = [loft("trans", rows, M["cmc"], uvscale=4000)]
     for sy in (1, -1):
         walls.append(box(f"wall{sy}", (-4930, sy * 575, 0), (460, 30, 760), M["cmc"]))
-    part("tobera", walls, 18, (-3400, 0, 0))
+    part("tobera", walls, 18, (-3400, 0, 0), out=3)
     for sz, name in ((1, "superior"), (-1, "inferior")):
         flap = hull(f"flap{sz}", [(-4700, -560, sz * 360), (-4700, 560, sz * 360), (-5160, -560, sz * 300), (-5160, 560, sz * 300),
                                   (-4700, -560, sz * 400), (-4700, 560, sz * 400), (-5160, -560, sz * 330), (-5160, 560, sz * 330)], M["cmc"])
-        ob = part(f"aleta.{name}", [flap], 19, (-3900, 0, sz * 600), pivot=(-4700, 0, sz * 380), control="vector", hinge=[0.0, 1.0, 0.0], range=[-20, 20])
+        ob = part(f"aleta.{name}", [flap], 19, (-3900, 0, sz * 600), pivot=(-4700, 0, sz * 380), out=1 if sz > 0 else 2, control="vector", hinge=[0.0, 1.0, 0.0], range=[-20, 20])
     return root, parts
 
 
@@ -249,7 +249,7 @@ def build_f22(M, root, meta, log=lambda msg: None):
     eng = {}
     for side, prefix, detailed in ((-1, "F119", True), (1, "F119.L", False)):
         er, ep = build_f119(prefix, M, root, (FAN_X, side * ENG_Y, AX_Z), meta, side, detailed)
-        tag(er, part=prefix, group="engine", order=40, explode=[-1500, -8000, 600] if detailed else [0, 0, 0], label="F119 derecho" if detailed else "F119 izquierdo", system="engines")
+        tag(er, part=prefix, group="engine", order=40, explode=[-1500, -8000, -1200] if detailed else [0, 0, 0], label="F119 derecho" if detailed else "F119 izquierdo", system="engines", path="v")
         eng[prefix] = (er, ep)
         log(f"Motor {prefix}")
     return parts, eng

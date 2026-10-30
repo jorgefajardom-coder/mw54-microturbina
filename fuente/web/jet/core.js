@@ -9,6 +9,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { createFloor } from "../floor.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps } from "../look.js";
+import { createFlame } from "../flame.js";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -67,7 +69,9 @@ export async function start(profile, cfg) {
   Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 160 });
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.02;
-  scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.5));
+  scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.4));
+  studioLights(scene, cfg.view.max / 4);
+  const composer = createComposer(renderer, scene, camera, profile, { aoRadius: cfg.view.max / 140 });
   scene.add(createFloor(renderer, { ...cfg.floor, res: profile.textureSize }));
 
   // ── modelo ──
@@ -97,6 +101,17 @@ export async function start(profile, cfg) {
       parts.push(entry);
     }
   });
+  // cada pieza del motor con su propio material (para que brille sola cuando se calienta) y los metales con microdetalle
+  const isEngineGroup = (d) => d.group === cfg.engine || (cfg.engineAlt && d.group === cfg.engineAlt);
+  const clones = new Map();
+  for (const e of parts) {
+    for (const m of e.materials) {
+      if (isEngineGroup(e.data)) m.material = m.material.clone();
+      else if (m.material.metalness > 0.5) m.material = clones.get(m.material) ?? clones.set(m.material, m.material.clone()).get(m.material);
+      if (m.material.metalness > 0.5) enrichMetal(m.material);
+      allMaterials.add(m.material);
+    }
+  }
   for (const e of parts) for (const m of e.materials) m.userData.realMaterial = m.material;
   const spinners = engineParts.filter((e) => e.data.spin);
   const controlParts = parts.filter((e) => e.data.control).map((e) => ({
@@ -129,48 +144,46 @@ export async function start(profile, cfg) {
     for (const e of parts) e.t = share;
     applyPose(0);
   }
+  const UP = new THREE.Vector3(0, 1, 0);
   function applyPose(time) {
-    for (const e of parts) {
-      const k = 1 - EASE(1 - e.t);
-      e.obj.position.copy(e.home).addScaledVector(e.offset, k);
-      const wob = k * 0.35 * Math.sin(time * 2 + e.data.order);
-      e.obj.quaternion.copy(e.quat).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(wob * 0.08, wob * 0.12, wob * 0.05)));
-    }
+    for (const e of parts) organicPose(e, time, { up: UP, dir: e.dir ?? 1 });
   }
-  function assemble() {
-    timeline = null;
-    setExploded(1);
-    exploded = false;
-    const frame = parts.filter((e) => e.data.group === "airframe" && !late(e)).sort((a, b) => a.data.order - b.data.order);
-    const eng = engineParts.slice().sort((a, b) => a.data.order - b.data.order);
-    for (const e of parts) if (!isEngine(e) && e.data.group !== "airframe" && e !== engineRoot) e.t = 0;
-    const steps = [];
-    let at = 0;
-    for (const e of frame) { steps.push({ e, at, dur: 1.1 }); at += 0.3; }
-    at += 0.3;
-    for (const e of eng) { steps.push({ e, at, dur: 0.9 }); at += 0.32; }
-    at += 0.3;
-    if (engineRoot) { steps.push({ e: engineRoot, at, dur: 1.6, say: cfg.say.install }); at += 1.4; engineRoot.t = 1; }
-    for (const e of parts.filter(late)) { steps.push({ e, at, dur: 1.1 }); at += 0.45; }
-    timeline = { steps, start: performance.now() / 1000, total: at + 1.2 };
+  // desarme y montaje pieza por pieza, por caminos libres (look.js); el montaje es el desarme al revés
+  const order = disassemblyOrder(parts, {
+    isGear: (e) => e.data.part.startsWith("tren"),
+    isLate: (e) => late(e),
+    root: engineRoot,
+    isEngine: (e) => e.data.group === cfg.engine,
+  });
+  const labelOf = (e) => infoOf(e)?.name ?? e.data.label;
+  function sequence(target, speed = 1) {
+    const steps = sequenceSteps(order, target, { speed, label: labelOf });
+    for (const st of steps) st.from = st.e.t;
+    timeline = { steps, start: performance.now() / 1000, total: Math.max(...steps.map((x) => x.at + x.dur)) + 0.1 };
+    exploded = !!target;
     $("steps").style.display = "block";
   }
+  function assemble(speed = 1) {
+    setExploded(1);
+    exploded = false;
+    for (const e of parts) if (e.offset.length() < 1e-6) e.t = 0;
+    sequence(0, speed);
+  }
   function explode() {
-    const target = parts.some((e) => e.t < 0.5) ? 1 : 0;
-    exploded = !!target;
-    const start = performance.now() / 1000;
-    timeline = { steps: parts.map((e, i) => ({ e, at: target ? (isEngine(e) ? 0.3 : 0) + (i % 7) * 0.04 : 0, dur: 1.0, from: e.t, to: target })), start, total: 1.8, reverse: true };
+    // si se pulsa a mitad de camino, la secuencia se da la vuelta desde donde está
+    sequence(exploded ? 0 : 1);
   }
   function stepTimeline(now) {
     if (!timeline) return;
     const t = now - timeline.start;
     let current = null;
-    for (const s of timeline.steps) {
-      const k = Math.min(1, Math.max(0, (t - s.at) / s.dur));
-      if (timeline.reverse) s.e.t = s.from + (s.to - s.from) * EASE(k);
-      else { s.e.t = 1 - k; if (k > 0 && k < 1) current = s; }
+    for (const st of timeline.steps) {
+      const k = Math.min(1, Math.max(0, (t - st.at) / st.dur));
+      st.e.t = st.from + (st.to - st.from) * k;
+      st.e.dir = st.to > st.from ? 1 : -1;
+      if (k > 0 && k < 1) current = st;
     }
-    if (current) $("steps").textContent = current.say || `Montando · ${infoOf(current.e)?.name ?? current.e.data.label}`;
+    if (current) $("steps").textContent = current.say;
     if (t > timeline.total) { timeline = null; $("steps").style.display = "none"; }
   }
   const settle = () => { if (parts.some((e) => e.t > 0.02)) { timeline = null; setExploded(0); } };
@@ -191,46 +204,9 @@ export async function start(profile, cfg) {
     for (const c of controlParts) if (c.slide && c.value) c.e.obj.position.addScaledVector(c.slide, c.value);
   }
 
-  // ── chorro: un sombreador por tobera; la config da su posición, tamaño y forma ──
-  const plumeMat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uAb: { value: 0 }, uRam: { value: 0 }, uScram: { value: 0 }, uTeb: { value: 0 } },
-    vertexShader: `varying vec3 vPos; varying vec3 vN; varying vec3 vView;
-      void main(){ vPos = position; vec4 w = modelMatrix * vec4(position,1.); vN = normalize(mat3(modelMatrix) * normal); vView = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: `uniform float uTime; uniform float uHeat; uniform float uAb; uniform float uRam; uniform float uScram; uniform float uTeb; varying vec3 vPos; varying vec3 vN; varying vec3 vView;
-      float h(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719)))*43758.5453); }
-      float n3(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.-2.*f);
-        return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z); }
-      void main(){
-        float L = clamp(-vPos.x, 0., 1.);
-        float rim = pow(abs(dot(vN, vView)), 1.4);
-        float turb = n3(vec3(vPos.x*30. + uTime*12., vPos.y*3., vPos.z*3.));
-        float diamonds = .5 + .5*sin(L*48. - uTime*3.);
-        float reach = mix(.45, 1., max(uRam, uScram));
-        float fade = 1. - smoothstep(reach*.55, reach, L);
-        vec3 ab = mix(vec3(1., .55, .2), vec3(.6,.35,.3), L);
-        vec3 ram = mix(vec3(.62, .55, 1.), vec3(.35,.3,.7), L);
-        vec3 scr = mix(vec3(.8, .9, 1.), vec3(.4,.5,.8), L);
-        vec3 teb = vec3(.35, 1., .45);
-        vec3 col = ab*uAb + ram*uRam*(1.-uScram) + scr*uScram + vec3(.5,.45,.4)*(1.-uAb)*(1.-uRam)*.4;
-        col = mix(col, teb, uTeb);
-        float k = uAb*(.7+.3*diamonds) + uRam*(1.-uScram)*.8 + uScram*.35 + (1.-uAb)*(1.-uRam)*.35 + uTeb;
-        float a = rim * (exp(-L*3.) + .4*smoothstep(.3,.9,turb)*(1.-L)) * fade * uHeat * k;
-        gl_FragColor = vec4(col * a, a);
-      }`,
-  });
-  const plumes = cfg.plumes.map((p) => {
-    // geometría de longitud 1 hacia −x; la escala da largo, alto y ancho reales
-    const g = new THREE.CylinderGeometry(1, p.tail ?? 0.6, 1, 48, 32, true);
-    g.rotateZ(Math.PI / 2);
-    g.translate(-0.5, 0, 0);
-    const m = new THREE.Mesh(g, plumeMat);
-    m.position.copy(fromBlender(p.at).multiplyScalar(MM));
-    m.scale.set(p.length, p.r * (p.h ?? 1), p.r * (p.w ?? 1));
-    m.visible = false;
-    scene.add(m);
-    return m;
-  });
+  // ── llama: volumen con el gradiente de las fotos reales de este motor y diamantes de choque (flame.js) ──
+  const flame = createFlame(scene, cfg.flame, { steps: profile.tier === "baja" ? 20 : profile.tier === "media" ? 28 : 40 });
+  for (const p of cfg.plumes) flame.add(scene, fromBlender(p.at).multiplyScalar(MM), p);
 
   // ── corte por el plano medio del motor, con el aire que lo recorre coloreado por su temperatura ──
   const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), cfg.cut.z);
@@ -410,7 +386,7 @@ export async function start(profile, cfg) {
     const fps = fpsN / fpsT;
     fpsT = fpsN = 0;
     const next = fps < 38 ? Math.max(profile.minPixelRatio, ratio * 0.85) : fps > 56 ? Math.min(profile.pixelRatio, ratio * 1.1) : ratio;
-    if (Math.abs(next - ratio) > 0.02) { ratio = next; renderer.setPixelRatio(ratio); renderer.setSize(...profile.size()); }
+    if (Math.abs(next - ratio) > 0.02) { ratio = next; renderer.setPixelRatio(ratio); renderer.setSize(...profile.size()); composer.setPixelRatio?.(ratio); composer.setSize(...profile.size()); }
     profile.onStats?.({ fps, ratio });
   }
   function frame() {
@@ -436,15 +412,10 @@ export async function start(profile, cfg) {
     motor.angle += dt * motor.spin * (8 + 30 * motor.thr) * (o.turbine ?? 1);
     for (const e of spinners) e.obj.rotation.x = motor.angle * (e.data.spin ?? 1);
     const assembled = parts.every((e) => e.t < 0.02);
-    for (const p of plumes) p.visible = motor.heat > 0.02 && assembled;
-    const u = plumeMat.uniforms;
-    u.uTime.value = now;
-    u.uHeat.value = motor.heat * (0.3 + 0.7 * motor.thr);
-    u.uAb.value = o.ab ?? 0;
-    u.uRam.value = (o.ram ?? 0) * motor.thr;
-    u.uScram.value = o.scram ?? 0;
-    u.uTeb.value = Math.max(0, 1 - motor.heat * 3) * (motor.on ? 1 : 0) * (cfg.teb ? 1 : 0);
+    flame.update({ ...cfg.flame.state(o, motor), time: now, visible: motor.heat > 0.02 && assembled });
     stepFlow(dt);
+    // el metal que pasa de ~520 °C empieza a brillar con su color de cuerpo negro
+    if (!heatOn) for (const e of engineParts) { if (e === hovered) continue; const g = blackbody(e.T); for (const m of e.materials) m.material.emissive?.copy(g); }
     if (heatOn && (heatTick += dt) > 0.2) { heatTick = 0; paintHeat(); }
     if (hovered && heatTick % 0.2 < dt) showCard(hovered);
     const md = modeOf(motor.M);
@@ -454,7 +425,7 @@ export async function start(profile, cfg) {
     profile.onFrame?.(motor);
     stepCamera(now);
     controls.update();
-    renderer.render(scene, camera);
+    composer.render();
     adapt(dt);
     requestAnimationFrame(frame);
   }
@@ -463,10 +434,11 @@ export async function start(profile, cfg) {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    composer.setSize(w, h);
     if (!camTween && !cutOn) flyCamera("home");
   }
   setExploded(0);
-  if (!still) setTimeout(() => { assemble(); notify(); }, 600);
+  if (!still) setTimeout(() => { assemble(2.2); notify(); }, 600);
   frame();
   return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, maxMach: cfg.maxMach };
 }

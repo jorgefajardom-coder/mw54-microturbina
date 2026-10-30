@@ -2,6 +2,8 @@
 import * as sim from "./sim.js";
 import { fmt } from "../jet/core.js";
 
+const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
 export default {
   glb: "./f22.glb",
   parts: "./parts.json",
@@ -37,6 +39,18 @@ export default {
     rudder: (o, s, c) => s.yaw * c.range[1],
     // empuje vectorial: las dos aletas giran juntas con el cabeceo
     vector: (o, s, c) => s.pitch * c.range[1],
+  },
+  // llama del F119: gradiente tomado de fotos nocturnas del F-22 con postquemador (núcleo blanco que pasa a amarillo y a
+  // rosa pálido); diamantes con la separación de la tobera bidimensional
+  flame: {
+    modes: {
+    dry: { core: [[0, [0.75, 0.72, 0.85], 0.6], [0.35, [0.55, 0.5, 0.7], 0.2], [1, [0.4, 0.4, 0.5], 0]], edge: [[0, [0.5, 0.5, 0.75], 0.25], [1, [0.3, 0.3, 0.4], 0]] },
+      ab: { core: [[0, [1, 0.97, 0.92], 5], [0.12, [1, 0.93, 0.82], 4], [0.35, [1, 0.8, 0.55], 2.2], [0.6, [0.98, 0.62, 0.42], 1], [0.85, [0.55, 0.42, 0.3], 0.3], [1, [0.4, 0.3, 0.25], 0]], edge: [[0, [1, 0.7, 0.8], 1.2], [0.4, [0.95, 0.55, 0.55], 0.7], [1, [0.5, 0.3, 0.3], 0]] },
+    },
+    brightness: 0.55,
+    diamonds: { spacing: 0.085, count: 6, color: [1, 0.9, 0.7] },
+    light: { intensity: 40, distance: 22 },
+    state: (o, motor) => ({ w: { dry: 1 - o.ab, ab: o.ab }, level: motor.heat * (0.25 + 0.75 * motor.thr), optimal: o.ab * sm(0.88, 1, motor.thr), reach: 0.55 + 0.45 * o.ab }),
   },
   plumes: [620, -620].map((y) => ({ at: [-8680, y, -150], length: 9, r: 0.55, h: 0.7, w: 1.05, tail: 0.75 })),
   cut: { z: 0.62, pos: [-4.5, -1.3, 16], target: [-4.8, -0.2, 0.62] },
