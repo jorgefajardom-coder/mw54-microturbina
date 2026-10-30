@@ -2,6 +2,8 @@
 import * as sim from "./sim.js";
 import { fmt } from "../jet/core.js";
 
+const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
 export default {
   glb: "./sr71.glb",
   parts: "./parts.json",
@@ -12,7 +14,6 @@ export default {
   maxMach: 3.3,
   throttle: 0.85,
   heatMax: 1200,
-  teb: true,
   doubleSided: /^Interior oscuro/,
   view: { home: [32, 15, 38], target: [-1, -1.2, 0], max: 110 },
   shadow: 24,
@@ -38,6 +39,23 @@ export default {
     spike: (o) => o.spike,
     elevon: (o, s, c) => Math.max(-1, Math.min(1, s.pitch - s.roll * c.sign)) * c.range[1],
     rudder: (o, s, c) => s.yaw * c.range[1],
+  },
+  // llama del J58: gradiente tomado de la foto del J58 en el banco de pruebas de noche (penacho violeta translúcido con
+  // nudos claros) y del SR-71 despegando (núcleo blanco amarillento y diamantes amarillos muy marcados); al arrancar,
+  // el destello verde del trietilborano (TEB)
+  flame: {
+    modes: {
+    dry: { core: [[0, [0.75, 0.72, 0.85], 0.6], [0.35, [0.55, 0.5, 0.7], 0.2], [1, [0.4, 0.4, 0.5], 0]], edge: [[0, [0.5, 0.5, 0.75], 0.25], [1, [0.3, 0.3, 0.4], 0]] },
+      ab: { core: [[0, [1, 0.96, 0.85], 4.5], [0.12, [1, 0.88, 0.7], 3], [0.3, [0.86, 0.55, 0.62], 1.6], [0.6, [0.76, 0.46, 0.55], 1], [0.85, [0.76, 0.44, 0.4], 0.45], [1, [0.6, 0.35, 0.3], 0]], edge: [[0, [0.55, 0.3, 0.6], 1], [0.5, [0.6, 0.35, 0.6], 0.6], [1, [0.5, 0.3, 0.4], 0]] },
+      teb: { core: [[0, [0.4, 1, 0.5], 3], [0.5, [0.3, 0.9, 0.4], 1.2], [1, [0.2, 0.6, 0.3], 0]], edge: [[0, [0.3, 0.8, 0.4], 1], [1, [0.2, 0.5, 0.3], 0]] },
+    },
+    brightness: 0.55,
+    diamonds: { spacing: 0.07, count: 8, color: [1, 0.82, 0.55] },
+    light: { intensity: 45, distance: 26 },
+    state: (o, motor) => {
+      const teb = motor.on && motor.heat < 0.3 ? 1 - motor.heat / 0.3 : 0;
+      return { w: { dry: (1 - o.ab) * (1 - teb), ab: o.ab * (1 - teb), teb }, level: Math.max(teb, motor.heat * (0.25 + 0.75 * motor.thr)), optimal: o.ab * sm(0.88, 1, motor.thr) * (1 - teb), reach: 0.55 + 0.45 * o.ab };
+    },
   },
   plumes: [3300, -3300].map((y) => ({ at: [-14500, y, -150], length: 12, r: 0.62, tail: 0.5 })),
   cut: { z: 3.3, pos: [-5, -1.6, 25], target: [-5.5, -0.4, 3.3] },

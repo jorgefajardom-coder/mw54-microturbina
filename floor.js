@@ -62,17 +62,18 @@ function floorTextures(renderer, N) {
   out[0].colorSpace = THREE.SRGBColorSpace;
   return out;
 }
-// El borde se funde con el color de fondo ya en la salida sRGB, así el piso no termina en un canto.
+// El borde se funde con el color de fondo, así el piso no termina en un canto.
 function fadeToBackground(material, inner, outer) {
   material.onBeforeCompile = (sh) => {
     sh.uniforms.uFade = { value: new THREE.Vector2(inner, outer) };
-    sh.uniforms.uBg = { value: new THREE.Color(0x0d0f12).convertLinearToSRGB() };
+    // en lineal y antes del mapeo de tonos: así casa con el fondo tanto si se dibuja directo como con posproceso
+    sh.uniforms.uBg = { value: new THREE.Color(0x0d0f12) };
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vFloor;")
       .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvFloor = (modelMatrix * vec4(transformed, 1.0)).xz;");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vFloor;\nuniform vec2 uFade;\nuniform vec3 uBg;")
-      .replace("#include <dithering_fragment>", "gl_FragColor.rgb = mix(gl_FragColor.rgb, uBg, smoothstep(uFade.x, uFade.y, length(vFloor)));\n#include <dithering_fragment>");
+      .replace("#include <tonemapping_fragment>", "gl_FragColor.rgb = mix(gl_FragColor.rgb, uBg, smoothstep(uFade.x, uFade.y, length(vFloor)));\n#include <tonemapping_fragment>");
   };
 }
 // marcas pintadas del puesto: esquinas del recuadro, eje de rodaje con flecha y topes para las ruedas

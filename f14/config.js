@@ -3,6 +3,8 @@
 import * as sim from "./sim.js";
 import { fmt } from "../jet/core.js";
 
+const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
 export default {
   glb: "./f14.glb",
   parts: "./parts.json",
@@ -37,6 +39,18 @@ export default {
     ramp: (o) => -o.ramp,
     stabilator: (o, s, c) => Math.max(-1, Math.min(1, s.pitch - 0.6 * s.roll * c.sign)) * c.range[1],
     rudder: (o, s, c) => s.yaw * c.range[1],
+  },
+  // llama del F110: gradiente tomado de fotos del F110 en banco de pruebas y del F-14 al despegar (núcleo blanco rosado,
+  // lavanda y cola azul violeta); diamantes con la separación de la tobera de pétalos
+  flame: {
+    modes: {
+    dry: { core: [[0, [0.75, 0.72, 0.85], 0.6], [0.35, [0.55, 0.5, 0.7], 0.2], [1, [0.4, 0.4, 0.5], 0]], edge: [[0, [0.5, 0.5, 0.75], 0.25], [1, [0.3, 0.3, 0.4], 0]] },
+      ab: { core: [[0, [1, 0.95, 0.98], 5], [0.15, [1, 0.9, 0.94], 3.5], [0.4, [0.9, 0.78, 0.92], 1.8], [0.7, [0.7, 0.65, 0.9], 0.8], [0.9, [0.47, 0.52, 0.85], 0.3], [1, [0.4, 0.45, 0.8], 0]], edge: [[0, [1, 0.75, 0.85], 1], [0.5, [0.75, 0.6, 0.85], 0.6], [1, [0.45, 0.5, 0.85], 0]] },
+    },
+    brightness: 0.55,
+    diamonds: { spacing: 0.08, count: 6, color: [1, 0.9, 0.95] },
+    light: { intensity: 40, distance: 22 },
+    state: (o, motor) => ({ w: { dry: 1 - o.ab, ab: o.ab }, level: motor.heat * (0.25 + 0.75 * motor.thr), optimal: o.ab * sm(0.88, 1, motor.thr), reach: 0.55 + 0.45 * o.ab }),
   },
   plumes: [1450, -1450].map((y) => ({ at: [-8520, y, -250], length: 9, r: 0.48, tail: 0.6 })),
   cut: { z: 1.45, pos: [-4, -1.1, 15], target: [-4.5, -0.3, 1.45] },
