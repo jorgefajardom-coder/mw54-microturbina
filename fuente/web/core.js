@@ -179,15 +179,16 @@ const UP = new THREE.Vector3(0, 1, 0);
 function applyPose(time = 0) {
   for (const e of parts) organicPose(e, time, { up: UP, dir: e.dir ?? 1 });
 }
-// el tren y sus compuertas no pueden bajar (el suelo está debajo): salen hacia fuera, y el de morro hacia delante
+// el tren y sus compuertas no pueden bajar (el suelo está debajo): salen hacia delante y hacia fuera, por delante
+// del borde de ataque, para que el ala pase luego sin tocarlos; el de morro, sólo hacia delante
 for (const e of parts) {
   if (e.data.control !== "gear" && e.data.control !== "door") continue;
   const side = Math.sign(e.home.z) || 0;
-  e.offset.set(side ? 0 : 220, 0, side * 260);
+  e.offset.set(side ? 250 : 220, 0, side * 260);
 }
 // desarme y montaje pieza por pieza por caminos libres (look.js); el montaje es el desarme al revés
 const disassembly = disassemblyOrder(parts, {
-  isGear: (e) => e.data.control === "gear" || e.data.control === "door",
+  isGear: (e) => (e.data.control === "gear" && e.data.part !== "tren.morro") || e.data.control === "door",
   isLate: (e) => (e.data.group === "airframe" || e.data.group === "systems") && e.data.order >= 30,
   root: engineRoot,
   isEngine: (e) => e.data.group === "MW54",

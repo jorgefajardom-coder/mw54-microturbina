@@ -19,12 +19,14 @@ Datos del motor: [GTBA · MW54](https://www.gtba.co.uk/engine_designs/mw54.php).
 - **F-22 Raptor** (`web/f22/`) y **SR-71 Blackbird** (`web/sr71/`) a escala real, con sus Pratt & Whitney F119 (fan de 3 etapas, compresor de 6, turbinas contrarrotativas, tobera bidimensional de empuje vectorial) y J58 (compresor de 9 etapas, cono de entrada móvil, tubos de derivación al postquemador, eyector).
 - **F-14 Tomcat** (`web/f14/`) según las cotas públicas de su manual NATOPS, con sus General Electric F110-GE-400 (fan de 3 etapas, compresor de 9, turbinas de 1 y 2 etapas, tobera de pétalos) y las alas de geometría variable, que giran de 20° a 68° con el Mach.
 - Los cuatro aviones usan el mismo visor (`web/jet/`): núcleo común, interfaz de escritorio e interfaz de celular. Cada avión aporta su `config.js`, su `sim.js` y su `parts.json`.
+- **Despiece sin choques**: cada pieza sale por un camino libre y en un orden que lo permite (los motores salen por detrás o por la boca de la toma, las carcasas se parten en dos mitades, el fuselaje delantero del Hawk se abre). `blender/check_overlap.py` lo comprueba: mide cuánto entra cada pieza en otra con el avión armado, con los mandos y compuertas en sus extremos y en cada paso del despiece.
 - **Escritorio y celular** van separados en la misma URL: `device.js` detecta el dispositivo y carga `desktop.js` o `mobile.js` con su hoja de estilos. En celular, la calidad (densidad de píxeles, sombras, texturas) se fija según la GPU, la memoria y los núcleos del teléfono, y se ajusta sola con los fps reales. `?vista=celular` o `?vista=escritorio` fuerza una interfaz; `?debug=1` muestra el perfil del teléfono y los fps en pantalla.
 
 ```bash
 pip install bpy                      # Blender como módulo de Python
 python blender/build_headless.py     # web/mw54.glb
 python blender/build_jet.py sr72     # web/sr72/sr72.glb (también f22, f14 y sr71)
+python blender/check_overlap.py sr72 # piezas que se atraviesan (también hawk, f22, f14 y sr71)
 python blender/assets/make_insignia.py
 node src/serve.mjs web               # http://127.0.0.1:8765/
 node src/to-pages.mjs                # copia el sitio a ../mw54-microturbina
@@ -53,12 +55,14 @@ Engine data: [GTBA · MW54](https://www.gtba.co.uk/engine_designs/mw54.php).
 - **F-22 Raptor** (`web/f22/`) and **SR-71 Blackbird** (`web/sr71/`) at full scale, with their Pratt & Whitney F119 (3-stage fan, 6-stage compressor, counter-rotating turbines, 2D thrust-vectoring nozzle) and J58 (9-stage compressor, translating inlet spike, bypass tubes to the afterburner, ejector).
 - **F-14 Tomcat** (`web/f14/`) from the public dimensions in its NATOPS flight manual, with its General Electric F110-GE-400s (3-stage fan, 9-stage compressor, 1- and 2-stage turbines, iris nozzle) and variable-sweep wings that move from 20° to 68° with Mach number.
 - All four aircraft share one viewer (`web/jet/`): a common core, a desktop interface and a phone interface. Each aircraft provides its own `config.js`, `sim.js` and `parts.json`.
+- **Collision-free disassembly**: every part leaves along a clear path and in an order that allows it (engines slide out the back or through the inlet mouth, casings split in two halves, the Hawk's forward fuselage opens up). `blender/check_overlap.py` checks it: it measures how far each part enters another with the aircraft assembled, with controls and doors at their limits, and at every step of the disassembly.
 - **Desktop and phone** are separate at the same URL: `device.js` detects the device and loads `desktop.js` or `mobile.js` with its stylesheet. On phones, quality (pixel density, shadows, textures) is set from the phone's GPU, memory and cores, and adjusts itself to the real frame rate. `?vista=celular` or `?vista=escritorio` forces an interface; `?debug=1` shows the phone profile and fps on screen.
 
 ```bash
 pip install bpy                      # Blender as a Python module
 python blender/build_headless.py     # web/mw54.glb
-python blender/build_jet.py sr72     # web/sr72/sr72.glb (también f22, f14 y sr71)
+python blender/build_jet.py sr72     # web/sr72/sr72.glb (also f22, f14 and sr71)
+python blender/check_overlap.py sr72 # parts that pass through each other (also hawk, f22, f14 and sr71)
 python blender/assets/make_insignia.py
 node src/serve.mjs web               # http://127.0.0.1:8765/
 node src/to-pages.mjs                # copies the site to ../mw54-microturbina

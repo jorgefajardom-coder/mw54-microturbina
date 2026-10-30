@@ -24,7 +24,7 @@ export default {
     stand: { W: 30, D: 24, box: { x0: -11, x1: 11, z0: -10.5, z1: 10.5, arm: 2.4, w: 0.22 }, dash: [1, 1.8, 0.16], stops: [[7.4, 0], [-1.3, 2.75], [-1.3, -2.75]], stop: [0.25, 1] },
     ao: { w: 22, d: 18, x: 0 },
   },
-  late: ["gondola"],
+  late: [],
   say: { install: "El F110 entra en su góndola por detrás", engines: "dos F110" },
   skin(part, o) {
     const T0 = o.T0 - sim.K;

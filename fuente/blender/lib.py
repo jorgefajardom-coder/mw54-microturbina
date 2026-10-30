@@ -275,6 +275,17 @@ def boolean_cut(ob, cutters):
         bpy.data.objects.remove(c, do_unlink=True)
 
 
+def halves(ob, name):
+    """Parte un sólido de revolución por el plano vertical del eje: mitad +Y y mitad −Y (como una carcasa partida)."""
+    other = ob.copy()
+    other.data = ob.data.copy()
+    other.name = name
+    bpy.context.scene.collection.objects.link(other)
+    boolean_cut(ob, [box("cutA", (0, -5000, 0), (40000, 10000, 10000))])
+    boolean_cut(other, [box("cutB", (0, 5000, 0), (40000, 10000, 10000))])
+    return ob, other
+
+
 def join(name, obs, parent=None):
     """Une varias mallas en un objeto (una pieza física = un objeto que se mueve entero)."""
     obs = [o for o in obs if o is not None]

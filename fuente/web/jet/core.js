@@ -94,7 +94,7 @@ export async function start(profile, cfg) {
     }
     const d = o.userData;
     if (d && d.part) {
-      const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), t: 1, materials: [], T: 15 };
+      const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), via: d.via ? fromBlender(d.via) : null, t: 1, materials: [], T: 15 };
       o.traverse((m) => m.isMesh && entry.materials.push(m));
       if (d.group === "engine" && d.part === cfg.engine) engineRoot = entry;
       if (d.group === cfg.engine) engineParts.push(entry);

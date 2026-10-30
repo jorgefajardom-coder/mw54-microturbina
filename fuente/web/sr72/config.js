@@ -24,8 +24,8 @@ export default {
     stand: { W: 32, D: 22, box: { x0: -12.5, x1: 12.5, z0: -9.5, z1: 9.5, arm: 2.6, w: 0.24 }, dash: [1.15, 2, 0.18], stops: [[6.8, 0], [-1.5, 1.6], [-1.5, -1.6]], stop: [0.28, 1.2] },
     ao: { w: 24, d: 14, x: 0 },
   },
-  late: ["gondola"],
-  say: { install: "El TBCC sube a su bahía bajo el ala, detrás de la toma", engines: "dos TBCC" },
+  late: [],
+  say: { install: "El TBCC entra en su góndola por la boca de la toma", engines: "dos TBCC" },
   // la piel se queda en el equilibrio radiativo, muy por debajo de T₀, salvo morro y bordes de ataque
   skin(part, o) {
     const T0 = o.T0 - sim.K;

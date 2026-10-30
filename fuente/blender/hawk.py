@@ -292,7 +292,16 @@ def loft(name, sections, mats, closed=True, caps=False, keep=lambda i, j: True, 
             side = f.calc_center_median().y
             for loop, (ii, jj) in zip(f.loops, ((i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j))):
                 loop[layer].uv = uvmap(loop.vert.co, side) if uvmap else (lengths[ii] / uvscale, jj / n * 2.0)
-    if caps:
+    if caps == "strip":
+        # la primera sección se cierra con una tira de caras entre extradós e intradós (sigue una raíz curva)
+        r = rows[0]
+        for k in range(n):
+            a_, b_, c_, d_ = k, k + 1, n - k - 1, (n - k) % n
+            if b_ >= c_:
+                break
+            bm.faces.new([r[a_], r[b_], r[c_]] if a_ == d_ else [r[a_], r[b_], r[c_], r[d_]])
+        bm.faces.new(rows[-1])
+    elif caps:
         bm.faces.new(list(reversed(rows[0])))
         bm.faces.new(rows[-1])
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
@@ -386,10 +395,10 @@ def build_cockpit(M, part):
         obs.append(tube_path(f"{name}_handle", [(x + 12, 5, FLOOR + 10), (x + 16, 5, FLOOR + 16), (x + 16, -5, FLOOR + 16), (x + 12, -5, FLOOR + 10)], 0.9, M["handle"], bend=2))
         return obs
 
-    part("cabina.cubeta", [tub, footwell, bulkhead, deck] + consoles, "airframe", 33, (0, 0, 150), "Cubeta de cabina con consolas", "airframe")
-    part("cabina.tablero", front_panel, "airframe", 34, (60, 0, 170), "Tablero delantero con HUD y dos pantallas", "airframe")
-    part("cabina.tablero_trasero", rear_panel, "airframe", 35, (0, 0, 190), "Tablero trasero", "airframe")
-    part("asientos", seat("s1", 498) + seat("s2", 430), "airframe", 36, (0, 0, 210), "Asientos eyectables", "airframe")
+    part("cabina.cubeta", [tub, footwell, bulkhead, deck] + consoles, "airframe", 55, (0, 350, 200), "Cubeta de cabina con consolas", "airframe", path="v")
+    part("cabina.tablero", front_panel, "airframe", 60, (0, 350, 200), "Tablero delantero con HUD y dos pantallas", "airframe", path="v")
+    part("cabina.tablero_trasero", rear_panel, "airframe", 61, (0, 350, 200), "Tablero trasero", "airframe", path="v")
+    part("asientos", seat("s1", 498) + seat("s2", 430), "airframe", 56, (0, 350, 200), "Asientos eyectables", "airframe", path="v")
 
     # mandos de cada puesto, con la bisagra en su pie
     for tagname, x in (("delantero", 498), ("trasero", 430)):
@@ -398,24 +407,39 @@ def build_cockpit(M, part):
                                             cylinder_between(f"sts{x}", (sx, 0, FLOOR + 2), (sx - 2, 0, FLOOR + 22), 1.1, M["alu"], steps=12),
                                             box(f"stg{x}", (sx - 2.4, 0, FLOOR + 26), (4.5, 4, 9), M["black"], bevel=1.5),
                                             cylinder_between(f"stb{x}", (sx - 1, 0, FLOOR + 30.3), (sx - 1, 0, FLOOR + 31), 0.9, M["ember"], steps=10)],
-                     "airframe", 37, (0, 0, 120), f"Palanca de mando ({tagname})", "airframe", control="stick", range=[-14, 14])
+                     "airframe", 58, (0, 350, 200), f"Palanca de mando ({tagname})", "airframe", path="v", control="stick", range=[-14, 14])
         stick["hinge"] = [0.0, 1.0, 0.0]
         stick["roll"] = [1.0, 0.0, 0.0]
         set_pivot(stick, (sx, 0, FLOOR + 1.5))
-        ty = inner(x, 58) - 7
+        ty = inner(x, 58) - 14   # separada de la pared para que la palanca gire sin rozarla
         thr = part(f"gases.{tagname}", [box(f"thb{x}", (x + 4, ty, 66.5), (14, 6, 2), M["alu"]),
                                          cylinder_between(f"thl{x}", (x + 4, ty, 66), (x + 4, ty, 74), 0.9, M["alu"], steps=10),
                                          box(f"thg{x}", (x + 4, ty - 0.5, 75.5), (4, 5, 4), M["black"], bevel=1.2)],
-                   "airframe", 38, (0, 60, 120), f"Palanca de gases ({tagname})", "airframe", control="throttle", range=[-22, 22])
+                   "airframe", 59, (0, 350, 200), f"Palanca de gases ({tagname})", "airframe", path="v", control="throttle", range=[-22, 22])
         thr["hinge"] = [0.0, 1.0, 0.0]
         set_pivot(thr, (x + 4, ty, 66))
         for sgn in (1, -1):
             px = x + 34
             ped = part(f"pedal.{tagname}.{'izq' if sgn > 0 else 'der'}", [cylinder_between(f"pa{x}{sgn}", (px, sgn * 8, FLOOR + 22), (px + 3, sgn * 8, FLOOR + 6), 0.9, M["alu"], steps=10),
                                                                             box(f"pp{x}{sgn}", (px + 3, sgn * 8, FLOOR + 6), (2, 6, 9), M["black"], bevel=0.6)],
-                       "airframe", 39, (40, sgn * 30, 100), f"Pedal de timón ({tagname})", "airframe", control="pedal", range=[-12, 12], sign=sgn)
+                       "airframe", 57, (0, 350, 200), f"Pedal de timón ({tagname})", "airframe", path="v", control="pedal", range=[-12, 12], sign=sgn)
             ped["hinge"] = [0.0, 1.0, 0.0]
             set_pivot(ped, (px, sgn * 8, FLOOR + 22))
+
+
+# despiece de la MW54 en el Hawk: (desplazamiento en x, turno). Por delante salen la tuerca, la toma, la tapa, la
+# rueda del compresor y el difusor; por detrás la tobera, la turbina, el estátor y la cámara; el eje sale el último.
+# Cada pieza queda delante (o detrás) de la anterior, sin pasar por las que siguen montadas.
+ENGINE_EXPLODE = {"nut": (184, 1), "bellmouth": (166, 2), "shroud": (156, 3), "wheel": (129, 4), "diffuser": (117, 5),
+                  "nozzle": (-108, 6), "turbine": (-84, 7), "ngv": (-76, 8), "combustor": (-68, 9), "tunnel": (95, 10)}
+
+
+def engine_meta(model):
+    """Datos de cada pieza de la MW54 para el Hawk, con el despiece de arriba."""
+    meta = {k: {**v, "move": [model["MOVES"].get(k, [0, 0, 0])[0], 0, 0]} for k, v in model["PARTS"].items()}
+    for k, (dx, out) in ENGINE_EXPLODE.items():
+        meta.setdefault(k, {}).update(move=[dx, 0, 0], out=out)
+    return meta
 
 
 def build_hawk(M, root, log=lambda msg: None):
@@ -433,7 +457,8 @@ def build_hawk(M, root, log=lambda msg: None):
     TOP = set(range(9, 16))
     SIDE = {N_SEC - 1, 0, N_SEC // 2 - 1, N_SEC // 2}
     CAN = (560, 330)
-    HATCH = (300, -60)
+    HATCH = (330, -60)     # empieza donde acaba la cabina: la MW54 y los equipos salen por arriba sin rozar la piel
+    HTOP = set(range(6, 18))   # la escotilla es más ancha que la cabina: deja pasar la MW54 con su montura
     NOSE_WELL = (612, 450)
     BOT_R, BOT_L = (34, 35), (36, 37)
     xs = sorted(set([r[0] for r in ST] + [CAN[0], CAN[1], HATCH[0], HATCH[1], NOSE_WELL[0], NOSE_WELL[1]]), reverse=True)
@@ -457,11 +482,11 @@ def build_hawk(M, root, log=lambda msg: None):
     }
     corners = [p for s in (secs[i0], secs[i1]) for p in (s[34], s[38])]
     nose_well = well_shell("nwell", corners, -8.0, M)
-    mid = loft("fus_mid", secs[iF:iM + 1], [M["paint"], M["orange"]], keep=lambda i, j: not (in_range(i + iF, *HATCH) and j in TOP), matof=lambda i, j: cheat(i + iF, j))
+    mid = loft("fus_mid", secs[iF:iM + 1], [M["paint"], M["orange"]], keep=lambda i, j: not (in_range(i + iF, *HATCH) and j in HTOP), matof=lambda i, j: cheat(i + iF, j))
     rear = loft("fus_rear", secs[iM:], [M["paint"], M["orange"]], matof=lambda i, j: cheat(i + iM, j))
     nz = section_at(-796)
     nozzle = lathe("nozzle_ring", frame((-796, 0, nz[3]), (1, 0, 0)), [(0, 18), (0, 23.0), (6, 22.0), (6, 18)], M["paint_dark"], steps=48)
-    hatch = loft("hatch", [[s[k] for k in range(min(TOP), max(TOP) + 2)] for s in secs[xs.index(HATCH[0]):xs.index(HATCH[1]) + 1]], M["paint"], closed=False)
+    hatch = loft("hatch", [[s[k] for k in range(min(HTOP), max(HTOP) + 2)] for s in secs[xs.index(HATCH[0]):xs.index(HATCH[1]) + 1]], M["paint"], closed=False)
     canopy_rows = []
     for x in [x for x in xs if CAN[0] >= x >= CAN[1]]:
         s = superellipse(*section_at(x))
@@ -486,11 +511,22 @@ def build_hawk(M, root, log=lambda msg: None):
         x, w, h, zc = 318, 30, 66, 4
         off = skin_y(x, zc) + w / 2 - 6
         intakes.append(loft(f"mouth{side}", [superellipse(x, w - 1.5, h - 1.5, zc, n=32, p=2.2, y0=side * off), superellipse(x - 30, w - 3, h - 3, zc, n=32, p=2.2, y0=side * off)], M["paint_dark"]))
-    part("fuselaje.delantero", [front], "airframe", 2, (360, 0, 0), "Fuselaje delantero", "airframe")
+    # el fuselaje delantero se abre en dos mitades (como el molde de la maqueta) para dejar a la vista los equipos
+    for half, (sgn, tagname) in enumerate(((1, "izquierda"), (-1, "derecha"))):
+        piece = front.copy()
+        piece.data = front.data.copy()
+        bpy.context.scene.collection.objects.link(piece)
+        bm = bmesh.new()
+        bm.from_mesh(piece.data)
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.calc_center_median().y * sgn < 0], context="FACES")
+        bm.to_mesh(piece.data)
+        bm.free()
+        part("fuselaje.delantero" + (".b" if half else ""), [piece], "airframe", 62, (0, sgn * 160, 0), f"Fuselaje delantero, mitad {tagname}", "airframe")
+    bpy.data.objects.remove(front, do_unlink=True)
     part("fuselaje.central", [mid] + intakes, "airframe", 0, (0, 0, 0), "Fuselaje central con las tomas de aire", "airframe")
-    part("fuselaje.trasero", [rear, nozzle], "airframe", 1, (-360, 0, 0), "Fuselaje trasero y tobera", "airframe")
-    part("cabina", [canopy], "airframe", 31, (0, 0, 240), "Cabina en tándem", "airframe")
-    part("escotilla", [hatch], "airframe", 32, (0, 0, 280), "Escotilla del motor", "airframe")
+    part("fuselaje.trasero", [rear, nozzle], "airframe", 65, (-850, 0, 0), "Fuselaje trasero y tobera", "airframe")
+    part("cabina", [canopy], "airframe", 64, (0, 0, 240), "Cabina en tándem", "airframe")
+    part("escotilla", [hatch], "airframe", 63, (0, 0, 380), "Escotilla del motor", "airframe")
     build_cockpit(M, part)
 
     # ── alas: raíz ajustada a la piel, flecha de ~26°, perfil del 11 al 9 %, diedro de 2°;
@@ -537,9 +573,9 @@ def build_hawk(M, root, log=lambda msg: None):
                 loft(f"w4{side}", rows(0, 1, [half - 22, half]), M["ember"], caps=True)]
         tz = WZ + DZ(half)
         wing.append(cylinder_between(f"navlight{side}", (LE(half) - 0.35 * CH(half), side * half, tz), (LE(half) - 0.35 * CH(half), side * (half + 3), tz), 3.0, M["light_red" if side > 0 else "light_green"], steps=12))
-        part(f"ala.{tagname}", wing, "airframe", 5, (0, side * 420, -40), f"Ala {tagname}", "airframe")
-        flap = part(f"flap.{tagname}", [loft(f"flap{side}", rows(HINGE_F + 0.004, 1, [110.3, 200, 329.5]), M["paint"], caps=True)], "airframe", 6, (-120, side * 300, -60), f"Flap {tagname}", "airframe", control="flap", range=[0, 40], sign=side)
-        ail = part(f"aleron.{tagname}", [loft(f"ail{side}", rows(HINGE_A + 0.004, 1, [380.5, 520, 640, half - 22.5]), M["paint"], caps=True)], "airframe", 6, (-80, side * 480, -40), f"Alerón {tagname}", "airframe", control="aileron", range=[-22, 22], sign=side)
+        part(f"ala.{tagname}", wing, "airframe", 69, (0, side * 420, 0), f"Ala {tagname}", "airframe")
+        flap = part(f"flap.{tagname}", [loft(f"flap{side}", rows(HINGE_F + 0.004, 1, [110.3, 200, 329.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Flap {tagname}", "airframe", control="flap", range=[0, 40], sign=side)
+        ail = part(f"aleron.{tagname}", [loft(f"ail{side}", rows(HINGE_A + 0.004, 1, [380.5, 520, 640, half - 22.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Alerón {tagname}", "airframe", control="aileron", range=[-22, 22], sign=side)
         for ob, (ya, yb), frac in ((flap, (110.3, 329.5), HINGE_F), (ail, (380.5, half - 22.5), HINGE_A)):
             pa = Vector((LE(ya) - frac * CH(ya), side * ya, WZ + DZ(ya)))
             pb = Vector((LE(yb) - frac * CH(yb), side * yb, WZ + DZ(yb)))
@@ -556,7 +592,7 @@ def build_hawk(M, root, log=lambda msg: None):
                 wz = 30 + z if y is None else 30 - math.tan(math.radians(10)) * (313 - 40) + z
                 row.append((wx, side * (skin_y(wx, wz) + 0.3 if y is None else y), wz))
             rows.append(row)
-        ob = part(f"estabilizador.{tagname}", [loft(f"tail{side}", rows, M["paint"], caps=True)], "airframe", 7, (-120, side * 260, 0), f"Estabilizador {tagname} (monobloque)", "airframe", control="elevator", range=[-18, 14])
+        ob = part(f"estabilizador.{tagname}", [loft(f"tail{side}", rows, M["paint"], caps=True)], "airframe", 66, (-120, side * 260, 0), f"Estabilizador {tagname} (monobloque)", "airframe", control="elevator", range=[-18, 14])
         ob["hinge"] = [0.0, side * 1.0, 0.0]
         set_pivot(ob, (-580, side * skin_y(-580, 30), 30))
 
@@ -577,8 +613,8 @@ def build_hawk(M, root, log=lambda msg: None):
         return (min(1, max(0, u if side >= 0 else 1 - u)), min(1, max(0, (co.z - 60) / 190)))
     fin = loft("fin", fin_rows(0, 0.7, FIN), [M["fin"]], uvmap=fin_uv)
     tipband = loft("finband", fin_rows(0, 1, ((248, -605, 150), (270, -620, 130))), M["glow"], caps=True)
-    part("deriva", [fin, tipband], "airframe", 8, (0, 0, 300), "Deriva con la insignia del agujero negro", "airframe")
-    rud = part("timon", [loft("rudder", fin_rows(0.703, 1, FIN), M["paint"], caps=True)], "airframe", 9, (-160, 0, 300), "Timón de dirección", "airframe", control="rudder", range=[-25, 25])
+    part("deriva", [fin, tipband], "airframe", 67, (0, 0, 300), "Deriva con la insignia del agujero negro", "airframe")
+    rud = part("timon", [loft("rudder", fin_rows(0.703, 1, FIN), M["paint"], caps=True)], "airframe", 68, (-300, 0, 300), "Timón de dirección", "airframe", control="rudder", range=[-25, 25])
     ra = Vector((-380 - 0.7 * 360, 0, skin_top(-380 - 0.7 * 360)))
     rb = Vector((-605 - 0.7 * 150, 0, 248))
     rud["hinge"] = list((rb - ra).normalized())
@@ -618,7 +654,8 @@ def build_hawk(M, root, log=lambda msg: None):
     npivot = Vector((NOSE_X, 0, sx[3] - sx[2] / 2 + 14))
     naxle = Vector((NOSE_X, 0, GROUND + 22))
     nose = [cylinder_between("nl", npivot, naxle + Vector((0, 0, 14)), 4.5, M["steel"], steps=20), box("nfork", (NOSE_X, 0, GROUND + 34), (10, 22, 20), M["alu"])] + wheel("nw", naxle, 22, 12)
-    ob = part("tren.morro", nose, "airframe", 10, (0, 0, -160), "Tren de morro", "gear", control="gear", range=[0, 90])
+    # el de morro sale cuando ya no están el fuselaje delantero ni su pozo (su pata entra en el pozo)
+    ob = part("tren.morro", nose, "airframe", 40, (0, 0, -160), "Tren de morro", "gear", control="gear", range=[0, 90])
     ob["hinge"] = [0.0, -1.0, 0.0]
     set_pivot(ob, npivot)
     for side in (1, -1):
@@ -631,7 +668,7 @@ def build_hawk(M, root, log=lambda msg: None):
         ob = part(f"compuerta.morro.{'izquierda' if side > 0 else 'derecha'}", [d], "airframe", 11, (0, side * 40, -140), "Compuerta del tren de morro", "gear", control="door", range=[0, 80])
         ob["hinge"] = list(axis)
         set_pivot(ob, edge)
-    part("pozo.morro", [nose_well], "airframe", 12, (0, 0, -120), "Pozo del tren de morro", "gear")
+    part("pozo.morro", [nose_well], "airframe", 43, (0, -350, 200), "Pozo del tren de morro", "gear", path="v")
 
     # ── instalación del motor: carriles, montura de dos piezas, tubo de empuje hasta la tobera ──
     EF = frame(ENGINE_TIP, (-1, 0, 0))
@@ -639,14 +676,28 @@ def build_hawk(M, root, log=lambda msg: None):
     for s_ in (64, 96):
         mount.append(lathe(f"band{s_}", EF, [(s_ - 4, 44.45), (s_ - 4, 46.6), (s_ + 4, 46.6), (s_ + 4, 44.45)], M["anod"], steps=72))
         mount.append(box(f"foot{s_}", (ENGINE_TIP[0] - s_, 0, ENGINE_TIP[2] - 48.6), (10, 88, 3), M["anod"]))
-    part("motor.montura", mount, "systems", 20, (0, 0, -220), "Montura de dos piezas de Wren", "mounts")
+    # la montura es de dos piezas: las abrazaderas de arriba salen antes que el motor y la base después
+    upper = []
+    for ob in [m for m in mount if m.name.startswith("band")]:
+        top = ob.copy()
+        top.data = ob.data.copy()
+        bpy.context.scene.collection.objects.link(top)
+        for piece, keep_up in ((top, True), (ob, False)):
+            bm = bmesh.new()
+            bm.from_mesh(piece.data)
+            bmesh.ops.delete(bm, geom=[f for f in bm.faces if (f.calc_center_median().z > ENGINE_TIP[2]) != keep_up], context="FACES")
+            bm.to_mesh(piece.data)
+            bm.free()
+        upper.append(top)
+    part("motor.montura.sup", upper, "systems", 54, (0, -350, 200), "Abrazaderas superiores de la montura", "mounts", path="v")
+    part("motor.montura", mount, "systems", 20, (0, 0, 140), "Base de la montura de dos piezas de Wren", "mounts")
     x0 = ENGINE_TIP[0] - 167 - 6
     tail = section_at(-786)
     start = Vector((x0, 0, ENGINE_TIP[2]))
     end = Vector((-786, 0, tail[3]))
     TF = frame(start, end - start)
     L_TT = (end - start).length
-    part("tubo_empuje", [lathe("thrusttube", TF, [(0, 38), (12, 32), (L_TT, 17.6), (L_TT, 17.0), (12, 31.4), (0, 37.4)], M["thrust"], steps=64)], "systems", 21, (-260, 0, 0), "Tubo de empuje (pared simple)", "engines")
+    part("tubo_empuje", [lathe("thrusttube", TF, [(0, 38), (12, 32), (L_TT, 17.6), (L_TT, 17.0), (12, 31.4), (0, 37.4)], M["thrust"], steps=64)], "systems", 21, (0, 0, 160), "Tubo de empuje (pared simple)", "engines")
     return parts, EF
 
 
@@ -661,26 +712,44 @@ def install_systems(M, root, fittings, log=lambda msg: None):
         log(label)
         return ob
     TZ = -42
-    part("bandeja", [box("tray", (320, 0, TZ - 2), (240, 80, 4), M["wood"])], "systems", 22, (0, 0, -180), "Bandeja de equipos", "airframe")
-    part("bandeja.morro", [box("tray2", (575, 0, -2), (130, 52, 4), M["wood"])], "systems", 22, (0, 0, -160), "Bandeja del morro, sobre el pozo del tren", "airframe")
-    part("deposito", [box("tank", (270, 0, TZ + 44), (130, 76, 88), M["tank"], bevel=10), box("fuelin", (270, 0, TZ + 26), (120, 68, 48), M["fuel"], bevel=8), cylinder_between("cap", (310, 0, TZ + 88), (310, 0, TZ + 95), 8, M["black"], steps=24)], "systems", 23, (0, 0, 300), "Depósito principal", "fuel")
-    part("hopper", [cylinder_between("hop", (158, 0, TZ + 22), (196, 0, TZ + 22), 22, M["tank"], steps=48), cylinder_between("hopf", (160, 0, TZ + 16), (194, 0, TZ + 16), 16, M["fuel"], steps=32)], "systems", 24, (0, 0, 280), "Hopper con clunk de fieltro", "fuel")
-    part("bomba", [cylinder_between("pump", (380, -28, TZ + 11), (420, -28, TZ + 11), 11, M["anod"], steps=32), box("ph", (426, -28, TZ + 11), (12, 22, 22), M["alu"])], "systems", 25, (0, -40, 260), "Bomba de combustible", "pumps")
-    part("valvula.combustible", [box("v1", (410, 24, TZ + 7), (22, 16, 14), M["black"]), cylinder_between("v1c", (410, 24, TZ + 14), (410, 24, TZ + 21), 5.5, M["festo"], steps=20)], "systems", 26, (0, 40, 260), "Electroválvula de combustible", "pumps")
-    part("valvula.gas", [box("v2", (365, 22, TZ + 6), (20, 12, 12), M["black"]), cylinder_between("v2c", (365, 22, TZ + 12), (365, 22, TZ + 19), 5, M["gasline"], steps=20)], "systems", 27, (0, 40, 240), "Electroválvula de gas", "gas")
-    part("ecu", [box("ecu", (358, 38, TZ + 6), (26, 18, 12), M["pcb"], bevel=1.5)], "systems", 28, (0, 30, 300), "ECU", "ecu")
-    part("gas", [cylinder_between("gas", (530, 0, 15), (585, 0, 15), 15, M["gascan"], steps=40)], "systems", 29, (0, 0, 280), "Botella de gas de arranque", "gas")
-    part("radio", [box("rx", (600, 0, 6), (22, 22, 12), M["black"], bevel=1), box("bat1", (632, 0, 8), (30, 22, 16), M["lipo"], bevel=2)], "systems", 30, (220, 0, 120), "Receptor y batería", "radio")
+    part("bandeja", [box("tray", (320, 0, TZ - 2), (240, 80, 4), M["wood"])], "systems", 44, (0, -350, 200), "Bandeja de equipos", "airframe", path="v")
+    part("bandeja.morro", [box("tray2", (575, 0, -2), (130, 52, 4), M["wood"])], "systems", 45, (0, -350, 200), "Bandeja del morro, sobre el pozo del tren", "airframe", path="v")
+    part("deposito", [box("tank", (270, 0, TZ + 44), (130, 76, 88), M["tank"], bevel=10), box("fuelin", (270, 0, TZ + 26), (120, 68, 48), M["fuel"], bevel=8), cylinder_between("cap", (310, 0, TZ + 88), (310, 0, TZ + 95), 8, M["black"], steps=24)], "systems", 46, (0, -350, 200), "Depósito principal", "fuel", path="v")
+    part("hopper", [cylinder_between("hop", (158, 0, TZ + 22), (196, 0, TZ + 22), 22, M["tank"], steps=48), cylinder_between("hopf", (160, 0, TZ + 16), (194, 0, TZ + 16), 16, M["fuel"], steps=32)], "systems", 47, (0, -350, 200), "Hopper con clunk de fieltro", "fuel", path="v")
+    part("bomba", [cylinder_between("pump", (380, -28, TZ + 11), (420, -28, TZ + 11), 11, M["anod"], steps=32), box("ph", (426, -28, TZ + 11), (12, 22, 22), M["alu"])], "systems", 48, (0, -350, 200), "Bomba de combustible", "pumps", path="v")
+    part("valvula.combustible", [box("v1", (410, 24, TZ + 7), (22, 16, 14), M["black"]), cylinder_between("v1c", (410, 24, TZ + 14), (410, 24, TZ + 21), 5.5, M["festo"], steps=20)], "systems", 49, (0, -350, 200), "Electroválvula de combustible", "pumps", path="v")
+    part("valvula.gas", [box("v2", (365, 22, TZ + 6), (20, 12, 12), M["black"]), cylinder_between("v2c", (365, 22, TZ + 12), (365, 22, TZ + 19), 5, M["gasline"], steps=20)], "systems", 50, (0, -350, 200), "Electroválvula de gas", "gas", path="v")
+    part("ecu", [box("ecu", (358, 38, TZ + 6), (26, 18, 12), M["pcb"], bevel=1.5)], "systems", 51, (0, -350, 200), "ECU", "ecu", path="v")
+    part("gas", [cylinder_between("gas", (530, 0, 15), (585, 0, 15), 15, M["gascan"], steps=40)], "systems", 52, (0, -350, 200), "Botella de gas de arranque", "gas", path="v")
+    part("radio", [box("rx", (600, 0, 6), (22, 22, 12), M["black"], bevel=1), box("bat1", (632, 0, 8), (30, 22, 16), M["lipo"], bevel=2)], "systems", 53, (0, -350, 200), "Receptor y batería", "radio", path="v")
     fp, fn = fittings["fuel"]
     gp, gn = fittings["gas"]
     lines = [tube_path("tyg1", [(205, 26, TZ + 8), (148, 26, TZ + 8), (148, 0, TZ + 22), (158, 0, TZ + 22)], 1.6, M["tygon"], bend=5),
-             tube_path("tyg2", [(177, -22.5, TZ + 22), (177, -50, TZ + 22), (350, -50, TZ + 11), (366, -28, TZ + 11), (380, -28, TZ + 11)], 1.4, M["tygon"], bend=6),
+             tube_path("tyg2", [(177, -22.5, TZ + 22), (177, -44, TZ + 22), (350, -44, TZ + 11), (366, -28, TZ + 11), (380, -28, TZ + 11)], 1.4, M["tygon"], bend=6),
              tube_path("festo1", [(432, -28, TZ + 14), (444, -28, TZ + 14), (444, 30, TZ + 7), (430, 24, TZ + 7), (421, 24, TZ + 7)], 1.2, M["festo"], bend=5),
              tube_path("festo2", [(399, 24, TZ + 7), (392, 24, TZ + 7), (386, 32, TZ + 7), (384, 34, 60), (220, 34, 62), tuple(fp + fn * 10), tuple(fp)], 1.2, M["festo"], bend=10),
              tube_path("gas1", [(530, 0, 15), (523, 0, 15), (523, 28, 8), (480, 34, 0), (392, 34, TZ + 6), (382, 22, TZ + 6), (375, 22, TZ + 6)], 0.9, M["gasline"], bend=5),
              tube_path("gas2", [(355, 22, TZ + 6), (349, 22, TZ + 6), (343, 14, TZ + 6), (341, 14, 72), (220, 14, 72), tuple(gp + gn * 10), tuple(gp)], 0.9, M["gasline"], bend=8)]
-    part("lineas", lines, "systems", 31, (0, 0, 240), "Líneas: Tygon al hopper y la bomba, Festo y gas al motor", "fuel")
+    # las líneas que suben hasta el motor salen primero; las de abajo, cuando ya no hay equipos encima y antes que las
+    # bandejas sobre las que pasan
+    part("lineas.motor", lines[3:4] + lines[5:6], "systems", 54.5, (0, -350, 200), "Líneas al motor: Festo de combustible y gas", "fuel", path="v")
+    part("lineas", lines[:3] + lines[4:5], "systems", 45.5, (0, -350, 200), "Líneas entre equipos: Tygon al hopper y la bomba, Festo y gas", "fuel", path="v")
+    # la cabina se aparta hacia la izquierda y los equipos hacia la derecha, cada pieza a su propio hueco: la primera en
+    # salir va más lejos, así ninguna barre a las que ya están fuera
+    for side in (1, -1):
+        group = sorted([o for o in root.children if o.get("path") == "v" and o.get("explode", [0, 0, 0])[1] * side >= 350], key=lambda o: -o["order"])
+        fan_out(group, side)
     return parts
+
+
+def fan_out(obs, side, lift=200.0, near=200.0, gap=15.0):
+    """Destinos en fila hacia `side` (±y): sube `lift` y se aparta; la última en salir queda más cerca."""
+    cursor = near * side
+    for ob in reversed(obs):
+        ys = [(ob.matrix_basis @ v.co).y for v in ob.data.vertices]
+        dy = cursor - (min(ys) if side > 0 else max(ys))
+        ob["explode"] = [0.0, dy, lift]
+        cursor = (max(ys) if side > 0 else min(ys)) + dy + gap * side
 
 
 def well_shell(name, corners, z_top, M):

@@ -57,6 +57,8 @@ def build_engine(prefix, M, parent=None, location=(0, 0, 0), meta=None):
         ob = join(f"{prefix}.{key}", obs, root)
         info = meta.get(key, {})
         tag(ob, part=key, group=prefix, order=order, explode=list(info.get("move", (0, 0, 0))), label=info.get("name", key), material=info.get("material", ""), melt=list(info.get("melt", [0, 0])), service=info.get("service", 0))
+        if "out" in info:
+            ob["out"] = info["out"]
         parts[key] = ob
         return ob
 

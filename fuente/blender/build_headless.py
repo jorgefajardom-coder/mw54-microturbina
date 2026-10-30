@@ -18,7 +18,7 @@ for other in list(bpy.data.scenes):
     if other != sc:
         bpy.data.scenes.remove(other)
 model = json.load(open(os.path.join(HERE, "model.json"), encoding="utf8"))
-meta = {k: {**v, "move": [model["MOVES"].get(k, [0, 0, 0])[0], 0, 0]} for k, v in model["PARTS"].items()}
+meta = hawk.engine_meta(model)
 with bpy.context.temp_override(scene=sc):
     root = lib.empty("Avion_MW54")
     AM, EM = hawk.materials(), engine.materials()

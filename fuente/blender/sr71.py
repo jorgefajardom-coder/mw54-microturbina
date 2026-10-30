@@ -5,7 +5,7 @@
 # encima de Mach 2 y eyector con aletas libres al final de la góndola. 1 unidad = 1 mm, +X morro, +Y izquierda.
 import math
 from mathutils import Vector
-from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, tube_path)
+from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, tube_path, boolean_cut, halves)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
 from sr72 import catmull, blade_ring, hinged_ring, attach
 
@@ -14,6 +14,18 @@ NAC_Y = 3300.0
 NAC_Z = -150.0
 FACE_X = -3000.0   # cara del compresor (mundo)
 OUTER = [(-2300, 840), (-1000, 960), (2000, 980), (6000, 950), (8800, 880)]   # radio exterior de la góndola
+# hueco que la góndola y el eyector abren en el ala: el ala llega hasta la piel de la góndola y no sigue por dentro
+HOLE = [(-4700, 0), (-4700, 830), (-2300, 834), (-1000, 954), (2000, 974), (6000, 944), (8800, 874), (8800, 920), (11800, 920), (11800, 0)]
+
+
+def door_angles(n, w, keep=0.45):
+    """Ángulos de las compuertas repartidos fuera de la unión con el ala (a 0° y 180°, ±`keep` rad)."""
+    half = math.pi / n * w
+    arcs = [(keep + half, math.pi - keep - half), (math.pi + keep + half, TAU - keep - half)]
+    per = [n // 2, n - n // 2]
+    return [a + (b - a) * (k + 0.5) / m for (a, b), m in zip(arcs, per) for k in range(m)]
+
+
 
 ST = [
     (16000, 30, 10, 10, 0), (14500, 700, 220, 180, 0), (12000, 1500, 460, 300, 0), (9000, 2200, 760, 420, 0),
@@ -73,7 +85,7 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
     # cono de entrada: punta 4,5 m por delante de la cara del compresor; se desliza 660 mm hacia atrás con el Mach
     spike = lathe("spike", F, [(-4500, 0), (-3600, 260), (-2700, 560), (-2300, 640), (-1200, 520), (-400, 330), (0, 300), (0, 0)], M["ti"], steps=64)
     part("cono", [spike], 1, (3500, 0, 0), out=1, control="spike", slide=[-1.0, 0.0, 0.0], range=[0, 660])
-    comp = [lathe("drum", F, [(0, 0), (0, 300), (1600, 330), (1600, 0)], M["wasp"], steps=48)]
+    comp = [lathe("drum", F, [(0, 80), (0, 300), (1600, 330), (1600, 80)], M["wasp"], steps=48)]   # con el agujero del eje
     for k in range(9):
         s = 80 + k * 175
         comp.append(blade_ring(f"c{k}", F, s, 305 + k * 3, 640 - k * 22, 32 + 5 * k, 110 - k * 5, 30, 55, 6, M["ti"] if k < 4 else M["wasp"], phase=k * 0.1))
@@ -81,27 +93,31 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
     tubes = []
     for i in range(6):
         th = TAU * i / 6 + 0.26
-        a = point(F, 720, 640, th)
-        b = point(F, 820, 720, th)
-        c = point(F, 2900, 720, th)
-        d = point(F, 3100, 640, th)
+        a = point(F, 720, 680, th)
+        b = point(F, 820, 730, th)
+        c = point(F, 2900, 730, th)
+        d = point(F, 3100, 680, th)
         tubes.append(tube_path(f"bt{i}", [tuple(a), tuple(b), tuple(c), tuple(d)], 70, M["steel"], bend=120))
-    part("tubos", tubes, 11, (0, 0, 1600), out=5)
+    part("tubos", tubes, 11, (-2600, 0, 2400), out=5)
     comb = [lathe("cmbcase", F, [(1700, 330), (1700, 600), (2350, 600), (2350, 330)], M["hast"], steps=64)]
     for i in range(8):
         th = TAU * i / 8
         Fc = frame(point(F, 1720, 465, th), (-1, 0, 0))
         comb.append(lathe(f"can{i}", Fc, [(0, 0), (0, 95), (600, 95), (600, 0)], M["hot"], steps=24))
-    part("camara", comb, 12, (-500, 0, 0), out=8)
-    turb = [lathe("tdisc", F, [(2400, 0), (2400, 330), (2750, 340), (2750, 0)], M["wasp"], steps=48)]
+    part("camara", comb, 12, (-1200, 0, 0), out=8)
+    turb = [lathe("tdisc", F, [(2400, 80), (2400, 330), (2750, 340), (2750, 80)], M["wasp"], steps=48)]
     for k, s in enumerate((2470, 2660)):
         turb.append(blade_ring(f"t{k}", F, s, 335, 560 + k * 30, 68 + 8 * k, 105, -40, -56, 10, M["blade"], phase=k * 0.05))
-    part("turbina", turb, 13, (-1200, 0, 0), pivot=O, spin=1, out=7)
-    part("eje", [cylinder_between("shaft", point(F, -200, 0, 0), point(F, 2800, 0, 0), 75, M["steel"], steps=24)], 14, (0, 0, -2200), pivot=O, spin=1, out=10)
+    part("turbina", turb, 13, (-2000, 0, 0), pivot=O, spin=1, out=7)
+    part("eje", [cylinder_between("shaft", point(F, 20, 0, 0), point(F, 2800, 0, 0), 75, M["steel"], steps=24)], 14, (0, -1500, 0), pivot=O, spin=1, out=10)
     case = [lathe("case", F, [(-60, 640), (-60, 690), (2950, 690), (2950, 640)], M["inco"], steps=64)]
     for k in range(3):
-        case.append(blade_ring(f"igv{k}", F, -40 + k * 700, 310, 640, 30, 90, -15, -8, 7, M["inco"], phase=0.03))
-    part("carcasa", case, 15, (0, 0, 2000), out=6)
+        case.append(blade_ring(f"igv{k}", F, (-40, 692, 1392)[k], (315, 318, 332)[k], 640, 30, 64, -15, -8, 7, M["inco"], phase=0.03))
+    # la carcasa se parte en dos mitades por el plano del eje, como la real, y cada una sale hacia su lado con sus
+    # estátores sin cruzar los álabes del rotor
+    a, b = halves(join(f"{prefix}.case", case), f"{prefix}.case.b")
+    part("carcasa", [a], 15, (0, 2000, 0), out=6)
+    part("carcasa.b", [b], 15, (0, -2000, 0), out=6)
     ab = [lathe("abl", F, [(2950, 640), (2950, 690), (8000, 690), (8000, 640)], M["hast"], steps=64),
           lathe("cone", F, [(2800, 0), (2800, 330), (3900, 150), (4200, 0)], M["inco"], steps=48)]
     for r in (260, 470):
@@ -143,7 +159,10 @@ def build_sr71(M, root, meta, log=lambda msg: None):
             top = catmull(ST, x)
             zt = top[4] + top[2]
             bulge = 300 * math.sin(math.pi * i / 8) ** 0.6
-            rows.append([(x, 380 * math.cos(t), zt - 20 + bulge * math.sin(t) ** 0.8) for t in [math.pi * j / 16 for j in range(17)]])
+            w = top[1]
+            # el borde de la cúpula sigue la piel del lomo (superelipse de exponente 1,5) y queda apenas por dentro
+            zb = lambda y: top[4] + top[2] * max(0.0, 1 - (2 * abs(y) / w) ** 1.5) ** (1 / 1.5)
+            rows.append([(x, 380 * math.cos(t), zb(380 * math.cos(t)) - 12 + bulge * math.sin(t) ** 0.8) for t in [math.pi * j / 16 for j in range(17)]])
         cockpit.append(loft(f"can{k}", rows, M["glass"] if k == 0 else M["skin"], closed=False))
     part("cabina", cockpit, "airframe", 30, (0, 0, 1800), "Cabina en tándem: piloto y oficial de reconocimiento")
 
@@ -165,13 +184,19 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         ch = LE(y) - TE(y)
         return [(LE(y) - x, side * y, NAC_Z + z) for x, z in naca_cut(ch, t, a, b)]
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
-        ys = [1300, 2000, 2400, 4200, 4600, 6200, 6300, 8100, 8470]
-        wing = loft(f"wing{side}", [wrow(y, side, 0, HINGE) for y in ys], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)
-        fill = [loft(f"wf{side}{a}", [wrow(y, side, HINGE, 1) for y in (a, b)], M["skin"], caps=True, uvscale=4000) for a, b in ((1300, 2000), (6200, 6300), (8100, 8470))]
-        part(f"ala.{tagname}", [wing] + fill, "airframe", 4, (0, side * 4000, 0), f"Ala {tagname}")
-        for k, (a, b) in enumerate(((2000, 6200), (6300, 8100))):
+        hole = lambda: lathe(f"hole{side}", frame((FACE_X, side * NAC_Y, NAC_Z), (-1, 0, 0)), HOLE, steps=64)
+        for key, ys, fills, order, explode, title in (
+                ("ala", [1300, 2000, 2400, 2800], ((1300, 1500), (2300, 2800)), 4, (0, side * 2200, 0), "Ala interior"),
+                ("ala.ext", [3800, 4200, 4600, 6200, 8100, 8470], ((3800, 4300), (8100, 8470)), 4, (0, side * 5000, 0), "Ala exterior")):
+            wing = loft(f"wing{side}{key}", [wrow(y, side, 0, HINGE) for y in ys], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)
+            fill = [loft(f"wf{side}{a}", [wrow(y, side, HINGE, 1) for y in (a, b)], M["skin"], caps=True, uvscale=4000) for a, b in fills]
+            ob = join(f"w{side}{key}", [wing] + fill)
+            boolean_cut(ob, [hole()])
+            part(f"{key}.{tagname}", [ob], "airframe", order, explode, f"{title} {tagname}")
+        # elevones: el interior sale hacia atrás y el exterior hacia fuera, ninguno pasa por la góndola ni por el otro
+        for k, (a, b) in enumerate(((1500, 2300), (4300, 8100))):
             ob = part(f"elevon.{tagname}.{k}", [loft(f"ev{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 20, b - 20)], M["skin"], caps=True, uvscale=4000)],
-                      "airframe", 5, (-1500, side * 4400, 0), f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
+                      "airframe", 5, (-2600, 0, 0), f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
             p0 = Vector((LE(a) - HINGE * (LE(a) - TE(a)), side * a, NAC_Z))
             p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, NAC_Z))
             ob["hinge"] = list((p1 - p0).normalized() * side)
@@ -189,23 +214,24 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         doors, recess = [], []
         for name, s0, s1, n, kind, w in (("bp", -1750, -1300, 6, "bypass", 0.55), ("si", -300, 350, 8, "suckin", 0.6), ("te", 7450, 8050, 12, "tertiary", 0.7)):
             r0, r1 = outer(s0) + 4, outer(s1) + 4
-            doors += hinged_ring(f"{name}{side}", F, s0, s1, r0, r1, n, M["skin"], kind, width=w, thick=12, phase=0.2)
+            at = door_angles(n, w)
+            doors += hinged_ring(f"{name}{side}", F, s0, s1, r0, r1, n, M["skin"], kind, width=w, thick=12, at=at)
             recess += [hull(f"{name}h{side}{i}", [tuple(point(F, ss, rr, t)) for ss, rr in ((s0 + 20, outer(s0 + 20) + 2), (s1 - 20, outer(s1 - 20) + 2)) for t in (th - TAU / n * w * 0.45, th + TAU / n * w * 0.45)]
                              + [tuple(point(F, ss, rr - 25, t)) for ss, rr in ((s0 + 20, outer(s0 + 20)), (s1 - 20, outer(s1 - 20))) for t in (th - TAU / n * w * 0.45, th + TAU / n * w * 0.45)], M["dark"])
-                       for i, th in enumerate([0.2 + TAU * k / n for k in range(n)])]
-        nacp = part(f"gondola.{tagname}", [nac] + recess, "airframe", 7, (12000, 0, 0), f"Góndola {tagname} con el labio de la toma y sus compuertas")
+                       for i, th in enumerate(door_angles(n, w))]
+        nacp = part(f"gondola.{tagname}", [nac] + recess, "airframe", 7, (0, side * 3500, 0), f"Góndola {tagname} con el labio de la toma y sus compuertas")
         attach(nacp, doors)
 
     # ── derivas enterizas sobre las góndolas, inclinadas 15° hacia dentro ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         cant = -math.tan(math.radians(15)) * side
-        base = NAC_Z + 900
+        base = NAC_Z + 975
 
         def frow(h, le, c):
             return [(le - x, side * NAC_Y + y + cant * h, base + h) for x, y in naca_cut(c, 0.05)]
         FIN = ((0, -9600, 4000), (2300, -12000, 1600))
         ob = part(f"deriva.{tagname}", [loft(f"fin{side}", [frow(h, le, c) for h, le, c in FIN], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)],
-                  "airframe", 6, (0, side * 1200, 2600), f"Deriva enteriza {tagname}", control="rudder", range=[-20, 20])
+                  "airframe", 6, (0, side * 1200, 2600), f"Deriva enteriza {tagname}", control="rudder", range=[-20, 20], path="v")
         ob["hinge"] = [0.0, cant, 1.0]
         set_pivot(ob, (-11200, side * NAC_Y, base))
 
@@ -214,10 +240,10 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         Fw = frame(Vector(c) - Vector((0, w / 2, 0)), (0, 1, 0))
         return [lathe(f"{name}_t", Fw, [(0, r * 0.6), (0, r * 0.9), (w * 0.15, r), (w * 0.85, r), (w, r * 0.9), (w, r * 0.6)], M["rubber"], steps=40),
                 lathe(f"{name}_h", Fw, [(w * 0.1, 0), (w * 0.1, r * 0.6), (w * 0.9, r * 0.6), (w * 0.9, 0)], M["alu"], steps=32)]
-    nose = [cylinder_between("ns", (7600, 0, -420), (7600, 0, GROUND + 330), 90, M["steel"], steps=20)]
+    nose = [cylinder_between("ns", (7600, 0, -485), (7600, 0, GROUND + 330), 90, M["steel"], steps=20)]
     for y in (-200, 200):
         nose += wheel(f"nw{y}", (7600, y, GROUND + 330), 330, 220)
-    part("tren.morro", nose, "airframe", 8, (3000, 0, 0), "Tren de morro")
+    part("tren.morro", nose, "airframe", 8, (0, 2600, 0), "Tren de morro")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         y = side * 1900
         g = [cylinder_between(f"ms{side}", (-3200, y, -480), (-3200, y, GROUND + 450), 130, M["steel"], steps=20)]
@@ -228,7 +254,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
     eng = {}
     for side, prefix, detailed in ((-1, "J58", True), (1, "J58.L", False)):
         er, ep = build_j58(prefix, M, root, (FACE_X, side * NAC_Y, NAC_Z), meta, detailed)
-        tag(er, part=prefix, group="engine", order=40, explode=[-1000, -9000, -1200] if detailed else [0, 0, 0], label="J58 derecho" if detailed else "J58 izquierdo", system="engines", path="v")
+        tag(er, part=prefix, group="engine", order=40, explode=[-16000, 0, -1300], label="J58 derecho" if detailed else "J58 izquierdo", system="engines")
         eng[prefix] = (er, ep)
         log(f"Motor {prefix}")
     return parts, eng
