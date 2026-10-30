@@ -15,9 +15,10 @@ SPAN = 9390 / 7.0
 GROUND = -180.0
 ENGINE_TIP = (150.0, 0.0, 4.0)
 WZ = -52.0
-# Insignia en la deriva, en el UV de la deriva (u = (−x − 400)/300, v = (z − 60)/190): 150 × 45 mm, la proporción de
-# la imagen, centrada en x = −548 y z = 110, donde la cuerda es más ancha y queda lejos del borde de ataque y del timón.
-FIN_DECAL = ((548 - 75 - 400) / 300, (548 + 75 - 400) / 300, (110 - 22.5 - 60) / 190, (110 + 22.5 - 60) / 190)
+# Insignia en la deriva (agujero negro con "SINGULARITY" en arco), 150 × 77 mm con la proporción de la imagen. El UV
+# de la deriva va centrado en x = −555, z = 60 (u = 0,5 + (−x − 555)/300, v = (z − 60)/190) y se refleja en la cara
+# derecha, para que el texto se lea bien por los dos lados.
+FIN_DECAL = (0.5 - 75 / 300, 0.5 + 75 / 300, (118 - 38.5 - 60) / 190, (118 + 38.5 - 60) / 190)
 
 # Fuselaje: (x, ancho, alto, centro z) de secciones superelípticas.
 ST = [
@@ -76,12 +77,14 @@ def naca_cut(chord, t, a=0.0, b=1.0, n=22):
     return up + lo
 
 
-def panel_texture(name, base, size=1024, seed=3, decal=None, place=None):
-    """Pintura negra con líneas de panel y remaches; con `decal`, la insignia horneada en la propia textura.
+def panel_textures(base, size=1024, seed=3, decal=None, place=None):
+    """La pintura como en el avión real: color, relieve (normal) y rugosidad de una misma chapa.
 
-    El periodo de los paneles es el de siempre (1/4 de u y 3/16 de v); las líneas son ranuras finas con su filo
-    iluminado, los remaches puntos redondos, y la laca tiene un moteado suave para que el negro no quede plano.
-    `place` = (u0, u1, v0, v1) es el rectángulo de la insignia en el espacio UV."""
+    El periodo de los paneles es el de siempre (1/4 de u y 3/16 de v). Las líneas son ranuras de verdad en el mapa de
+    normales, los remaches cabezas abombadas, la laca tiene piel de naranja y un brillo que varía de panel a panel
+    (pulido, desgaste, retoques), de modo que el reflejo se rompe como en una chapa pintada y no como en un plástico.
+    Con `decal` y `place` = (u0, u1, v0, v1) la insignia se hornea en el color y alisa la rugosidad bajo la calcomanía.
+    Devuelve las tres matrices (n × n × 4) para crear las imágenes."""
     import numpy as np
     rng = np.random.default_rng(seed)
     n = size
@@ -105,22 +108,34 @@ def panel_texture(name, base, size=1024, seed=3, decal=None, place=None):
         d = np.abs(((t / period + 0.5) % 1.0) - 0.5) * period * n
         return np.clip(width - d, 0, 1)
 
-    mottle = 0.55 * smooth_noise(6) + 0.3 * smooth_noise(16) + 0.15 * smooth_noise(48)
-    k = 1.0 + 0.35 * (mottle - 0.5)
-    groove = np.maximum(line(U, 0.25, 1.2), line(V, 0.1875, 1.2))
-    lit = np.maximum(line(U - 1.6 / n, 0.25, 0.8), line(V - 1.6 / n, 0.1875, 0.8)) * (1 - groove)
-    k = k * (1 - 0.45 * groove) + 2.6 * lit
-    # remaches: una fila a lo largo de cada línea, cada 12 px en v y cada 16 px en u (como antes, a doble resolución)
     def rivets(along, across, period_along, step, offset):
         da = np.abs(((across - offset) / period_along + 0.5) % 1.0 - 0.5) * period_along * n
         db = np.abs(((along * n / step) + 0.5) % 1.0 - 0.5) * step
-        return np.clip(1.6 - np.hypot(da, db), 0, 1)
-    r = np.maximum(rivets(V, U, 0.25, 24, 12 / n), rivets(U, V, 0.1875, 32, 12 / n))
-    k = k + 1.3 * r
-    k = k + rng.normal(0, 0.03, (n, n))
-    px = np.ones((n, n, 4), dtype=np.float32)
+        return np.clip(1 - (np.hypot(da, db) / 2.2) ** 2, 0, 1)
+
+    mottle = 0.55 * smooth_noise(6) + 0.3 * smooth_noise(16) + 0.15 * smooth_noise(48)
+    groove = np.maximum(line(U, 0.25, 1.4), line(V, 0.1875, 1.4))
+    rv = np.maximum(rivets(V, U, 0.25, 24, 12 / n), rivets(U, V, 0.1875, 32, 12 / n))
+    # cada panel con su propio brillo: id del panel → valor pseudoaleatorio
+    pid = (np.floor(U / 0.25) * 7 + np.floor(V / 0.1875) * 13) % 17
+    panel = (np.sin(pid * 12.9898) * 43758.5453) % 1.0
+
+    k = (1.0 + 0.3 * (mottle - 0.5)) * (1 - 0.5 * groove) + 0.9 * rv + rng.normal(0, 0.025, (n, n))
+    color = np.ones((n, n, 4), dtype=np.float32)
     for c in range(3):
-        px[..., c] = base[c] * k
+        color[..., c] = base[c] * k
+
+    peel = smooth_noise(180) * 0.6 + smooth_noise(90) * 0.4
+    height = -1.6 * groove + 0.9 * rv + 0.12 * peel
+    gy, gx = np.gradient(height)
+    nx, ny, nz = -gx * 2.2, -gy * 2.2, np.ones_like(height)
+    ln = np.sqrt(nx * nx + ny * ny + nz * nz)
+    normal = np.ones((n, n, 4), dtype=np.float32)
+    normal[..., 0] = nx / ln * 0.5 + 0.5
+    normal[..., 1] = ny / ln * 0.5 + 0.5
+    normal[..., 2] = nz / ln * 0.5 + 0.5
+
+    r = 0.26 + 0.12 * panel + 0.1 * (smooth_noise(24) - 0.5) + 0.35 * groove + 0.08 * rv
     if decal is not None:
         dw, dh = decal.size
         d = np.array(decal.pixels[:], dtype=np.float32).reshape(dh, dw, 4)
@@ -133,30 +148,109 @@ def panel_texture(name, base, size=1024, seed=3, decal=None, place=None):
         fx, fy = (su - i)[..., None], (sv - j)[..., None]
         s = (d[j, i] * (1 - fx) + d[j, i + 1] * fx) * (1 - fy) + (d[j + 1, i] * (1 - fx) + d[j + 1, i + 1] * fx) * fy
         a = s[..., 3] * inside
-        # el halo blanco del recorte no debe quedar como un filo claro sobre el negro: donde la imagen es casi
-        # blanca y poco opaca, se apaga
+        # el halo blanco del recorte no debe quedar como un filo claro sobre el negro
         white = np.clip((s[..., :3].min(axis=-1) - 0.55) / 0.35, 0, 1)
         a = a * (1 - white * (1 - a))
         for c in range(3):
-            px[..., c] = px[..., c] * (1 - a) + s[..., c] * a
-    img = bpy.data.images.new(name, n, n)
+            color[..., c] = color[..., c] * (1 - a) + s[..., c] * a
+        r = r * (1 - a) + 0.22 * a
+    rough = np.ones((n, n, 4), dtype=np.float32)
+    rough[..., 0] = rough[..., 2] = 0.0
+    rough[..., 1] = np.clip(r, 0.05, 1)
+    return color, normal, rough
+
+
+def image_of(name, px):
+    img = bpy.data.images.new(name, px.shape[1], px.shape[0])
     img.pixels.foreach_set(px.ravel())
     img.pack()
     return img
 
 
+def screen_image(kind, n=256):
+    """Imagen de una pantalla de cabina: horizonte artificial (pfd) o página de motor de la MW54 (mfd)."""
+    import numpy as np
+    y, x = np.mgrid[0:n, 0:n] / (n - 1)
+    px = np.zeros((n, n, 4), dtype=np.float32)
+    px[..., 3] = 1
+    green = np.array([0.15, 1.0, 0.35])
+
+    def paint(mask, col, a=1.0):
+        for c in range(3):
+            px[..., c] = px[..., c] * (1 - mask * a) + col[c] * mask * a
+
+    if kind == "pfd":
+        sky = y > 0.5 + 0.12 * (x - 0.5)
+        paint(sky.astype(float), (0.05, 0.22, 0.55))
+        paint((~sky).astype(float), (0.30, 0.17, 0.06))
+        horizon = np.abs(y - (0.5 + 0.12 * (x - 0.5))) < 0.008
+        paint(horizon.astype(float), (1, 1, 1))
+        for k in (-2, -1, 1, 2):
+            ladder = (np.abs(y - (0.5 + k * 0.1 + 0.12 * (x - 0.5))) < 0.005) & (np.abs(x - 0.5) < 0.08 + 0.03 * abs(k) % 2)
+            paint(ladder.astype(float), (1, 1, 1))
+        wings = ((np.abs(y - 0.5) < 0.012) & (np.abs(x - 0.5) > 0.07) & (np.abs(x - 0.5) < 0.2)) | (np.hypot(x - 0.5, y - 0.5) < 0.015)
+        paint(wings.astype(float), (1.0, 0.75, 0.1))
+        for x0 in (0.04, 0.84):
+            tape = (x > x0) & (x < x0 + 0.12) & (y > 0.15) & (y < 0.85)
+            paint(tape.astype(float), (0.02, 0.02, 0.03), 0.85)
+            ticks = tape & (((y * 40) % 1) < 0.12)
+            paint(ticks.astype(float), (0.9, 0.9, 0.9))
+    else:
+        for cx, cy in ((0.3, 0.62), (0.72, 0.62)):
+            r = np.hypot(x - cx, y - cy)
+            ang = np.arctan2(y - cy, x - cx)
+            arc = (np.abs(r - 0.17) < 0.012) & (ang > -0.6) & (ang < 3.4)
+            paint(arc.astype(float), green)
+            red = (np.abs(r - 0.17) < 0.012) & (ang > -0.6) & (ang < 0.0)
+            paint(red.astype(float), (1, 0.25, 0.1))
+            needle = (np.abs((x - cx) * np.sin(0.9) - (y - cy) * np.cos(0.9)) < 0.008) & (r < 0.15) & ((x - cx) * np.cos(0.9) + (y - cy) * np.sin(0.9) > 0)
+            paint(needle.astype(float), (1, 1, 1))
+        for k, h in enumerate((0.55, 0.8, 0.35, 0.62)):
+            bar = (x > 0.12 + k * 0.2) & (x < 0.2 + k * 0.2) & (y > 0.12) & (y < 0.12 + 0.25 * h)
+            paint(bar.astype(float), green)
+        frame = (x < 0.02) | (x > 0.98) | (y < 0.02) | (y > 0.98)
+        paint(frame.astype(float), (0.25, 0.27, 0.3))
+    img = bpy.data.images.new(f"screen_{kind}", n, n)
+    img.pixels.foreach_set(px.ravel())
+    img.pack()
+    return img
+
+
+def screen_material(name, kind):
+    """Pantalla: la imagen es a la vez color y emisión, para que se lea dentro de la cabina en sombra."""
+    m = material(name, (1, 1, 1), 0.0, 0.18, coat=1.0, coat_rough=0.03, image=screen_image(kind))
+    nt = m.node_tree
+    p = nt.nodes.get("Principled BSDF")
+    tex = [nd for nd in nt.nodes if nd.type == "TEX_IMAGE"][0]
+    nt.links.new(tex.outputs["Color"], p.inputs["Emission Color"])
+    p.inputs["Emission Strength"].default_value = 1.6
+    return m
+
+
 def materials():
     # Colores del portafolio en lineal: tinta #08070a, brasa #ff9a3c, naranja del disco #ff6a12, rojo del borde #db3208.
     ink = (0.010, 0.009, 0.012)
-    hole = bpy.data.images.load(os.path.join(os.path.dirname(__file__), "assets", "stack-hole.png"), check_existing=True)
+    hole = bpy.data.images.load(os.path.join(os.path.dirname(__file__), "assets", "insignia.png"), check_existing=True)
+    c, nrm, rgh = panel_textures(ink)
+    fc, fn, fr = panel_textures(ink, decal=hole, place=FIN_DECAL)
+    nrm, rgh, fn, fr = image_of("panel_normal", nrm), image_of("panel_rough", rgh), image_of("fin_normal", fn), image_of("fin_rough", fr)
+    lac = dict(coat=0.55, coat_rough=0.12, normal=nrm, rough=rgh)
     return {
-        "paint": material("Negro brillante", (1, 1, 1), 0.0, 0.3, coat=1.0, coat_rough=0.06, image=panel_texture("panel_ink", ink)),
-        "fin": material("Negro con insignia", (1, 1, 1), 0.0, 0.3, coat=1.0, coat_rough=0.06, image=panel_texture("panel_fin", ink, decal=hole, place=FIN_DECAL)),
-        "orange": material("Naranja del disco", (1.0, 0.144, 0.006), 0.0, 0.32, coat=1.0, coat_rough=0.05),
-        "ember": material("Rojo del borde", (0.71, 0.032, 0.0024), 0.0, 0.32, coat=1.0, coat_rough=0.05),
-        "glow": material("Brasa", (1.0, 0.32, 0.045), 0.0, 0.32, coat=1.0, coat_rough=0.05),
+        "paint": material("Negro brillante", (1, 1, 1), 0.0, 0.3, image=image_of("panel_ink", c), **lac),
+        "fin": material("Negro con insignia", (1, 1, 1), 0.0, 0.3, coat=0.55, coat_rough=0.12, image=image_of("panel_fin", fc), normal=fn, rough=fr),
+        "orange": material("Naranja del disco", (1.0, 0.144, 0.006), 0.0, 0.32, **lac),
+        "ember": material("Rojo del borde", (0.71, 0.032, 0.0024), 0.0, 0.32, **lac),
+        "glow": material("Brasa", (1.0, 0.32, 0.045), 0.0, 0.32, **lac),
         "paint_dark": material("Gris antirreflejo", (0.03, 0.03, 0.035), 0.0, 0.75),
-        "glass": material("Cabina ahumada", (0.06, 0.08, 0.10), 0.0, 0.03, coat=1.0, coat_rough=0.02, transmission=0.5, ior=1.49, alpha=0.8),
+        "glass": material("Cabina de policarbonato", (0.62, 0.68, 0.72), 0.0, 0.02, coat=1.0, coat_rough=0.01, transmission=0.6, ior=1.58, alpha=0.3),
+        "cockpit": material("Gris de cabina", (0.028, 0.03, 0.034), 0.0, 0.62),
+        "console": material("Consola", (0.025, 0.027, 0.03), 0.0, 0.45),
+        "cushion": material("Cojín de asiento", (0.03, 0.035, 0.025), 0.0, 0.9),
+        "harness": material("Arnés", (0.32, 0.30, 0.22), 0.0, 0.85),
+        "handle": material("Asa de eyección", (0.95, 0.62, 0.02), 0.0, 0.4),
+        "hud": material("Combinador del HUD", (0.55, 0.9, 0.62), 0.0, 0.02, transmission=0.7, ior=1.5, alpha=0.25),
+        "pfd": screen_material("Pantalla de vuelo", "pfd"),
+        "mfd": screen_material("Pantalla de motor", "mfd"),
         "rubber": material("Goma", (0.03, 0.03, 0.03), 0.0, 0.75),
         "alu": material("Aluminio mecanizado", (0.91, 0.92, 0.93), 1.0, 0.2),
         "anod": material("Aluminio anodizado negro", (0.05, 0.05, 0.06), 1.0, 0.38),
@@ -172,7 +266,7 @@ def materials():
         "lipo": material("Batería LiPo", (0.10, 0.25, 0.65), 0.0, 0.3, coat=0.6),
         "gascan": material("Botella de gas", (0.75, 0.10, 0.08), 0.8, 0.3, coat=0.5),
         "steel": material("Acero", (0.72, 0.73, 0.75), 1.0, 0.28),
-        "seat": material("Asiento", (0.18, 0.20, 0.16), 0.0, 0.8),
+        "seat": material("Asiento", (0.06, 0.07, 0.05), 0.0, 0.8),
         "light_red": material("Luz de navegación roja", (0.9, 0.05, 0.03), 0.0, 0.2, emission=((1, 0.1, 0.05), 2.0)),
         "light_green": material("Luz de navegación verde", (0.05, 0.8, 0.2), 0.0, 0.2, emission=((0.1, 1, 0.3), 2.0)),
     }
@@ -195,8 +289,9 @@ def loft(name, sections, mats, closed=True, caps=False, keep=lambda i, j: True, 
             jn = (j + 1) % n
             f = bm.faces.new([rows[i][j], rows[i][jn], rows[i + 1][jn], rows[i + 1][j]])
             f.material_index = matof(i, j)
+            side = f.calc_center_median().y
             for loop, (ii, jj) in zip(f.loops, ((i, j), (i, j + 1), (i + 1, j + 1), (i + 1, j))):
-                loop[layer].uv = uvmap(loop.vert.co) if uvmap else (lengths[ii] / uvscale, jj / n * 2.0)
+                loop[layer].uv = uvmap(loop.vert.co, side) if uvmap else (lengths[ii] / uvscale, jj / n * 2.0)
     if caps:
         bm.faces.new(list(reversed(rows[0])))
         bm.faces.new(rows[-1])
@@ -213,6 +308,114 @@ def set_pivot(ob, pivot):
     pivot = Vector(pivot)
     ob.data.transform(Matrix.Translation(-pivot))
     ob.location = pivot
+
+
+def build_cockpit(M, part):
+    """Cabina en tándem a escala, metida bajo la cúpula por encima de los equipos (suelo a z = 38): cubeta con consolas
+    laterales, tablero delantero con visera, HUD y dos pantallas, tablero trasero sobre el respaldo del asiento
+    delantero, dos asientos eyectables, y en cada puesto palanca, gases y pedales con su bisagra real."""
+    FLOOR, TOPZ = 38.0, 87.0
+    X0, X1 = 546.0, 396.0
+    inner = lambda x, z: skin_y(x, z) - 2.5
+
+    # cubeta: perfil en U que sigue la piel por dentro, de la visera al mamparo trasero
+    rows = []
+    for x in [X0 - (X0 - X1) * k / 16 for k in range(17)]:
+        # cada pared llega justo bajo el borde de la abertura de su lado (la franja superior no es simétrica)
+        sec = superellipse(*section_at(x))
+        walls = []
+        for edge, sgn in ((sec[9], 1), (sec[16], -1)):
+            top = min(TOPZ, edge[2] - 2)
+            zs = [top] + [FLOOR + (top - FLOOR) * f for f in (0.75, 0.5, 0.25)]
+            walls.append([(x, sgn * min(inner(x, z), abs(edge[1]) - 1.5 if z > top - 1 else inner(x, z)), z) for z in zs])
+        floor = [(x, inner(x, FLOOR) * f, FLOOR) for f in (1.0, 0.5, 0.0, -0.5, -1.0)]
+        rows.append(walls[0] + floor + list(reversed(walls[1])))
+    tub = loft("tub", rows, M["cockpit"], closed=False)
+    # mamparo trasero y cubierta posterior (tortuga) hasta el final de la abertura de la cúpula
+    bulk = [(X1, inner(X1, z) * f, z) for z in (FLOOR, TOPZ) for f in (1, -1)]
+    # pared del pozo de los pies: la propia sección en U de la cubeta en x = X0, cerrada como una cara
+    fb = bmesh.new()
+    fv = [fb.verts.new(p) for p in rows[0]]
+    fb.faces.new(fv)
+    footwell = to_object("footwell", fb, M["cockpit"], smooth=False)
+    bulkhead = box("bulkhead", (X1 - 1.5, 0, (FLOOR + TOPZ) / 2), (3, 2 * inner(X1, 60), TOPZ - FLOOR), M["cockpit"])
+    deck = loft("deck", [[(x, inner(x, TOPZ - 1) * f, TOPZ - 1 + 3 * (1 - f * f)) for f in (1, 0.5, 0, -0.5, -1)] for x in (X1, 330)], M["cockpit"], closed=False)
+    # consolas laterales con paneles de interruptores
+    consoles = []
+    for xs, xe in ((536, 486), (462, 400)):
+        for sgn in (1, -1):
+            yc = sgn * (inner((xs + xe) / 2, 58) - 7)
+            consoles.append(box(f"con{xs}{sgn}", ((xs + xe) / 2, yc, 52), (xs - xe, 13, 28), M["console"], bevel=1))
+            for k in range(5):
+                consoles.append(cylinder_between(f"sw{xs}{sgn}{k}", ((xs - 12 - k * 13), yc, 66), ((xs - 12 - k * 13), yc, 68.5), 1.3, M["alu"], steps=10))
+
+    # tablero delantero con visera, dos pantallas y el HUD encima
+    def panel(name, x, zb, zt, w, screens, hud=False):
+        tilt = 12
+        obs = [box(f"{name}_board", (x, 0, (zb + zt) / 2), (3, w, zt - zb), M["console"], bevel=0.8)]
+        obs.append(box(f"{name}_hood", (x - 5, 0, zt + 1.5), (14, w + 4, 3), M["paint_dark"], bevel=1))
+        for k, mat in enumerate(screens):
+            yc = (k - (len(screens) - 1) / 2) * (w / len(screens))
+            obs.append(box(f"{name}_bez{k}", (x - 2, yc, (zb + zt) / 2 + 1), (1.5, w / len(screens) - 4, zt - zb - 8), M["black"], bevel=0.6))
+            scr = box(f"{name}_scr{k}", (x - 2.9, yc, (zb + zt) / 2 + 1), (0.4, w / len(screens) - 8, zt - zb - 12), mat)
+            uv = scr.data.uv_layers.new(name="UVMap")
+            for poly in scr.data.polygons:
+                for li in poly.loop_indices:
+                    co = scr.data.vertices[scr.data.loops[li].vertex_index].co
+                    uv.data[li].uv = ((co.y - (yc - (w / len(screens) - 8) / 2)) / (w / len(screens) - 8), (co.z - (zb + 6 + 1)) / (zt - zb - 12))
+            obs.append(scr)
+        if hud:
+            obs.append(box(f"{name}_hudbase", (x - 8, 0, zt + 4), (8, 14, 3), M["black"], bevel=0.6))
+            g = box(f"{name}_hudglass", (x - 9, 0, zt + 11), (0.6, 13, 12), M["hud"])
+            g.rotation_euler = (0, math.radians(-tilt), 0)
+            obs.append(g)
+        return obs
+    front_panel = panel("fp", 533, 56, 76, 60, [M["pfd"], M["mfd"]], hud=True)
+    rear_panel = panel("rp", 472, 68, 86, 46, [M["pfd"], M["mfd"]])
+
+    # asientos eyectables: cubo, cojín, respaldo, cabezal con el paracaídas y el asa amarilla entre las piernas
+    def seat(name, x):
+        obs = [box(f"{name}_pan", (x, 0, FLOOR + 8), (26, 30, 16), M["cockpit"], bevel=1.5),
+               box(f"{name}_cush", (x + 1, 0, FLOOR + 17), (22, 26, 3), M["cushion"], bevel=1.2),
+               box(f"{name}_back", (x - 14, 0, FLOOR + 30), (5, 30, 42), M["cockpit"], bevel=1.5),
+               box(f"{name}_pad", (x - 11, 0, FLOOR + 30), (2.5, 24, 30), M["cushion"], bevel=1),
+               box(f"{name}_head", (x - 14, 0, FLOOR + 55), (9, 22, 12), M["seat"], bevel=2)]
+        for sgn in (1, -1):
+            obs.append(box(f"{name}_rail{sgn}", (x - 15, sgn * 16, FLOOR + 27), (3, 2, 44), M["anod"]))
+            obs.append(tube_path(f"{name}_strap{sgn}", [(x - 9, sgn * 9, FLOOR + 46), (x - 2, sgn * 6, FLOOR + 36), (x + 4, sgn * 3, FLOOR + 22)], 1.1, M["harness"], bend=4))
+        obs.append(tube_path(f"{name}_handle", [(x + 12, 5, FLOOR + 10), (x + 16, 5, FLOOR + 16), (x + 16, -5, FLOOR + 16), (x + 12, -5, FLOOR + 10)], 0.9, M["handle"], bend=2))
+        return obs
+
+    part("cabina.cubeta", [tub, footwell, bulkhead, deck] + consoles, "airframe", 33, (0, 0, 150), "Cubeta de cabina con consolas", "airframe")
+    part("cabina.tablero", front_panel, "airframe", 34, (60, 0, 170), "Tablero delantero con HUD y dos pantallas", "airframe")
+    part("cabina.tablero_trasero", rear_panel, "airframe", 35, (0, 0, 190), "Tablero trasero", "airframe")
+    part("asientos", seat("s1", 498) + seat("s2", 430), "airframe", 36, (0, 0, 210), "Asientos eyectables", "airframe")
+
+    # mandos de cada puesto, con la bisagra en su pie
+    for tagname, x in (("delantero", 498), ("trasero", 430)):
+        sx = x + 20
+        stick = part(f"palanca.{tagname}", [cylinder_between(f"st{x}", (sx, 0, FLOOR), (sx, 0, FLOOR + 3), 4, M["black"], steps=20),
+                                            cylinder_between(f"sts{x}", (sx, 0, FLOOR + 2), (sx - 2, 0, FLOOR + 22), 1.1, M["alu"], steps=12),
+                                            box(f"stg{x}", (sx - 2.4, 0, FLOOR + 26), (4.5, 4, 9), M["black"], bevel=1.5),
+                                            cylinder_between(f"stb{x}", (sx - 1, 0, FLOOR + 30.3), (sx - 1, 0, FLOOR + 31), 0.9, M["ember"], steps=10)],
+                     "airframe", 37, (0, 0, 120), f"Palanca de mando ({tagname})", "airframe", control="stick", range=[-14, 14])
+        stick["hinge"] = [0.0, 1.0, 0.0]
+        stick["roll"] = [1.0, 0.0, 0.0]
+        set_pivot(stick, (sx, 0, FLOOR + 1.5))
+        ty = inner(x, 58) - 7
+        thr = part(f"gases.{tagname}", [box(f"thb{x}", (x + 4, ty, 66.5), (14, 6, 2), M["alu"]),
+                                         cylinder_between(f"thl{x}", (x + 4, ty, 66), (x + 4, ty, 74), 0.9, M["alu"], steps=10),
+                                         box(f"thg{x}", (x + 4, ty - 0.5, 75.5), (4, 5, 4), M["black"], bevel=1.2)],
+                   "airframe", 38, (0, 60, 120), f"Palanca de gases ({tagname})", "airframe", control="throttle", range=[-22, 22])
+        thr["hinge"] = [0.0, 1.0, 0.0]
+        set_pivot(thr, (x + 4, ty, 66))
+        for sgn in (1, -1):
+            px = x + 34
+            ped = part(f"pedal.{tagname}.{'izq' if sgn > 0 else 'der'}", [cylinder_between(f"pa{x}{sgn}", (px, sgn * 8, FLOOR + 22), (px + 3, sgn * 8, FLOOR + 6), 0.9, M["alu"], steps=10),
+                                                                            box(f"pp{x}{sgn}", (px + 3, sgn * 8, FLOOR + 6), (2, 6, 9), M["black"], bevel=0.6)],
+                       "airframe", 39, (40, sgn * 30, 100), f"Pedal de timón ({tagname})", "airframe", control="pedal", range=[-12, 12], sign=sgn)
+            ped["hinge"] = [0.0, 1.0, 0.0]
+            set_pivot(ped, (px, sgn * 8, FLOOR + 22))
 
 
 def build_hawk(M, root, log=lambda msg: None):
@@ -288,7 +491,7 @@ def build_hawk(M, root, log=lambda msg: None):
     part("fuselaje.trasero", [rear, nozzle], "airframe", 1, (-360, 0, 0), "Fuselaje trasero y tobera", "airframe")
     part("cabina", [canopy], "airframe", 31, (0, 0, 240), "Cabina en tándem", "airframe")
     part("escotilla", [hatch], "airframe", 32, (0, 0, 280), "Escotilla del motor", "airframe")
-    part("asientos", [box(f"seat{x}", (x, 0, 34), (40, 40, 46), M["seat"], bevel=4) for x in (500, 390)], "airframe", 30, (0, 0, 200), "Asientos (maqueta)", "airframe")
+    build_cockpit(M, part)
 
     # ── alas: raíz ajustada a la piel, flecha de ~26°, perfil del 11 al 9 %, diedro de 2°;
     #    flaps y alerones cortados en su línea de bisagra; puntas en rojo de borde ──
@@ -368,7 +571,11 @@ def build_hawk(M, root, log=lambda msg: None):
             rows.append(row)
         return rows
     FIN = ((None, -380, 360), (248, -605, 150))
-    fin = loft("fin", fin_rows(0, 0.7, FIN), [M["fin"]], uvmap=lambda co: (min(1, max(0, (-co.x - 400) / 300)), min(1, max(0, (co.z - 60) / 190))))
+
+    def fin_uv(co, side):
+        u = 0.5 + (-co.x - 555) / 300
+        return (min(1, max(0, u if side >= 0 else 1 - u)), min(1, max(0, (co.z - 60) / 190)))
+    fin = loft("fin", fin_rows(0, 0.7, FIN), [M["fin"]], uvmap=fin_uv)
     tipband = loft("finband", fin_rows(0, 1, ((248, -605, 150), (270, -620, 130))), M["glow"], caps=True)
     part("deriva", [fin, tipband], "airframe", 8, (0, 0, 300), "Deriva con la insignia del agujero negro", "airframe")
     rud = part("timon", [loft("rudder", fin_rows(0.703, 1, FIN), M["paint"], caps=True)], "airframe", 9, (-160, 0, 300), "Timón de dirección", "airframe", control="rudder", range=[-25, 25])

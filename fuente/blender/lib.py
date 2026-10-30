@@ -16,7 +16,7 @@ def clear_scene():
 _mats = {}
 
 
-def material(name, color, metallic=0.0, roughness=0.5, coat=0.0, coat_rough=0.05, transmission=0.0, ior=1.45, alpha=1.0, image=None, emission=None, specular=0.5):
+def material(name, color, metallic=0.0, roughness=0.5, coat=0.0, coat_rough=0.05, transmission=0.0, ior=1.45, alpha=1.0, image=None, emission=None, specular=0.5, normal=None, rough=None, strength=1.0):
     if name in _mats:
         return _mats[name]
     m = bpy.data.materials.new(name)
@@ -47,6 +47,22 @@ def material(name, color, metallic=0.0, roughness=0.5, coat=0.0, coat_rough=0.05
         tex = nt.nodes.new("ShaderNodeTexImage")
         tex.image = image
         nt.links.new(tex.outputs["Color"], p.inputs["Base Color"])
+    if rough is not None:
+        # rugosidad en el canal verde, como la lee el exportador glTF (metallicRoughness)
+        rt = nt.nodes.new("ShaderNodeTexImage")
+        rt.image = rough
+        rough.colorspace_settings.name = "Non-Color"
+        sep = nt.nodes.new("ShaderNodeSeparateColor")
+        nt.links.new(rt.outputs["Color"], sep.inputs["Color"])
+        nt.links.new(sep.outputs["Green"], p.inputs["Roughness"])
+    if normal is not None:
+        nm = nt.nodes.new("ShaderNodeTexImage")
+        nm.image = normal
+        normal.colorspace_settings.name = "Non-Color"
+        node = nt.nodes.new("ShaderNodeNormalMap")
+        node.inputs["Strength"].default_value = strength
+        nt.links.new(nm.outputs["Color"], node.inputs["Color"])
+        nt.links.new(node.outputs["Normal"], p.inputs["Normal"])
     _mats[name] = m
     return m
 

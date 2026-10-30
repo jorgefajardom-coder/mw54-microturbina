@@ -2,63 +2,15 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12">
 <!--SEO-->
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
-<style>
-  :root { --bg: #0d0f12; --panel: #15181d; --line: #ffffff14; --text: #e9ecef; --muted: #8b939c; --accent: #ff8a3c; --cool: #7fb2ff; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { position: fixed; top: 0; left: 0; right: 0; z-index: 5; display: flex; align-items: baseline; gap: 14px; padding: 16px 20px; pointer-events: none; }
-  header h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: .01em; }
-  header p { margin: 0; color: var(--muted); font-size: 12.5px; }
-  #view { position: fixed; inset: 0; }
-  canvas { display: block; }
-  .ui { position: fixed; z-index: 6; }
-  #controls { left: 20px; bottom: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: calc(100% - 40px); }
-  button, .chip { height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--panel); color: var(--text); font: 600 11px/32px ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); }
-  button:hover, button[data-on] { background: #232830; }
-  button[data-on] { box-shadow: inset 0 0 0 1px var(--accent); }
-  .lamp { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #4a4a4a; margin-right: 8px; vertical-align: 1px; }
-  button[data-on] .lamp { background: var(--accent); box-shadow: 0 0 10px 2px #ff7a2a88; }
-  label.chip { display: inline-flex; gap: 10px; align-items: center; cursor: default; }
-  input[type=range] { width: 120px; accent-color: var(--accent); }
-  #readout { right: 20px; bottom: 22px; font: 12px ui-monospace, Menlo, monospace; color: var(--muted); text-align: right; }
-  #readout b { color: var(--text); font-weight: 600; }
-  #card { right: 20px; top: 64px; width: 300px; padding: 14px 16px; border-radius: 12px; background: #15181dee; box-shadow: inset 0 0 0 1px var(--line); backdrop-filter: blur(8px); display: none; }
-  #card h2 { margin: 0 0 2px; font-size: 15px; }
-  #card .mat { color: var(--muted); font-size: 12.5px; margin-bottom: 10px; }
-  #card dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font: 12px ui-monospace, Menlo, monospace; }
-  #card dt { color: var(--muted); }
-  #card .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: #ffffff12; position: relative; margin-top: 6px; }
-  #card .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--cool); }
-  #pip { left: 20px; top: 64px; width: 340px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--line), 0 10px 40px #0008; background: #000; display: none; }
-  #pip .head { padding: 8px 12px; font: 600 11px ui-monospace, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); background: #15181d; display: flex; justify-content: space-between; }
-  #pip .frame { height: 220px; }
-  #pip .chem { padding: 8px 12px 10px; font: 11.5px/1.55 ui-monospace, Menlo, monospace; color: var(--muted); background: #15181d; }
-  #pip .chem b { color: var(--text); }
-  #legend { left: 50%; transform: translateX(-50%); top: 64px; padding: 8px 12px; border-radius: 10px; background: #15181dee; box-shadow: inset 0 0 0 1px var(--line); font: 11px ui-monospace, Menlo, monospace; color: var(--muted); display: none; }
-  #legend .ramp { width: 260px; height: 8px; border-radius: 4px; margin: 6px 0 2px; background: linear-gradient(90deg, #30123b, #4662d7, #36aaf9, #1ae4b6, #72fe5e, #c7ef34, #faba39, #f66b19, #ca2a04, #7a0403); }
-  #legend .scale { display: flex; justify-content: space-between; }
-  #steps { left: 50%; transform: translateX(-50%); bottom: 64px; font: 12px ui-monospace, Menlo, monospace; color: var(--text); padding: 6px 12px; border-radius: 999px; background: #15181dcc; display: none; }
-  #tip { position: fixed; z-index: 7; pointer-events: none; padding: 4px 9px; border-radius: 6px; background: #000c; font-size: 12px; display: none; white-space: nowrap; }
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); font: 12px ui-monospace, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; }
-  #hud { left: 50%; transform: translateX(-50%); top: 64px; padding: 10px 16px; border-radius: 12px; background: #000a; font: 12.5px/1.6 ui-monospace, Menlo, monospace; color: #cfd6dd; text-align: center; display: none; }
-  #hud b { color: #fff; }
-  #keys { left: 50%; transform: translateX(-50%); bottom: 64px; font: 11px ui-monospace, Menlo, monospace; color: #cfd6dd; background: #000a; padding: 6px 12px; border-radius: 999px; display: none; white-space: nowrap; }
-  body[data-flying] #hud, body[data-flying] #keys { display: block; }
-  body[data-flying] #card, body[data-flying] #legend, body[data-flying] #steps, body[data-flying] #assemble, body[data-flying] #explode, body[data-flying] #heat, body[data-flying] #cam, body[data-flying] #pip, body[data-flying] #surfaces { display: none !important; }
-  footer { position: fixed; z-index: 5; right: 20px; top: 18px; font-size: 12px; color: var(--muted); }
-  footer a { color: var(--text); }
-  nav.sections { position: fixed; z-index: 6; left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 6px; }
-  nav.sections a { padding: 6px 12px; border-radius: 999px; background: var(--panel); color: var(--muted); text-decoration: none; font: 600 11px ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; box-shadow: inset 0 0 0 1px var(--line); }
-  nav.sections a[aria-current] { color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
-  @media (max-width: 760px) { #card { left: 12px; right: 12px; width: auto; top: auto; bottom: 120px; } #pip { width: calc(100% - 24px); left: 12px; } header p, footer { display: none; } nav.sections { top: 52px; } }
-</style>
+<link rel="stylesheet" href="./ui.css">
 </head>
 <body>
 <header><h1>Wren MW54 en un entrenador a reacción</h1><p>Maqueta 1:7 · pasa el cursor por las piezas, móntala o arráncala</p></header>
-<nav class="sections"><a href="./" aria-current="page">Hawk + MW54</a><a href="./anatomia/">Anatomía técnica</a></nav>
+<nav class="sections"><a href="./" aria-current="page">Hawk + MW54</a><a href="./sr72/">SR-72</a><a href="./anatomia/">Anatomía técnica</a></nav>
 <footer>Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></footer>
 <div id="view"></div>
 <div id="loading">Cargando el modelo…</div>
@@ -78,9 +30,15 @@
   <button id="cam">Cámara de combustión</button>
   <button id="gear">Tren</button>
   <button id="surfaces">Mandos</button>
+  <button id="cockpit">Cabina</button>
   <button id="fly">Volar</button>
 </div>
 <div class="ui" id="readout"></div>
+<div id="pad" aria-hidden="true">
+  <div class="stick" id="stickL"><span>Gas · timón</span><div class="knob"></div></div>
+  <div class="stick" id="stickR"><span>Cabeceo · alabeo</span><div class="knob"></div></div>
+  <div class="padkeys"><button data-key="e">Motor</button><button data-key="g">Tren</button><button data-key="f">Flaps</button><button data-key="b">Freno</button><button data-key="c">Vista</button><button data-key="r">Reinicio</button></div>
+</div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 <script type="module" src="./app.js"></script>
 </body>

@@ -5,8 +5,10 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { op, metal, PARTS, SPEC } from "./model.js";
 import { createFlight } from "./flight.js";
+import { createPad } from "./controls.js";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString("es-ES");
@@ -19,8 +21,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.localClippingEnabled = true;
@@ -30,14 +32,26 @@ scene.background = new THREE.Color(0x0d0f12);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.9;
+// reflejos de una nave industrial real (Poly Haven, CC0): la pintura y el metal reflejan luces, vigas y puertas, no una caja
+new HDRLoader().load("./hangar.hdr", (hdr) => {
+  hdr.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = pmrem.fromEquirectangular(hdr).texture;
+  scene.environmentIntensity = 0.75;
+  hdr.dispose();
+});
 const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.01, 50);
-camera.position.set(1.9, 0.95, 2.1);
+// en vertical (celular) la cámara se aleja lo justo para que quepa la envergadura
+function homeView() {
+  const k = Math.min(2.6, Math.max(1, 1.25 / camera.aspect));
+  return new THREE.Vector3(1.9, 0.95, 2.1).multiplyScalar(k);
+}
+camera.position.copy(homeView());
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, -0.05, 0);
 controls.maxPolarAngle = Math.PI * 0.49;
 controls.minDistance = 0.25;
-controls.maxDistance = 6;
+controls.maxDistance = 6 * Math.max(1, 1.25 / camera.aspect);
 const sun = new THREE.DirectionalLight(0xffffff, 2.2);
 sun.position.set(2.5, 4, 1.5);
 sun.castShadow = true;
@@ -125,7 +139,7 @@ const [floorMap, floorRough] = floorTextures();
 const FLOOR_SIZE = TILE * 4;
 floorMap.repeat.set(4, 4);
 floorRough.repeat.set(4, 4);
-const floorMat = new THREE.MeshStandardMaterial({ map: floorMap, roughnessMap: floorRough, roughness: 0.7, metalness: 0, envMapIntensity: 0.7 });
+const floorMat = new THREE.MeshStandardMaterial({ map: floorMap, roughnessMap: floorRough, roughness: 0.7, metalness: 0, envMapIntensity: 0.35 });
 fadeToBackground(floorMat, 2.4, 6.2);
 const ground = new THREE.Group();
 const slab = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), floorMat);
@@ -212,8 +226,11 @@ scene.add(model);
 model.traverse((o) => {
   if (o.isMesh) {
     o.castShadow = o.receiveShadow = true;
-    o.material.side = THREE.FrontSide;
+    // la cubeta de la cabina es una lámina abierta: se ve por las dos caras
+    o.material.side = o.material.name.startsWith("Gris de cabina") ? THREE.DoubleSide : THREE.FrontSide;
     if (o.material.transmission > 0 || o.material.opacity < 1) { o.material.transparent = true; o.castShadow = false; }
+    // el combinador del HUD es una lámina casi invisible con un tinte verde, no un bloque refractivo
+    if (o.material.name.startsWith("Combinador")) Object.assign(o.material, { transmission: 0, opacity: 0.16, transparent: true, depthWrite: false });
   }
   const d = o.userData;
   if (d && d.part) {
@@ -227,7 +244,7 @@ model.traverse((o) => {
 for (const e of parts) for (const m of e.materials) m.userData.realMaterial = m.material;
 
 // ── mandos y tren: cada pieza gira alrededor de su bisagra real (el eje viene del modelo de Blender) ──
-const controlParts = parts.filter((e) => e.data.control).map((e) => ({ e, axis: fromBlender(e.data.hinge).normalize(), range: e.data.range, kind: e.data.control, sign: e.data.sign ?? 1, rest: e.quat.clone(), angle: 0 }));
+const controlParts = parts.filter((e) => e.data.control).map((e) => ({ e, axis: fromBlender(e.data.hinge).normalize(), roll: e.data.roll ? fromBlender(e.data.roll).normalize() : null, range: e.data.range, kind: e.data.control, sign: e.data.sign ?? 1, rest: e.quat.clone(), angle: 0 }));
 const gearState = { t: 0, target: 0 };
 const surf = { roll: 0, pitch: 0, yaw: 0, flap: 0 };
 const smooth01 = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
@@ -242,8 +259,13 @@ function poseControls() {
     else if (c.kind === "elevator") a = surf.pitch * (surf.pitch > 0 ? c.range[1] : -c.range[0]);
     else if (c.kind === "rudder") a = surf.yaw * c.range[1];
     else if (c.kind === "flap") a = surf.flap * c.range[1];
+    // en la cabina: la palanca sigue cabeceo y alabeo, los gases la palanca del motor y los pedales el timón
+    else if (c.kind === "stick") a = -surf.pitch * c.range[1];
+    else if (c.kind === "throttle") a = (0.5 - motor.target) * 2 * c.range[1];
+    else if (c.kind === "pedal") a = surf.yaw * c.range[1] * c.sign;
     c.angle = a;
     c.e.quat.copy(c.rest).multiply(new THREE.Quaternion().setFromAxisAngle(c.axis, a * D));
+    if (c.roll) c.e.quat.multiply(new THREE.Quaternion().setFromAxisAngle(c.roll, surf.roll * c.range[1] * D));
   }
 }
 spinners = ["wheel", "turbine", "nut"].map((k) => engineParts[k]).filter(Boolean);
@@ -504,7 +526,16 @@ function showCard(entry) {
     `</dl>`;
   card.style.display = "block";
 }
-renderer.domElement.addEventListener("pointermove", (ev) => {
+// con ratón la tarjeta sigue al cursor; en pantallas táctiles, un toque elige la pieza (y un toque fuera la cierra)
+let downAt = null;
+renderer.domElement.addEventListener("pointerdown", (ev) => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener("pointerup", (ev) => {
+  if (ev.pointerType === "mouse" || !downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 8 || flying) return;
+  pick(ev);
+  $("tip").style.display = "none";
+});
+renderer.domElement.addEventListener("pointermove", (ev) => { if (ev.pointerType === "mouse") pick(ev); });
+function pick(ev) {
   mouse.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1);
   ray.setFromCamera(mouse, camera);
   const hit = ray.intersectObjects(meshes, false)[0];
@@ -518,7 +549,7 @@ renderer.domElement.addEventListener("pointermove", (ev) => {
   const tip = $("tip");
   if (entry) { tip.style.display = "block"; tip.style.left = `${ev.clientX + 14}px`; tip.style.top = `${ev.clientY + 10}px`; tip.textContent = infoOf(entry)?.name ?? entry.data.label; }
   else tip.style.display = "none";
-});
+}
 let focus = null;
 renderer.domElement.addEventListener("click", () => {
   if (!hovered) return;
@@ -552,15 +583,42 @@ $("gear").onclick = () => { gearState.target = gearState.target ? 0 : 1; $("gear
 $("surfaces").onclick = () => { demoSurfaces = !demoSurfaces; $("surfaces").toggleAttribute("data-on", demoSurfaces); if (!demoSurfaces) setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); };
 let demoSurfaces = false;
 let flying = false;
-const flight = createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState });
-window.__sim = { flight, motor, gearState };
+const pad = createPad();
+const flight = createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
+
+// ── vista de cabina: la cámara entra por encima del puesto trasero y mira el tablero; los mandos se mueven solos ──
+const VIEWS = {
+  home: { pos: homeView(), target: new THREE.Vector3(0, -0.05, 0) },
+  cockpit: { pos: new THREE.Vector3(0.405, 0.16, 0.07), target: new THREE.Vector3(0.53, 0.055, 0) },
+};
+let camTween = null;
+let inCockpit = false;
+function flyCamera(view) {
+  camTween = { from: camera.position.clone(), fromT: controls.target.clone(), to: VIEWS[view], start: performance.now() / 1000, dur: 1.4 };
+}
+$("cockpit").onclick = () => {
+  inCockpit = !inCockpit;
+  $("cockpit").toggleAttribute("data-on", inCockpit);
+  controls.minDistance = inCockpit ? 0.06 : 0.25;
+  if (inCockpit && parts.some((e) => e.t > 0.02)) { timeline = null; setExploded(0); $("explode").removeAttribute("data-on"); }
+  if (inCockpit !== demoSurfaces) $("surfaces").click();
+  flyCamera(inCockpit ? "cockpit" : "home");
+};
+function stepCamera(now) {
+  if (!camTween) return;
+  const k = EASE(Math.min(1, (now - camTween.start) / camTween.dur));
+  camera.position.lerpVectors(camTween.from, camTween.to.pos, k);
+  controls.target.lerpVectors(camTween.fromT, camTween.to.target, k);
+  if (k >= 1) camTween = null;
+}
+window.__sim = { flight, motor, gearState, camera, controls, model };
 $("fly").onclick = () => {
   flying = !flying;
   document.body.toggleAttribute("data-flying", flying);
   $("fly").toggleAttribute("data-on", flying);
   $("fly").textContent = flying ? "Volver al taller" : "Volar";
   if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; flight.enter(); }
-  else { flight.exit(); controls.enabled = true; ground.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; }
+  else { flight.exit(); controls.enabled = true; ground.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; flyCamera(inCockpit ? "cockpit" : "home"); }
 };
 $("cam").onclick = () => { const on = $("pip").style.display !== "block"; $("pip").style.display = on ? "block" : "none"; $("cam").toggleAttribute("data-on", on); };
 
@@ -603,7 +661,7 @@ function frame() {
   const fuelKg = (o.thrust * 0.15) / 3600;
   $("chem").innerHTML = `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`;
   $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
-  if (!flying) controls.update();
+  if (!flying) { stepCamera(now); controls.update(); }
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, innerWidth, innerHeight);
   renderer.clippingPlanes = [];
@@ -635,6 +693,7 @@ addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  VIEWS.home.pos.copy(homeView());
 });
 setExploded(0);
 if (!still) setTimeout(() => assemble(), 600);

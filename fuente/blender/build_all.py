@@ -67,5 +67,5 @@ def export(path=None):
                 o.select_set(other == sc and o in obs, view_layer=vl)
     with bpy.context.temp_override(window=win, scene=sc, selected_objects=obs, selected_editable_objects=obs, active_object=root):
         bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_extras=True, export_apply=True, export_yup=True,
-                                  export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6, export_image_format="AUTO", export_cameras=False, export_lights=False)
+                                  export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6, export_image_format="WEBP", export_image_quality=90, export_cameras=False, export_lights=False)
     return {"path": path, "bytes": os.path.getsize(path)}
