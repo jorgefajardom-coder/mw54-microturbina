@@ -1,7 +1,7 @@
 # MW54 · anatomía de una microturbina
 
 Figura isométrica interactiva de la Wren MW54 para el portafolio (portfolio-3d, `public/lab/mw54/`).
-Se hace con la skill **anatomy**, que viene incluida en `.claude/skills/anatomy` para que funcione en sesiones en la nube.
+El kit de dibujo isométrico está en `.claude/skills/anatomy/kit`.
 
 - `src/model.mjs`: el modelo (datos GTBA, termodinámica aproximada, materiales y puntos de fusión). Todo número que muestra la figura sale de aquí.
 - `src/build.mjs`: geometría con el kit (`.claude/skills/anatomy/kit`), escribe `dist/index.html` (oscuro) y `dist/light.html`.
