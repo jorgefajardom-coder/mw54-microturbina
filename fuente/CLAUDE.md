@@ -12,3 +12,5 @@ Comandos: `npm run build`, `npm run audit` (debe terminar en `audit passed`), `n
 Reglas del repo: los commits y PR van **sin** líneas de coautoría ni atribución de Claude; el README es bilingüe (español primero, luego inglés).
 
 Textos de la figura en español. Para publicarla en el portafolio se copia `dist/` a `portfolio-3d/public/lab/mw54/`.
+
+El repositorio es mw54-microturbina (GitHub Pages desde `main`): el sitio publicado está en la raíz y este código en `fuente/`. `node src/to-pages.mjs` regenera el sitio en la raíz. Se trabaja en una sola rama, `main`.

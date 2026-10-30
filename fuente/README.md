@@ -28,7 +28,7 @@ python blender/build_jet.py sr72     # web/sr72/sr72.glb (también f22, f14 y sr
 python blender/check_overlap.py sr72 # piezas que se atraviesan (también hawk, f22, f14 y sr71)
 python blender/assets/make_insignia.py
 node src/serve.mjs web               # http://127.0.0.1:8765/
-node src/to-pages.mjs                # copia el sitio a ../mw54-microturbina
+node src/to-pages.mjs                # publica el sitio en la raíz del repositorio
 ```
 
 Reflejos: HDRI *Empty Warehouse 01* de [Poly Haven](https://polyhaven.com/a/empty_warehouse_01) (CC0).
@@ -63,7 +63,7 @@ python blender/build_jet.py sr72     # web/sr72/sr72.glb (also f22, f14 and sr71
 python blender/check_overlap.py sr72 # parts that pass through each other (also hawk, f22, f14 and sr71)
 python blender/assets/make_insignia.py
 node src/serve.mjs web               # http://127.0.0.1:8765/
-node src/to-pages.mjs                # copies the site to ../mw54-microturbina
+node src/to-pages.mjs                # publishes the site at the repository root
 ```
 
 Reflections: *Empty Warehouse 01* HDRI from [Poly Haven](https://polyhaven.com/a/empty_warehouse_01) (CC0).
