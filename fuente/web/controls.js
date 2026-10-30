@@ -1,6 +1,7 @@
-// Mandos para volar sin teclado: dos palancas táctiles dispuestas como una emisora de radiocontrol en modo 2 (izquierda:
-// gas sin retorno y timón; derecha: cabeceo y alabeo con retorno al centro) y cualquier mando de juego conectado
-// (Gamepad API, distribución estándar). Los botones repiten las teclas del simulador, así no hay dos lógicas de vuelo.
+// Mandos para volar sin teclado: en celular, dos palancas táctiles dispuestas como una emisora de radiocontrol en modo 2
+// (izquierda: gas sin retorno y timón; derecha: cabeceo y alabeo con retorno al centro); en los dos, cualquier mando de
+// juego conectado (Gamepad API, distribución estándar). Los botones repiten las teclas del simulador, así no hay dos
+// lógicas de vuelo. `touch` sólo es verdadero en la interfaz de celular, que crea las palancas antes de llamar aquí.
 
 const DEAD = 0.12;
 const dz = (v) => (Math.abs(v) < DEAD ? 0 : (v - Math.sign(v) * DEAD) / (1 - DEAD));
@@ -39,14 +40,12 @@ function stick(el, { spring }) {
   return { v, place, held: () => id !== null };
 }
 
-export function createPad() {
-  const touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
-  document.body.toggleAttribute("data-touch", touch);
-  const L = stick(document.getElementById("stickL"), { spring: { x: true, y: false } });
-  const R = stick(document.getElementById("stickR"), { spring: { x: true, y: true } });
+export function createPad({ touch = false, haptic = () => {} } = {}) {
+  const L = touch ? stick(document.getElementById("stickL"), { spring: { x: true, y: false } }) : null;
+  const R = touch ? stick(document.getElementById("stickR"), { spring: { x: true, y: true } }) : null;
   for (const b of document.querySelectorAll("#pad [data-key]")) {
     const k = b.dataset.key;
-    b.addEventListener("pointerdown", (ev) => { ev.preventDefault(); key(k, true); });
+    b.addEventListener("pointerdown", (ev) => { ev.preventDefault(); haptic(); key(k, true); });
     for (const t of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(t, () => key(k, false));
   }
   // mando de juego: A tren, B flaps, X motor, Y vista, gatillo derecho freno, Start reinicio
@@ -69,6 +68,7 @@ export function createPad() {
   return {
     touch,
     reset(throttle = 0) {
+      if (!touch) return;
       L.v.x = 0;
       L.v.y = 1 - 2 * throttle;
       R.v.x = R.v.y = 0;

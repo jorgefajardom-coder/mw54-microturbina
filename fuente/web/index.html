@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0d0f12">
 <!--SEO-->
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
-<link rel="stylesheet" href="./ui.css">
+<link rel="stylesheet" href="./base.css">
 </head>
 <body>
 <header><h1>Wren MW54 en un entrenador a reacción</h1><p>Maqueta 1:7 · pasa el cursor por las piezas, móntala o arráncala</p></header>
@@ -20,25 +20,7 @@
 <div class="ui" id="steps"></div>
 <div id="tip"></div>
 <div class="ui" id="hud"></div>
-<div class="ui" id="keys">E arrancar · Mayús/Ctrl gas · W/S cabeceo · A/D alabeo · Z/X timón · G tren · F flaps · B frenos · T giróscopo · C cámara · R reiniciar</div>
-<div class="ui" id="controls">
-  <button id="assemble">Montaje</button>
-  <button id="explode">Despiece</button>
-  <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
-  <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="60" aria-label="Palanca de gas"></label>
-  <button id="heat">Mapa de calor</button>
-  <button id="cam">Cámara de combustión</button>
-  <button id="gear">Tren</button>
-  <button id="surfaces">Mandos</button>
-  <button id="cockpit">Cabina</button>
-  <button id="fly">Volar</button>
-</div>
 <div class="ui" id="readout"></div>
-<div id="pad" aria-hidden="true">
-  <div class="stick" id="stickL"><span>Gas · timón</span><div class="knob"></div></div>
-  <div class="stick" id="stickR"><span>Cabeceo · alabeo</span><div class="knob"></div></div>
-  <div class="padkeys"><button data-key="e">Motor</button><button data-key="g">Tren</button><button data-key="f">Flaps</button><button data-key="b">Freno</button><button data-key="c">Vista</button><button data-key="r">Reinicio</button></div>
-</div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 <script type="module" src="./app.js"></script>
 </body>
