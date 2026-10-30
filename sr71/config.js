@@ -55,14 +55,15 @@ export default {
       teb: { core: [[0, [0.4, 1, 0.5], 3], [0.5, [0.3, 0.9, 0.4], 1.2], [1, [0.2, 0.6, 0.3], 0]], edge: [[0, [0.3, 0.8, 0.4], 1], [1, [0.2, 0.5, 0.3], 0]] },
     },
     brightness: 0.55,
-    diamonds: { spacing: 0.07, count: 8, color: [1, 0.82, 0.55] },
+    diamonds: { spacing: 0.1, count: 8, color: [1, 0.82, 0.55] },
     light: { intensity: 45, distance: 26 },
     state: (o, motor) => {
       const teb = motor.on && motor.heat < 0.3 ? 1 - motor.heat / 0.3 : 0;
       return { w: { dry: (1 - o.ab) * (1 - teb), ab: o.ab * (1 - teb), teb }, level: Math.max(teb, motor.heat * (0.25 + 0.75 * motor.thr)), optimal: o.ab * sm(0.88, 1, motor.thr) * (1 - teb), reach: 0.55 + 0.45 * o.ab };
     },
   },
-  plumes: [3300, -3300].map((y) => ({ at: [-14500, y, -150], length: 12, r: 0.62, tail: 0.5 })),
+  // boca del eyector ≈ 0,62 m de radio: r · 0,62 (lo que mide la llama al salir) = radio de la boca
+  plumes: [3300, -3300].map((y) => ({ at: [-14450, y, -150], length: 14, r: 1.0, tail: 0.5 })),
   cut: { z: 3.3, pos: [-5, -1.6, 25], target: [-5.5, -0.4, 3.3] },
   flow: {
     paths: {

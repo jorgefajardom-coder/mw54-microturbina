@@ -48,11 +48,12 @@ export default {
       ab: { core: [[0, [1, 0.97, 0.92], 5], [0.12, [1, 0.93, 0.82], 4], [0.35, [1, 0.8, 0.55], 2.2], [0.6, [0.98, 0.62, 0.42], 1], [0.85, [0.55, 0.42, 0.3], 0.3], [1, [0.4, 0.3, 0.25], 0]], edge: [[0, [1, 0.7, 0.8], 1.2], [0.4, [0.95, 0.55, 0.55], 0.7], [1, [0.5, 0.3, 0.3], 0]] },
     },
     brightness: 0.55,
-    diamonds: { spacing: 0.085, count: 6, color: [1, 0.9, 0.7] },
+    diamonds: { spacing: 0.11, count: 6, color: [1, 0.9, 0.7] },
     light: { intensity: 40, distance: 22 },
     state: (o, motor) => ({ w: { dry: 1 - o.ab, ab: o.ab }, level: motor.heat * (0.25 + 0.75 * motor.thr), optimal: o.ab * sm(0.88, 1, motor.thr), reach: 0.55 + 0.45 * o.ab }),
   },
-  plumes: [620, -620].map((y) => ({ at: [-8680, y, -150], length: 9, r: 0.55, h: 0.7, w: 1.05, tail: 0.75 })),
+  // tobera bidimensional: boca de ≈ 1,12 m de ancho por 0,6 m de alto
+  plumes: [620, -620].map((y) => ({ at: [-8660, y, -150], length: 10, r: 0.6, h: 0.8, w: 1.5, tail: 0.75 })),
   cut: { z: 0.62, pos: [-4.5, -1.3, 16], target: [-4.8, -0.2, 0.62] },
   flow: {
     paths: {

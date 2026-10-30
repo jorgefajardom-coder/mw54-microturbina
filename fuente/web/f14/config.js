@@ -50,11 +50,12 @@ export default {
       ab: { core: [[0, [1, 0.95, 0.98], 5], [0.15, [1, 0.9, 0.94], 3.5], [0.4, [0.9, 0.78, 0.92], 1.8], [0.7, [0.7, 0.65, 0.9], 0.8], [0.9, [0.47, 0.52, 0.85], 0.3], [1, [0.4, 0.45, 0.8], 0]], edge: [[0, [1, 0.75, 0.85], 1], [0.5, [0.75, 0.6, 0.85], 0.6], [1, [0.45, 0.5, 0.85], 0]] },
     },
     brightness: 0.55,
-    diamonds: { spacing: 0.08, count: 6, color: [1, 0.9, 0.95] },
+    diamonds: { spacing: 0.12, count: 6, color: [1, 0.9, 0.95] },
     light: { intensity: 40, distance: 22 },
     state: (o, motor) => ({ w: { dry: 1 - o.ab, ab: o.ab }, level: motor.heat * (0.25 + 0.75 * motor.thr), optimal: o.ab * sm(0.88, 1, motor.thr), reach: 0.55 + 0.45 * o.ab }),
   },
-  plumes: [1450, -1450].map((y) => ({ at: [-8520, y, -250], length: 9, r: 0.48, tail: 0.6 })),
+  // tobera de pétalos ≈ 0,5 m de radio en la boca
+  plumes: [1450, -1450].map((y) => ({ at: [-8500, y, -250], length: 10, r: 0.8, tail: 0.6 })),
   cut: { z: 1.45, pos: [-4, -1.1, 15], target: [-4.5, -0.3, 1.45] },
   flow: {
     paths: {

@@ -208,9 +208,9 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
     # entrada: rampa de compresión con bisagra delantera y labio de la capota (C/SiC)
     ramp = hull("ramp", [(900, -HALF_W + 10, RAMP_Z), (900, HALF_W - 10, RAMP_Z), (-1300, -HALF_W + 10, RAMP_Z), (-1300, HALF_W - 10, RAMP_Z),
                          (900, -HALF_W + 10, RAMP_Z + 50), (900, HALF_W - 10, RAMP_Z + 50), (-1300, -HALF_W + 10, RAMP_Z + 40), (-1300, HALF_W - 10, RAMP_Z + 40)], M["cmc"])
-    part("rampa", [ramp], 1, (3200, 0, 600), out=1, pivot=(900, 0, RAMP_Z + 25), control="ramp", hinge=[0.0, 1.0, 0.0], range=[3, 14])
-    lip = hull("lip", [(0, -HALF_W, COWL_Z), (0, HALF_W, COWL_Z), (-900, -HALF_W, COWL_Z - 100), (-900, HALF_W, COWL_Z - 100),
-                       (-900, -HALF_W, COWL_Z + 20), (-900, HALF_W, COWL_Z + 20)], M["cmc"])
+    part("rampa", [ramp], 1, (3200, 0, 2600), out=1, pivot=(900, 0, RAMP_Z + 25), control="ramp", hinge=[0.0, 1.0, 0.0], range=[3, 14])
+    lip = hull("lip", [(0, -HALF_W, COWL_Z), (0, HALF_W, COWL_Z), (-900, -HALF_W, COWL_Z - 160), (-900, HALF_W, COWL_Z - 160),
+                       (-900, -HALF_W, COWL_Z + 20), (-900, HALF_W, COWL_Z + 20), (0, -HALF_W, COWL_Z - 160), (0, HALF_W, COWL_Z - 160)], M["cmc"])
     part("labio", [lip], 2, (1500, 0, -700), out=2)
 
     # compuerta divisora: a baja velocidad cierra el estatorreactor; hacia Mach 3 sube y cierra la turbina
@@ -230,7 +230,10 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
         rows.append([(x, w * math.copysign(abs(math.cos(t)) ** (2 / p), math.cos(t)), (zt + zb) / 2 + (zt - zb) / 2 * math.copysign(abs(math.sin(t)) ** (2 / p), math.sin(t)))
                      for t in [TAU * j / 48 for j in range(48)]])
     # sale hacia delante por la boca (por encima de la compuerta) y luego sube
-    part("conducto", [loft("sduct", rows, M["dark"], uvscale=4000)], 4, (2600, 0, 1600), out=3)
+    # techo de la toma sobre la rampa, hasta casi el vientre del avión: la rampa cuelga de él por su bisagra delantera
+    top = (min(z_bottom(ENGINE_X + x * ENGINE_SCALE, ENGINE_Y) for x in (900, 0, -1300)) - 5 - ENGINE_Z) / ENGINE_SCALE
+    roof = hull("roof", [(x, y, z) for x in (900, -1300) for y in (-HALF_W + 10, HALF_W - 10) for z in (RAMP_Z + 52, top)], M["dark"])
+    part("conducto", [loft("sduct", rows, M["dark"], uvscale=4000), roof], 4, (2600, 0, 1600), out=3)
 
     # ── turbofán (clase F100/F110): fan de 3 etapas, compresor de 10, cámara anular, turbinas, postquemador ──
     if detailed:
@@ -414,7 +417,7 @@ def build_sr72(M, root, meta, log=lambda msg: None):
     for side, prefix, detailed in ((-1, "TBCC", True), (1, "TBCC.L", False)):
         er, ep = build_tbcc(prefix, M, root, (ENGINE_X, side * ENGINE_Y, ENGINE_Z), meta, detailed)
         er.scale = (S, S, S)
-        tag(er, part=prefix, group="engine", order=40, explode=[12500, side * 5000, 1600], via=[12500, 0, 0], label="TBCC derecho" if detailed else "TBCC izquierdo", system="engines")
+        tag(er, part=prefix, group="engine", order=40, explode=[16500, side * 5000, 1600], via=[16500, 0, 0], label="TBCC derecho" if detailed else "TBCC izquierdo", system="engines")
         eng[prefix] = (er, ep)
         log(f"Motor {prefix}")
     return parts, eng

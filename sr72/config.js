@@ -51,7 +51,7 @@ export default {
       scram: { core: [[0, [0.8, 0.9, 1], 1.6], [0.4, [0.6, 0.75, 1], 0.9], [1, [0.4, 0.5, 0.8], 0]], edge: [[0, [0.5, 0.6, 0.9], 0.4], [1, [0.3, 0.4, 0.6], 0]] },
     },
     brightness: 0.55,
-    diamonds: { spacing: 0.06, count: 9, color: [0.85, 0.9, 1] },
+    diamonds: { spacing: 0.1, count: 7, color: [0.85, 0.9, 1] },
     light: { intensity: 35, distance: 20 },
     state: (o, motor) => {
       const w = { dry: o.turbine * (1 - o.ab), ab: o.ab, ram: o.ram * (1 - o.scram), scram: o.scram * o.ram };
@@ -61,7 +61,8 @@ export default {
       return { w, level: motor.heat * (0.25 + 0.75 * motor.thr), optimal: opt, reach: 0.55 + 0.45 * Math.max(o.ab, o.ram) };
     },
   },
-  plumes: [1600, -1600].map((y) => ({ at: [-9200, y, -850], length: 9, r: 0.55, h: 0.7, w: 0.5 })),
+  // boca de la tobera de rampa única: ≈ 0,86 m de ancho por 0,94 m de alto
+  plumes: [1600, -1600].map((y) => ({ at: [-9180, y, -750], length: 11, r: 0.8, h: 0.95, w: 0.87 })),
   cut: { z: 1.6, pos: [-3, -2.4, 15], target: [-3.5, -0.9, 1.6] },
   flow: {
     size: 0.08,

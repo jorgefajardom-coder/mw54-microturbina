@@ -7,6 +7,31 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+
+// Carga del modelo con el decodificador Draco servido por el propio sitio (sin esperar a otro dominio). Se llama al
+// empezar, antes de montar la escena, para que la descarga corra en paralelo con todo lo demás.
+export function loadModel(url, decoder) {
+  const draco = new DRACOLoader().setDecoderPath(decoder).setDecoderConfig({ type: "wasm" });
+  draco.preload();
+  return new GLTFLoader().setDRACOLoader(draco).loadAsync(url);
+}
+
+// Si el teléfono se queda sin memoria de vídeo, el navegador quita el contexto WebGL y el lienzo queda negro: se avisa
+// y, cuando lo devuelve, se recarga la página.
+export function guardContext(renderer) {
+  const canvas = renderer.domElement;
+  canvas.addEventListener("webglcontextlost", (e) => {
+    e.preventDefault();
+    const note = document.createElement("div");
+    note.id = "lost";
+    note.textContent = "Recuperando el visor…";
+    Object.assign(note.style, { position: "fixed", inset: "0", display: "grid", placeItems: "center", color: "#cfd6df", font: "14px system-ui", background: "#0d0f12", zIndex: "50" });
+    document.body.appendChild(note);
+  });
+  canvas.addEventListener("webglcontextrestored", () => location.reload());
+}
 
 // Relleno frío desde el lado opuesto al sol y contraluz cálido que recorta la silueta contra el fondo oscuro.
 // `size` es la escala del objeto en metros (1,5 para la maqueta, 20–30 para los aviones).
@@ -25,7 +50,12 @@ export function createComposer(renderer, scene, camera, profile, { aoRadius = 0.
   const tier = profile.kind === "escritorio" ? "alta" : profile.tier;
   if (tier === "baja") return { render: () => renderer.render(scene, camera), setSize() {}, bloom: null };
   const [w, h] = profile.size();
-  const target = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: profile.antialias ? 4 : 0 });
+  // búfer de color con decimales sólo donde la GPU sabe dibujar en él (si no, el lienzo sale negro) y suavizado de bordes
+  // con las muestras que admita
+  const ext = renderer.extensions;
+  const half = ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float");
+  const samples = profile.antialias ? Math.min(4, renderer.capabilities.maxSamples || 0) : 0;
+  const target = new THREE.WebGLRenderTarget(w, h, { type: half ? THREE.HalfFloatType : THREE.UnsignedByteType, samples });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
   let gtao = null;

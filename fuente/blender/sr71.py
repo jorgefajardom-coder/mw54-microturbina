@@ -18,11 +18,13 @@ OUTER = [(-2300, 840), (-1000, 960), (2000, 980), (6000, 950), (8800, 880)]   # 
 HOLE = [(-4700, 0), (-4700, 830), (-2300, 834), (-1000, 954), (2000, 974), (6000, 944), (8800, 874), (8800, 920), (11800, 920), (11800, 0)]
 
 
-def door_angles(n, w, keep=0.45):
-    """Ángulos de las compuertas repartidos fuera de la unión con el ala (a 0° y 180°, ±`keep` rad)."""
+def door_angles(n, w, keep=0.45, fin=0.0):
+    """Ángulos de las compuertas repartidos fuera de la unión con el ala (a 0° y 180°, ±`keep` rad) y, si `fin`, fuera
+    del pie de la deriva (arriba, ±`fin` rad)."""
     half = math.pi / n * w
-    arcs = [(keep + half, math.pi - keep - half), (math.pi + keep + half, TAU - keep - half)]
-    per = [n // 2, n - n // 2]
+    arcs = [(keep + half, math.pi / 2 - fin - half), (math.pi / 2 + fin + half, math.pi - keep - half), (math.pi + keep + half, TAU - keep - half)] if fin else \
+        [(keep + half, math.pi - keep - half), (math.pi + keep + half, TAU - keep - half)]
+    per = [n // 4, n // 4, n - 2 * (n // 4)] if fin else [n // 2, n - n // 2]
     return [a + (b - a) * (k + 0.5) / m for (a, b), m in zip(arcs, per) for k in range(m)]
 
 
@@ -190,9 +192,9 @@ def build_sr71(M, root, meta, log=lambda msg: None):
                 ("ala.ext", [3800, 4200, 4600, 6200, 8100, 8470], ((3800, 4300), (8100, 8470)), 4, (0, side * 5000, 0), "Ala exterior")):
             wing = loft(f"wing{side}{key}", [wrow(y, side, 0, HINGE) for y in ys], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)
             fill = [loft(f"wf{side}{a}", [wrow(y, side, HINGE, 1) for y in (a, b)], M["skin"], caps=True, uvscale=4000) for a, b in fills]
-            ob = join(f"w{side}{key}", [wing] + fill)
-            boolean_cut(ob, [hole()])
-            part(f"{key}.{tagname}", [ob], "airframe", order, explode, f"{title} {tagname}")
+            for ob in [wing] + fill:
+                boolean_cut(ob, [hole()])   # cada pieza por separado: juntas, el corte falla en sus caras comunes
+            part(f"{key}.{tagname}", [wing] + fill, "airframe", order, explode, f"{title} {tagname}")
         # elevones: el interior sale hacia atrás y el exterior hacia fuera, ninguno pasa por la góndola ni por el otro
         for k, (a, b) in enumerate(((1500, 2300), (4300, 8100))):
             ob = part(f"elevon.{tagname}.{k}", [loft(f"ev{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 20, b - 20)], M["skin"], caps=True, uvscale=4000)],
@@ -214,11 +216,11 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         doors, recess = [], []
         for name, s0, s1, n, kind, w in (("bp", -1750, -1300, 6, "bypass", 0.55), ("si", -300, 350, 8, "suckin", 0.6), ("te", 7450, 8050, 12, "tertiary", 0.7)):
             r0, r1 = outer(s0) + 4, outer(s1) + 4
-            at = door_angles(n, w)
+            at = door_angles(n, w, fin=0.5 if kind == "tertiary" else 0.0)
             doors += hinged_ring(f"{name}{side}", F, s0, s1, r0, r1, n, M["skin"], kind, width=w, thick=12, at=at)
             recess += [hull(f"{name}h{side}{i}", [tuple(point(F, ss, rr, t)) for ss, rr in ((s0 + 20, outer(s0 + 20) + 2), (s1 - 20, outer(s1 - 20) + 2)) for t in (th - TAU / n * w * 0.45, th + TAU / n * w * 0.45)]
                              + [tuple(point(F, ss, rr - 25, t)) for ss, rr in ((s0 + 20, outer(s0 + 20)), (s1 - 20, outer(s1 - 20))) for t in (th - TAU / n * w * 0.45, th + TAU / n * w * 0.45)], M["dark"])
-                       for i, th in enumerate(door_angles(n, w))]
+                       for i, th in enumerate(door_angles(n, w, fin=0.5 if kind == "tertiary" else 0.0))]
         nacp = part(f"gondola.{tagname}", [nac] + recess, "airframe", 7, (0, side * 3500, 0), f"Góndola {tagname} con el labio de la toma y sus compuertas")
         attach(nacp, doors)
 
@@ -228,11 +230,16 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         base = NAC_Z + 975
 
         def frow(h, le, c):
+            if h == 0:
+                # la raíz copia el lomo de la góndola, 30 mm por encima (gira sin rozarla y no queda en el aire)
+                top = lambda x: NAC_Z + next(r0 + (r1 - r0) * (s_ - a0) / (a1 - a0) for s_ in [min(8800, max(-2300, FACE_X - x))]
+                                             for (a0, r0), (a1, r1) in zip(OUTER, OUTER[1:]) if a0 <= s_ <= a1) + 30
+                return [(le - x, side * NAC_Y + y, top(le - x)) for x, y in naca_cut(c, 0.05)]
             return [(le - x, side * NAC_Y + y + cant * h, base + h) for x, y in naca_cut(c, 0.05)]
         FIN = ((0, -9600, 4000), (2300, -12000, 1600))
-        ob = part(f"deriva.{tagname}", [loft(f"fin{side}", [frow(h, le, c) for h, le, c in FIN], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)],
+        ob = part(f"deriva.{tagname}", [loft(f"fin{side}", [frow(h, le, c) for h, le, c in FIN], [M["skin"], M["edge"]], caps="strip", uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)],
                   "airframe", 6, (0, side * 1200, 2600), f"Deriva enteriza {tagname}", control="rudder", range=[-20, 20], path="v")
-        ob["hinge"] = [0.0, cant, 1.0]
+        ob["hinge"] = [0.0, 0.0, 1.0]   # eje vertical: la raíz gira en su plano, sin hundirse en la góndola
         set_pivot(ob, (-11200, side * NAC_Y, base))
 
     # ── tren: tres ruedas en cada pata principal, dos en el morro ──

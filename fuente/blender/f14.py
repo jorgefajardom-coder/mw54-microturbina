@@ -242,9 +242,9 @@ def build_f14(M, root, meta, log=lambda msg: None):
         nose += wheel(f"nw{y}", (7400, y, GROUND + 280), 280, 180)
     part("tren.morro", nose, "airframe", 11, (0, 2200, 0), "Tren de morro con barra de lanzamiento")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
-        y = side * 2550
-        part(f"tren.{tagname}", [cylinder_between(f"ms{side}", (-1300, y, 430), (-1300, y, GROUND + 450), 110, M["steel"], steps=20)] + wheel(f"mw{side}", (-1300, y + side * 200, GROUND + 450), 450, 300),
-             "airframe", 11, (0, side * 1800, 0), f"Tren principal {tagname}")
+        y = side * 2350   # bajo el guante, por dentro de la raíz del ala
+        part(f"tren.{tagname}", [cylinder_between(f"ms{side}", (-1300, y, 475), (-1300, y, GROUND + 450), 110, M["steel"], steps=20)] + wheel(f"mw{side}", (-1300, y + side * 200, GROUND + 450), 450, 300),
+             "airframe", 11, (2500, side * 1800, 0), f"Tren principal {tagname}", via=[2500, 0, 0])
     part("gancho", [cylinder_between("hook", (-6200, 0, -150), (-8800, 0, -450), 60, M["steel"], steps=16)], "airframe", 12, (-2000, 0, -800), "Gancho de apontaje")
 
     eng = {}

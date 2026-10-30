@@ -3,20 +3,19 @@
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { op, metal, PARTS, SPEC } from "./model.js";
 import { createFlight } from "./flight.js";
 import { createFloor } from "./floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps } from "./look.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js";
 import { createFlame } from "./flame.js";
 
 const $ = (id) => document.getElementById(id);
 
 export async function start(profile) {
+const modelLoad = loadModel("./mw54.glb", "./draco/");
 const fmt = (n) => Math.round(n).toLocaleString("es-ES");
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Blender (Z arriba, mm) → glTF (Y arriba): (x, y, z) → (x, z, −y)
@@ -33,6 +32,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.localClippingEnabled = true;
 $("view").appendChild(renderer.domElement);
+guardContext(renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -78,15 +78,11 @@ const ground = createFloor(renderer, {
 scene.add(ground);
 
 // ── modelo ──
-const loader = new GLTFLoader();
-const draco = new DRACOLoader();
-draco.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/libs/draco/gltf/");
-loader.setDRACOLoader(draco);
 const parts = [];
 let engineRoot = null;
 let spinners = [];
 const engineParts = {};
-const gltf = await loader.loadAsync("./mw54.glb");
+const gltf = await modelLoad;
 const model = gltf.scene;
 scene.add(model);
 model.traverse((o) => {
@@ -280,7 +276,7 @@ const flame = createFlame(scene, {
   },
   light: { intensity: 0.08, distance: 1.2 },
 }, { steps: profile.tier === "baja" ? 18 : 30 });
-flame.add(plumeHolder, EXIT, { length: 0.55, r: 0.05 });
+flame.add(plumeHolder, EXIT, { length: 0.55, r: 0.03 });   // boca de la tobera de 18 mm de radio: 0,03 · 0,62
 
 // ── cámara de combustión: un segundo punto de vista con el motor cortado por la mitad y la llama dentro ──
 const pipCam = new THREE.PerspectiveCamera(38, 340 / 220, 0.005, 5);
@@ -512,6 +508,7 @@ function frame() {
   $("chem").innerHTML = `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`;
   $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
   if (!flying) { stepCamera(now); controls.update(); }
+  adapt(dt);   // antes de dibujar: si el cambio de resolución va después, ese cuadro se ve negro
   renderer.setScissorTest(false);
   const [W, H] = profile.size();
   renderer.setViewport(0, 0, W, H);
@@ -539,7 +536,6 @@ function frame() {
     renderer.clippingPlanes = [];
     renderer.setScissorTest(false);
   }
-  adapt(dt);
   requestAnimationFrame(frame);
 }
 // resolución adaptable: si el dispositivo no llega a ~40 fps baja la densidad de píxeles, y la recupera con holgura
@@ -565,6 +561,7 @@ function resize() {
   composer.setSize(w, h);
   VIEWS.home.pos.copy(homeView());
   if (!camTween && !flying && !inCockpit) flyCamera("home");
+  composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
 }
 setExploded(0);
 if (!still) setTimeout(() => assemble(2.4), 600);

@@ -3,13 +3,11 @@
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { createFloor } from "../floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps } from "../look.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js";
 import { createFlame } from "../flame.js";
 
 const $ = (id) => document.getElementById(id);
@@ -28,6 +26,7 @@ export const turbo = (t) => {
 
 export async function start(profile, cfg) {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const modelLoad = loadModel(cfg.glb, "../draco/");
   const PARTS = await (await fetch(cfg.parts)).json();
   const { op, metalOf, modeOf, gasAlong, K } = cfg.sim;
 
@@ -41,6 +40,7 @@ export async function start(profile, cfg) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.localClippingEnabled = true;
   $("view").appendChild(renderer.domElement);
+  guardContext(renderer);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d0f12);
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -75,11 +75,7 @@ export async function start(profile, cfg) {
   scene.add(createFloor(renderer, { ...cfg.floor, res: profile.textureSize }));
 
   // ── modelo ──
-  const loader = new GLTFLoader();
-  const draco = new DRACOLoader();
-  draco.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/libs/draco/gltf/");
-  loader.setDRACOLoader(draco);
-  const gltf = await loader.loadAsync(cfg.glb);
+  const gltf = await modelLoad;
   const model = gltf.scene;
   scene.add(model);
   const parts = [];
@@ -439,8 +435,9 @@ export async function start(profile, cfg) {
     profile.onFrame?.(motor);
     stepCamera(now);
     controls.update();
-    composer.render();
+    // el cambio de resolución va antes de dibujar: si va después, ese cuadro se ve negro
     adapt(dt);
+    composer.render();
     requestAnimationFrame(frame);
   }
   function resize() {
@@ -450,6 +447,7 @@ export async function start(profile, cfg) {
     renderer.setSize(w, h);
     composer.setSize(w, h);
     if (!camTween && !cutOn) flyCamera("home");
+    composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
   }
   setExploded(0);
   if (!still) setTimeout(() => { assemble(2.2); notify(); }, 600);
