@@ -23,8 +23,8 @@ export default {
     stand: { W: 28, D: 20, box: { x0: -11, x1: 11, z0: -8.5, z1: 8.5, arm: 2.2, w: 0.2 }, dash: [1, 1.8, 0.16], stops: [[6.3, 0], [-1.8, 1.81], [-1.8, -1.81]], stop: [0.25, 1] },
     ao: { w: 20, d: 14, x: 0 },
   },
-  late: ["fuselaje.trasero"],
-  say: { install: "El F119 entra en su bahía por detrás, bajo las vigas de cola", engines: "dos F119" },
+  late: [],
+  say: { install: "El F119 entra en su bahía por detrás, entre las vigas de cola", engines: "dos F119" },
   skin(part, o) {
     const T0 = o.T0 - sim.K;
     const amb = o.T - sim.K;

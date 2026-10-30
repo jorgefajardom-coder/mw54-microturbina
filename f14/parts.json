@@ -5,7 +5,8 @@
   "turbina_alta": { "name": "Turbina de alta presión, 1 etapa", "material": "Monocristal René N5", "melt": [1320, 1380], "service": 1100, "zone": "hpt" },
   "turbina_baja": { "name": "Turbina de baja presión, 2 etapas", "material": "Monocristal René N5", "melt": [1320, 1380], "service": 1050, "zone": "lpt" },
   "eje": { "name": "Ejes de alta y de baja", "material": "Acero maraging", "melt": [1413, 1450], "service": 450, "zone": "shaft" },
-  "carcasa": { "name": "Carcasa y estátores", "material": "Inconel 718 y titanio", "melt": [1260, 1336], "service": 700, "zone": "case" },
+  "carcasa": { "name": "Carcasa y estátores, mitad izquierda", "material": "Inconel 718 y titanio", "melt": [1260, 1336], "service": 700, "zone": "case" },
+  "carcasa.b": { "name": "Carcasa y estátores, mitad derecha", "material": "Inconel 718 y titanio", "melt": [1260, 1336], "service": 700, "zone": "case" },
   "postquemador": { "name": "Postquemador con estabilizadores de llama", "material": "Inconel 718", "melt": [1260, 1336], "service": 980, "zone": "ab" },
   "tobera": { "name": "Tobera convergente-divergente de pétalos", "material": "Inconel con tono de calor", "melt": [1260, 1336], "service": 980, "zone": "nozzle" }
 }

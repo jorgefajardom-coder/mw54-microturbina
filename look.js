@@ -109,7 +109,7 @@ export function blackbody(T) {
 }
 
 // ── despiece pieza por pieza: cada pieza sale por un camino libre (primero en horizontal y luego en vertical, o al
-//    revés si su dato `path` es "v"), sólo gira cuando ya está fuera, se asienta con un leve rebote al volver y, ya
+//    revés si su dato `path` es "v", o pasando por el punto `via`), sólo gira cuando ya está fuera, se asienta con un leve rebote al volver y, ya
 //    separada, flota despacio ──
 const eio = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const back = (t) => { const c = 1.25; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
@@ -125,7 +125,9 @@ export function organicPose(e, time, { up, float = 1, dir = 1 }) {
   H.copy(e.offset).sub(V);
   const [first, second] = e.data.path === "v" ? [V, H] : [H, V];
   e.obj.position.copy(e.home);
-  if (first.length() < 0.05 * L || second.length() < 0.05 * L) e.obj.position.addScaledVector(e.offset, k);
+  // `via`: punto de paso (sale primero hasta él, por ejemplo hacia delante por la boca de la toma, y luego al destino)
+  if (e.via) e.obj.position.addScaledVector(e.via, Math.min(1, k * 2)).addScaledVector(H.copy(e.offset).sub(e.via), Math.max(0, (k - 0.5) * 2));
+  else if (first.length() < 0.05 * L || second.length() < 0.05 * L) e.obj.position.addScaledVector(e.offset, k);
   else e.obj.position.addScaledVector(first, k < 0.5 ? k * 2 : 1).addScaledVector(second, k > 0.5 ? (k - 0.5) * 2 : 0);
   const bob = float * Math.pow(t, 6) * L * 0.012 * Math.sin(time * 0.9 + e.seed.phase);
   e.obj.position.addScaledVector(up, bob);

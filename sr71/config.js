@@ -23,8 +23,8 @@ export default {
     stand: { W: 46, D: 30, box: { x0: -18.5, x1: 18.5, z0: -12.5, z1: 12.5, arm: 3.6, w: 0.32 }, dash: [1.6, 2.8, 0.26], stops: [[7.6, 0], [-3.2, 1.9], [-3.2, -1.9]], stop: [0.35, 1.6] },
     ao: { w: 36, d: 22, x: -1 },
   },
-  late: ["gondola"],
-  say: { install: "El J58 entra en su góndola a media ala", engines: "dos J58" },
+  late: ["deriva", "elevon", "ala.ext"],
+  say: { install: "El J58 entra en su góndola por detrás, por el hueco del eyector", engines: "dos J58" },
   // titanio pintado de negro: radia bien y se queda por debajo de T₀; el morro y las góndolas son lo más caliente
   skin(part, o) {
     const T0 = o.T0 - sim.K;
@@ -41,7 +41,7 @@ export default {
     rudder: (o, s, c) => s.yaw * c.range[1],
     // ángulo positivo: el borde de salida va hacia el eje (la puerta entra o el flap cierra); negativo: hacia fuera
     suckin: (o) => 22 * o.suckin,
-    tertiary: (o) => 24 * o.tertiary,
+    tertiary: (o) => 16 * o.tertiary,
     bypass: (o) => -16 * o.bypass,
     ejector: (o) => 5 - 11 * o.ejector,
   },
