@@ -1,0 +1,13 @@
+{
+  "fan": { "name": "Fan de 3 etapas con discos de álabes integrales", "material": "Titanio Ti-6Al-4V", "melt": [1604, 1660], "service": 480, "zone": "fan" },
+  "compresor": { "name": "Compresor de alta, 6 etapas", "material": "Titanio de alta temperatura e Inconel 718", "melt": [1260, 1336], "service": 650, "zone": "hpc" },
+  "camara": { "name": "Cámara de combustión anular", "material": "Hastelloy X con recubrimiento térmico", "melt": [1260, 1355], "service": 1150, "zone": "burner" },
+  "turbina_alta": { "name": "Turbina de alta presión, 1 etapa", "material": "Monocristal PWA 1484 con barrera térmica", "melt": [1320, 1380], "service": 1100, "zone": "hpt" },
+  "turbina_baja": { "name": "Turbina de baja presión, 1 etapa, contrarrotativa", "material": "Monocristal PWA 1484", "melt": [1320, 1380], "service": 1050, "zone": "lpt" },
+  "eje": { "name": "Ejes de alta y de baja", "material": "Acero maraging", "melt": [1413, 1450], "service": 450, "zone": "shaft" },
+  "carcasa": { "name": "Carcasa y estátores", "material": "Aleación de titanio no inflamable Alloy C", "melt": [1550, 1650], "service": 600, "zone": "case" },
+  "postquemador": { "name": "Postquemador con estabilizadores de llama", "material": "Inconel 718", "melt": [1260, 1336], "service": 980, "zone": "ab" },
+  "tobera": { "name": "Transición y paredes de la tobera bidimensional", "material": "Matriz cerámica", "melt": [2500, 2700], "service": 1400, "zone": "nozzle" },
+  "aleta.superior": { "name": "Aleta superior de la tobera vectorial", "material": "Matriz cerámica", "melt": [2500, 2700], "service": 1400, "zone": "nozzle" },
+  "aleta.inferior": { "name": "Aleta inferior de la tobera vectorial", "material": "Matriz cerámica", "melt": [2500, 2700], "service": 1400, "zone": "nozzle" }
+}

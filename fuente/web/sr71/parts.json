@@ -1,0 +1,12 @@
+{
+  "cono": { "name": "Cono de entrada móvil (se retrasa 66 cm)", "material": "Titanio Ti-13V-11Cr-3Al", "melt": [1600, 1650], "service": 430, "zone": "spike" },
+  "compresor": { "name": "Compresor de 9 etapas", "material": "Titanio y Waspaloy", "melt": [1330, 1360], "service": 760, "zone": "hpc" },
+  "tubos": { "name": "Seis tubos de derivación al postquemador", "material": "Acero inoxidable", "melt": [1400, 1450], "service": 650, "zone": "bleed" },
+  "camara": { "name": "Cámara de combustión de 8 tubos", "material": "Hastelloy X", "melt": [1260, 1355], "service": 1150, "zone": "burner" },
+  "turbina": { "name": "Turbina de 2 etapas", "material": "Superaleación de níquel colada", "melt": [1260, 1340], "service": 1050, "zone": "turbine" },
+  "eje": { "name": "Eje único", "material": "Acero", "melt": [1420, 1460], "service": 450, "zone": "shaft" },
+  "carcasa": { "name": "Carcasa y estátores", "material": "Inconel X-750", "melt": [1393, 1427], "service": 700, "zone": "case" },
+  "postquemador": { "name": "Postquemador largo con estabilizadores", "material": "Hastelloy X", "melt": [1260, 1355], "service": 1100, "zone": "ab" },
+  "tobera": { "name": "Tobera convergente-divergente", "material": "Inconel", "melt": [1393, 1427], "service": 980, "zone": "nozzle" },
+  "eyector": { "name": "Eyector con aletas libres", "material": "Hastelloy X", "melt": [1260, 1355], "service": 1100, "zone": "ejector" }
+}

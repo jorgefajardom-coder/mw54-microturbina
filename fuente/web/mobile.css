@@ -8,7 +8,9 @@ button, .chip { height: 40px; line-height: 40px; touch-action: manipulation; }
 button:active { transform: scale(.97); }
 #readout { left: calc(14px + env(safe-area-inset-left)); top: calc(36px + env(safe-area-inset-top)); font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
 #readout b { color: var(--text); font-weight: 600; }
-nav.sections { left: calc(10px + env(safe-area-inset-left)); top: auto; transform: none; bottom: calc(80px + env(safe-area-inset-bottom)); }
+nav.sections { left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); top: auto; transform: none; bottom: calc(80px + env(safe-area-inset-bottom)); overflow-x: auto; scrollbar-width: none; }
+nav.sections::-webkit-scrollbar { display: none; }
+nav.sections a { flex: none; }
 nav.sections a { padding: 7px 11px; font-size: 10.5px; }
 
 #bar { left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); background: #0d0f12f2; box-shadow: 0 -1px 0 var(--line); backdrop-filter: blur(10px); }
