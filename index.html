@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#0d0f12">
 <title>Wren MW54 en un entrenador a reacción · visor 3D interactivo · Jorge Andres Fajardo Mora</title><meta name="description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: la microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador tipo Hawk. Montaje y despiece, tren retráctil con compuertas, mandos de vuelo, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo."><meta name="author" content="Jorge Andres Fajardo Mora"><link rel="canonical" href="https://jorgefajardom-coder.github.io/mw54-microturbina/"><meta property="og:type" content="article"><meta property="og:title" content="Wren MW54 en un entrenador a reacción · visor 3D interactivo · Jorge Andres Fajardo Mora"><meta property="og:description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: la microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador tipo Hawk. Montaje y despiece, tren retráctil con compuertas, mandos de vuelo, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo."><meta property="og:url" content="https://jorgefajardom-coder.github.io/mw54-microturbina/"><meta property="og:image" content="https://jorgefajardom-coder.github.io/mw54-microturbina/og.png"><meta property="article:author" content="https://jorgefajardom-coder.github.io/singularity/"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Wren MW54 en un entrenador a reacción · visor 3D interactivo · Jorge Andres Fajardo Mora"><meta name="twitter:description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: la microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador tipo Hawk. Montaje y despiece, tren retráctil con compuertas, mandos de vuelo, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo."><meta name="twitter:image" content="https://jorgefajardom-coder.github.io/mw54-microturbina/og.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"CreativeWork","name":"Wren MW54 en un entrenador a reacción","description":"Visor 3D interactivo por Jorge Andres Fajardo Mora: la microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador tipo Hawk. Montaje y despiece, tren retráctil con compuertas, mandos de vuelo, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo.","url":"https://jorgefajardom-coder.github.io/mw54-microturbina/","inLanguage":"es","image":"https://jorgefajardom-coder.github.io/mw54-microturbina/og.png","author":{"@type":"Person","name":"Jorge Andres Fajardo Mora","url":"https://jorgefajardom-coder.github.io/singularity/","jobTitle":"Technical Product Manager & Mechatronics Engineer"},"creator":{"@type":"Person","name":"Jorge Andres Fajardo Mora","url":"https://jorgefajardom-coder.github.io/singularity/"},"keywords":"MW54, Wren Turbines, microturbina, turbojet, aeromodelismo, análisis de materiales, punto de fusión, despiece, Jorge Andres Fajardo Mora"}</script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
-<link rel="stylesheet" href="./ui.css">
+<link rel="stylesheet" href="./base.css">
 </head>
 <body>
 <header><h1>Wren MW54 en un entrenador a reacción</h1><p>Maqueta 1:7 · pasa el cursor por las piezas, móntala o arráncala</p></header>
-<nav class="sections"><a href="./" aria-current="page">Hawk + MW54</a><a href="./sr72/">SR-72</a><a href="./anatomia/">Anatomía técnica</a></nav>
+<nav class="sections"><a href="./" aria-current="page">Hawk + MW54</a><a href="sr72/">SR-72</a><a href="f22/">F-22</a><a href="sr71/">SR-71</a><a href="anatomia/">Anatomía técnica</a></nav>
 <footer>Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></footer>
 <div id="view"></div>
 <div id="loading">Cargando el modelo…</div>
@@ -20,25 +20,7 @@
 <div class="ui" id="steps"></div>
 <div id="tip"></div>
 <div class="ui" id="hud"></div>
-<div class="ui" id="keys">E arrancar · Mayús/Ctrl gas · W/S cabeceo · A/D alabeo · Z/X timón · G tren · F flaps · B frenos · T giróscopo · C cámara · R reiniciar</div>
-<div class="ui" id="controls">
-  <button id="assemble">Montaje</button>
-  <button id="explode">Despiece</button>
-  <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
-  <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="60" aria-label="Palanca de gas"></label>
-  <button id="heat">Mapa de calor</button>
-  <button id="cam">Cámara de combustión</button>
-  <button id="gear">Tren</button>
-  <button id="surfaces">Mandos</button>
-  <button id="cockpit">Cabina</button>
-  <button id="fly">Volar</button>
-</div>
 <div class="ui" id="readout"></div>
-<div id="pad" aria-hidden="true">
-  <div class="stick" id="stickL"><span>Gas · timón</span><div class="knob"></div></div>
-  <div class="stick" id="stickR"><span>Cabeceo · alabeo</span><div class="knob"></div></div>
-  <div class="padkeys"><button data-key="e">Motor</button><button data-key="g">Tren</button><button data-key="f">Flaps</button><button data-key="b">Freno</button><button data-key="c">Vista</button><button data-key="r">Reinicio</button></div>
-</div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 <script type="module" src="./app.js"></script>
 </body>

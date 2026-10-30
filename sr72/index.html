@@ -6,18 +6,11 @@
 <meta name="theme-color" content="#0d0f12">
 <title>Lockheed Martin SR-72 y su motor TBCC · visor 3D interactivo · Jorge Andres Fajardo Mora</title><meta name="description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: el concepto SR-72 de Skunk Works a escala real con sus dos motores de ciclo combinado (turbofán y estatorreactor ramjet/scramjet en disposición over-under). Montaje y despiece, compuerta divisora y rampa de entrada que se mueven con el Mach, corte con el flujo coloreado por temperatura, perfil de misión hasta Mach 6 y mapa de calor de materiales."><meta name="author" content="Jorge Andres Fajardo Mora"><link rel="canonical" href="https://jorgefajardom-coder.github.io/mw54-microturbina/sr72/"><meta property="og:type" content="article"><meta property="og:title" content="Lockheed Martin SR-72 y su motor TBCC · visor 3D interactivo · Jorge Andres Fajardo Mora"><meta property="og:description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: el concepto SR-72 de Skunk Works a escala real con sus dos motores de ciclo combinado (turbofán y estatorreactor ramjet/scramjet en disposición over-under). Montaje y despiece, compuerta divisora y rampa de entrada que se mueven con el Mach, corte con el flujo coloreado por temperatura, perfil de misión hasta Mach 6 y mapa de calor de materiales."><meta property="og:url" content="https://jorgefajardom-coder.github.io/mw54-microturbina/sr72/"><meta property="og:image" content="https://jorgefajardom-coder.github.io/mw54-microturbina/og.png"><meta property="article:author" content="https://jorgefajardom-coder.github.io/singularity/"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Lockheed Martin SR-72 y su motor TBCC · visor 3D interactivo · Jorge Andres Fajardo Mora"><meta name="twitter:description" content="Visor 3D interactivo por Jorge Andres Fajardo Mora: el concepto SR-72 de Skunk Works a escala real con sus dos motores de ciclo combinado (turbofán y estatorreactor ramjet/scramjet en disposición over-under). Montaje y despiece, compuerta divisora y rampa de entrada que se mueven con el Mach, corte con el flujo coloreado por temperatura, perfil de misión hasta Mach 6 y mapa de calor de materiales."><meta name="twitter:image" content="https://jorgefajardom-coder.github.io/mw54-microturbina/og.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"CreativeWork","name":"Lockheed Martin SR-72 y su motor de ciclo combinado","description":"Visor 3D interactivo por Jorge Andres Fajardo Mora: el concepto SR-72 de Skunk Works a escala real con sus dos motores de ciclo combinado (turbofán y estatorreactor ramjet/scramjet en disposición over-under). Montaje y despiece, compuerta divisora y rampa de entrada que se mueven con el Mach, corte con el flujo coloreado por temperatura, perfil de misión hasta Mach 6 y mapa de calor de materiales.","url":"https://jorgefajardom-coder.github.io/mw54-microturbina/sr72/","inLanguage":"es","image":"https://jorgefajardom-coder.github.io/mw54-microturbina/og.png","author":{"@type":"Person","name":"Jorge Andres Fajardo Mora","url":"https://jorgefajardom-coder.github.io/singularity/","jobTitle":"Technical Product Manager & Mechatronics Engineer"},"creator":{"@type":"Person","name":"Jorge Andres Fajardo Mora","url":"https://jorgefajardom-coder.github.io/singularity/"},"keywords":"MW54, Wren Turbines, microturbina, turbojet, aeromodelismo, análisis de materiales, punto de fusión, despiece, Jorge Andres Fajardo Mora"}</script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
-<link rel="stylesheet" href="../ui.css">
-<style>
-  #mode { left: 50%; transform: translateX(-50%); top: 64px; max-width: min(640px, calc(100% - 24px)); padding: 8px 14px; border-radius: 12px; background: #15181dee; box-shadow: inset 0 0 0 1px var(--line); font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); text-align: center; display: none; }
-  #mode b { color: var(--accent); }
-  body:has(#mode[style*="block"]) #legend { top: 124px; }
-  label.chip output { min-width: 26px; color: var(--accent); }
-  @media (max-width: 760px) { #mode { top: 70px; font-size: 11px; } body:has(#legend[style*="block"]) #mode { display: none !important; } }
-</style>
+<link rel="stylesheet" href="../base.css">
 </head>
 <body>
 <header><h1><span class="wide">Lockheed Martin </span>SR-72 y su motor de ciclo combinado</h1><p>Concepto de Skunk Works · escala real · pasa el cursor por las piezas, arráncalo y llévalo a Mach 6</p></header>
-<nav class="sections"><a href="../">Hawk + MW54</a><a href="./" aria-current="page">SR-72</a><a href="../anatomia/">Anatomía técnica</a></nav>
+<nav class="sections"><a href="../">Hawk + MW54</a><a href="../sr72/" aria-current="page">SR-72</a><a href="../f22/">F-22</a><a href="../sr71/">SR-71</a><a href="../anatomia/">Anatomía técnica</a></nav>
 <footer>Por <a href="https://jorgefajardom-coder.github.io/singularity/" rel="author">Jorge Andres Fajardo Mora</a></footer>
 <div id="view"></div>
 <div id="loading">Cargando el modelo…</div>
@@ -26,17 +19,6 @@
 <div class="ui" id="legend"><div>Mapa de calor · temperatura de metal</div><div class="ramp"></div><div class="scale"><span>15 °C</span><span>800 °C</span><span>1.600 °C</span></div></div>
 <div class="ui" id="steps"></div>
 <div id="tip"></div>
-<div class="ui" id="controls">
-  <button id="assemble">Montaje</button>
-  <button id="explode">Despiece</button>
-  <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
-  <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="85" aria-label="Palanca de gases"></label>
-  <label class="chip">Mach <input id="mach" type="range" min="0" max="60" value="0" aria-label="Mach objetivo"><output id="machv">0</output></label>
-  <button id="mission">Misión</button>
-  <button id="heat">Mapa de calor</button>
-  <button id="cut">Corte</button>
-  <button id="surfaces">Mandos</button>
-</div>
 <div class="ui" id="readout"></div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 <script type="module" src="./app.js"></script>

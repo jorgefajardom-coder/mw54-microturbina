@@ -3,8 +3,7 @@
 import * as THREE from "three";
 
 const TILE = 4; // metros que cubre una repetición de la textura
-function floorTextures(renderer) {
-  const N = 2048;
+function floorTextures(renderer, N) {
   // ruido de valor periódico, para que la textura case consigo misma al repetirse
   const noise = (cells, seed) => {
     const g = new Float32Array(cells * cells);
@@ -138,8 +137,8 @@ function contactShadow({ w, d, x }) {
 }
 
 // `fade` = radios (m) donde el piso empieza y termina de fundirse con el fondo; `stand` en metros del puesto pintado.
-export function createFloor(renderer, { y, fade, stand, ao }) {
-  const [map, rough] = floorTextures(renderer);
+export function createFloor(renderer, { y, fade, stand, ao, res = 2048 }) {
+  const [map, rough] = floorTextures(renderer, res);
   const n = Math.ceil((fade[1] * 2.2) / TILE);
   for (const t of [map, rough]) t.repeat.set(n, n);
   const mat = new THREE.MeshStandardMaterial({ map, roughnessMap: rough, roughness: 0.7, metalness: 0, envMapIntensity: 0.35 });
