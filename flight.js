@@ -19,7 +19,7 @@ const WHEELS = [
 ];
 const BELLY = [[0.5, -0.06, 0], [-0.3, -0.06, 0], [-0.04, -0.07, 0.24], [-0.04, -0.07, -0.24]].map((p) => ({ p: new THREE.Vector3(...p) }));
 
-export function createFlight({ scene, camera, model, op, motor, setGear, setSurfaces, gearState }) {
+export function createFlight({ scene, camera, model, op, motor, setGear, setSurfaces, gearState, pad }) {
   const world = new THREE.Group();
   world.visible = false;
   scene.add(world);
@@ -101,12 +101,17 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   const vb = new THREE.Vector3();
   function step(dt) {
     // mandos con su recorrido real y algo de inercia
+    // teclado, palancas táctiles y mando de juego se suman (cada uno limitado a su recorrido)
     const want = (a, b) => (keys.has(a) ? 1 : 0) - (keys.has(b) ? 1 : 0);
-    s.pitch += (want("s", "w") - s.pitch) * Math.min(1, dt * 6);
-    s.roll += (want("d", "a") - s.roll) * Math.min(1, dt * 7);
-    s.yaw += (want("q", "e") * 0 + want("z", "x") - s.yaw) * Math.min(1, dt * 5);
+    const clamp1 = (v) => Math.max(-1, Math.min(1, v));
+    const ax = analog;
+    s.pitch += (clamp1(want("s", "w") + (ax?.pitch ?? 0)) - s.pitch) * Math.min(1, dt * 6);
+    s.roll += (clamp1(want("d", "a") + (ax?.roll ?? 0)) - s.roll) * Math.min(1, dt * 7);
+    s.yaw += (clamp1(want("z", "x") + (ax?.yaw ?? 0)) - s.yaw) * Math.min(1, dt * 5);
     if (keys.has("shift") || keys.has("arrowup")) s.throttle = Math.min(1, s.throttle + dt * 0.5);
     if (keys.has("control") || keys.has("arrowdown")) s.throttle = Math.max(0, s.throttle - dt * 0.5);
+    if (ax?.throttle != null) s.throttle = ax.throttle;
+    if (ax?.throttleRate) s.throttle = Math.min(1, Math.max(0, s.throttle + ax.throttleRate * dt * 0.6));
     s.brake = keys.has("b") || keys.has(" ") ? 1 : 0;
     motor.target = s.throttle;
     const o = op(motor.f);
@@ -201,14 +206,18 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   }
 
   let info = { V: 0, alpha: 0, onGround: true, thrust: 0 };
+  let analog = null;
   const camPos = new THREE.Vector3(-4, 1.5, 0);
   function update(dt) {
-    if (s.crashed) { $hud(`<b>Accidente</b> · R para volver a la pista`); return; }
+    if (s.crashed) { $hud(`<b>Accidente</b> · ${pad?.touch ? "Reinicio" : "R"} para volver a la pista`); return; }
+    analog = pad?.read() ?? null;
     for (let i = 0; i < 8; i++) info = step(dt / 8);
     model.position.copy(s.p);
     model.quaternion.copy(s.q);
     const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(s.q);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.q);
+    const fov = s.cam === "chase" ? 32 : 70;
+    if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     if (s.cam === "chase") {
       const want = s.p.clone().addScaledVector(fwd, -3.6).add(new THREE.Vector3(0, 1.0, 0));
       camPos.lerp(want, Math.min(1, dt * 3));
@@ -216,9 +225,10 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
       camera.up.set(0, 1, 0);
       camera.lookAt(s.p.clone().addScaledVector(fwd, 2));
     } else {
-      camera.position.copy(s.p).addScaledVector(fwd, 0.5).addScaledVector(up, 0.14);
+      // ojos del piloto delantero: sobre el asiento, a la altura del cabezal, mirando por encima del HUD
+      camera.position.copy(s.p).addScaledVector(fwd, 0.486).addScaledVector(up, 0.09);
       camera.up.copy(up);
-      camera.lookAt(camera.position.clone().addScaledVector(fwd, 10));
+      camera.lookAt(camera.position.clone().addScaledVector(fwd, 10).addScaledVector(up, -1.7));
     }
     const o = op(motor.f);
     const alt = Math.max(0, s.p.y);
@@ -226,7 +236,7 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     const vs = s.v.y;
     $hud(
       `<b>${kmh.toFixed(0)}</b> km/h · <b>${alt.toFixed(1)}</b> m · ${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s · α ${THREE.MathUtils.radToDeg(info.alpha).toFixed(0)}°<br>` +
-      `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : "apagada (E para arrancar)"} · gas ${(s.throttle * 100).toFixed(0)} %<br>` +
+      `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : `apagada (${pad?.touch ? "Motor" : "E"} para arrancar)`} · gas ${(s.throttle * 100).toFixed(0)} %<br>` +
       `Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * 40).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${info.alpha > CL.stall ? " · <b>PÉRDIDA</b>" : ""}`,
     );
   }
@@ -240,7 +250,8 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
       addEventListener("keydown", kd);
       addEventListener("keyup", ku);
       camPos.set(-4, 1.5, 0);
-      camera.near = 0.05;
+      pad?.reset(0);
+      camera.near = 0.004;
       camera.far = 12000;
       camera.updateProjectionMatrix();
     },
@@ -252,6 +263,7 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
       model.position.copy(home.pos);
       model.quaternion.copy(home.quat);
       camera.up.set(0, 1, 0);
+      camera.fov = 32;
       camera.near = 0.01;
       camera.far = 50;
       camera.updateProjectionMatrix();

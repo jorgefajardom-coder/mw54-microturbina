@@ -1,0 +1,18 @@
+{
+  "rampa": { "name": "Rampa de compresión variable", "material": "C/SiC (matriz cerámica)", "melt": [2500, 2700], "service": 1650, "zone": "inlet" },
+  "labio": { "name": "Labio de la capota", "material": "C/SiC (matriz cerámica)", "melt": [2500, 2700], "service": 1650, "zone": "lip" },
+  "compuerta": { "name": "Compuerta divisora turbina / estatorreactor", "material": "C/SiC (matriz cerámica)", "melt": [2500, 2700], "service": 1650, "zone": "inlet" },
+  "conducto": { "name": "Conducto en S hacia el fan", "material": "Titanio Ti-6Al-4V", "melt": [1604, 1660], "service": 480, "zone": "duct" },
+  "fan": { "name": "Fan de 3 etapas", "material": "Titanio Ti-6Al-4V", "melt": [1604, 1660], "service": 480, "zone": "fan" },
+  "compresor": { "name": "Compresor de alta, 10 etapas", "material": "Titanio Ti-6242 y Inconel 718", "melt": [1260, 1336], "service": 650, "zone": "hpc" },
+  "camara": { "name": "Cámara de combustión anular", "material": "Hastelloy X", "melt": [1260, 1355], "service": 1150, "zone": "burner" },
+  "turbina": { "name": "Turbinas de alta y baja presión", "material": "Monocristal CMSX-4 con barrera térmica", "melt": [1320, 1380], "service": 1100, "zone": "turbine" },
+  "eje": { "name": "Ejes", "material": "Acero maraging", "melt": [1413, 1450], "service": 450, "zone": "shaft" },
+  "carcasa": { "name": "Carcasa y estátores", "material": "Inconel 718 y titanio", "melt": [1260, 1336], "service": 700, "zone": "case" },
+  "postquemador": { "name": "Postquemador con estabilizadores de llama", "material": "Inconel 718", "melt": [1260, 1336], "service": 980, "zone": "ab" },
+  "tobera_turbina": { "name": "Tobera convergente-divergente del turbofán", "material": "Inconel 718", "melt": [1260, 1336], "service": 980, "zone": "abnozzle" },
+  "aislador": { "name": "Aislador del estatorreactor", "material": "Inconel 718 refrigerado con combustible", "melt": [1260, 1336], "service": 980, "zone": "isolator" },
+  "inyectores": { "name": "Montantes de inyección y cavidad de llama", "material": "Niobio C-103", "melt": [2350, 2400], "service": 1370, "zone": "injector" },
+  "camara_scram": { "name": "Cámara ramjet / scramjet refrigerada", "material": "C/SiC con canales de combustible", "melt": [2500, 2700], "service": 1650, "zone": "scram" },
+  "tobera": { "name": "Tobera de rampa única compartida", "material": "Carbono-carbono con SiC", "melt": [3000, 3650], "service": 2000, "zone": "nozzle" }
+}
