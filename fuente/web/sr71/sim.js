@@ -14,8 +14,8 @@ export function isa(h) {
   return 216.65 + (h - 20);
 }
 export function modeOf(M) {
-  if (M < 1.6) return { key: "jet", name: "Turborreactor", say: "El cono está adelante y todo el empuje sale del J58." };
-  if (M < 2) return { key: "spike", name: "Cono en marcha", say: "El cono empieza a retrasarse para mantener la onda de choque en el labio de la toma." };
+  if (M < 1.6) return { key: "jet", name: "Turborreactor", say: "El cono está adelante y todo el empuje sale del J58. En tierra las compuertas de succión y las terciarias están abiertas y los flaps del eyector, cerrados." };
+  if (M < 2) return { key: "spike", name: "Cono en marcha", say: "El cono empieza a retrasarse para mantener la onda de choque en el labio de la toma; se abren las compuertas de derivación." };
   if (M < 2.8) return { key: "bleed", name: "Derivación", say: "Seis tubos llevan aire del 4.º escalón del compresor al postquemador." };
   return { key: "ram", name: "Casi estatorreactor", say: "En crucero la toma da el 54 % del empuje, el eyector el 29 % y el motor sólo el 17 %." };
 }
@@ -31,7 +31,12 @@ export function op(M, throttle) {
   const burner = T3 + (950 + 250 * throttle) * (throttle > 0.02 ? 1 : 0);
   const inlet = 1 + 2.2 * smooth(1.8, 3.2, M); // la compresión en la toma multiplica el empuje
   const thrust = throttle * 106 * Math.pow(rho / 1.225, 0.75) * (1 + 0.3 * M) * (1 + 0.37 * ab) * inlet;
-  return { M, h, T, T0, pr, T3, burner, ab, bleed, throttle, thrust, turbine: 1, spike: 660 * smooth(1.6, 3.2, M), rpm: 7400 * (0.4 + 0.6 * throttle) };
+  return { M, h, T, T0, pr, T3, burner, ab, bleed, throttle, thrust, turbine: 1, spike: 660 * smooth(1.6, 3.2, M),
+    // compuertas de la góndola: las de succión abiertas en tierra y despegue, las terciarias hasta pasar Mach 1, las de
+    // derivación (bypass) se abren con el Mach para no tragar más aire del que pide el motor; los flaps del eyector se
+    // abren solos con la presión del chorro hasta quedar en línea en crucero
+    suckin: 1 - smooth(0.3, 0.6, M), tertiary: 1 - smooth(0.8, 1.2, M), bypass: smooth(1.4, 2.0, M), ejector: smooth(0.5, 3.2, M),
+    rpm: 7400 * (0.4 + 0.6 * throttle) };
 }
 export function metalOf(zone, o, on) {
   const amb = o.T - K;

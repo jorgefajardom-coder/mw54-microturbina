@@ -7,12 +7,13 @@ import math
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, tube_path)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
-from sr72 import catmull, blade_ring
+from sr72 import catmull, blade_ring, hinged_ring, attach
 
 GROUND = -2700.0
 NAC_Y = 3300.0
 NAC_Z = -150.0
 FACE_X = -3000.0   # cara del compresor (mundo)
+OUTER = [(-2300, 840), (-1000, 960), (2000, 980), (6000, 950), (8800, 880)]   # radio exterior de la góndola
 
 ST = [
     (16000, 30, 10, 10, 0), (14500, 700, 220, 180, 0), (12000, 1500, 460, 300, 0), (9000, 2200, 760, 420, 0),
@@ -110,13 +111,10 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
         ab.append(cylinder_between(f"sb{i}", point(F, 3150, 140, th), point(F, 3150, 630, th), 9, M["inco"], steps=8))
     part("postquemador", ab, 16, (-3000, 0, 0), out=4)
     part("tobera", [lathe("cd", F, [(8000, 640), (8000, 690), (8600, 560), (8800, 600), (8800, 570), (8600, 530)], M["inco"], steps=48)], 17, (-4200, 0, 0), out=3)
-    flaps = []
-    for i in range(16):
-        th = TAU * i / 16
-        a0, a1 = point(F, 8900, 760, th), point(F, 8900, 760, th + TAU / 16 * 0.9)
-        b0, b1 = point(F, 11400, 610, th), point(F, 11400, 610, th + TAU / 16 * 0.9)
-        flaps.append(hull(f"ej{i}", [tuple(a0), tuple(a1), tuple(b0), tuple(b1), tuple(a0 * 1.0 + (a0 - Vector((a0.x, 0, 0))).normalized() * 30), tuple(b0 + (b0 - Vector((b0.x, 0, 0))).normalized() * 30)], M["hot"]))
-    part("eyector", flaps, 18, (-5400, 0, 0), out=2)
+    # eyector: anillo de montaje y 16 aletas libres; convergen a baja velocidad y el propio flujo las abre hasta Mach 3,2
+    ring = lathe("ejring", F, [(8850, 700), (8850, 790), (8960, 790), (8960, 700)], M["hot"], steps=64)
+    ej = part("eyector", [ring], 18, (-5400, 0, 0), out=2)
+    attach(ej, hinged_ring("ejf", F, 8930, 11400, 760, 610, 16, M["hot"], "ejector", width=0.94, thick=28))
     return root, parts
 
 
@@ -184,7 +182,19 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         prof = [(-2300, 800), (-2300, 840), (-1000, 960), (2000, 980), (6000, 950), (8800, 880), (8800, 840), (2000, 940), (-1000, 920), (-2250, 805)]
         F = frame((FACE_X, side * NAC_Y, NAC_Z), (-1, 0, 0))
         nac = lathe(f"nac{side}", F, prof, M["skin"], steps=64)
-        part(f"gondola.{tagname}", [nac], "airframe", 7, (12000, 0, 0), f"Góndola {tagname} con el labio de la toma")
+        # compuertas de la góndola, como en el SR-71: de derivación delanteras junto a la toma (abren hacia fuera por
+        # encima de Mach 1,4 para tirar el aire que sobra), de succión junto a la cara del compresor (abren hacia dentro
+        # al despegar) y terciarias delante del eyector (abiertas a baja velocidad, cerradas al pasar Mach 1)
+        outer = lambda s_: next(r0 + (r1 - r0) * (s_ - a0) / (a1 - a0) for (a0, r0), (a1, r1) in zip(OUTER, OUTER[1:]) if a0 <= s_ <= a1)
+        doors, recess = [], []
+        for name, s0, s1, n, kind, w in (("bp", -1750, -1300, 6, "bypass", 0.55), ("si", -300, 350, 8, "suckin", 0.6), ("te", 7450, 8050, 12, "tertiary", 0.7)):
+            r0, r1 = outer(s0) + 4, outer(s1) + 4
+            doors += hinged_ring(f"{name}{side}", F, s0, s1, r0, r1, n, M["skin"], kind, width=w, thick=12, phase=0.2)
+            recess += [hull(f"{name}h{side}{i}", [tuple(point(F, ss, rr, t)) for ss, rr in ((s0 + 20, outer(s0 + 20) + 2), (s1 - 20, outer(s1 - 20) + 2)) for t in (th - TAU / n * w * 0.45, th + TAU / n * w * 0.45)]
+                             + [tuple(point(F, ss, rr - 25, t)) for ss, rr in ((s0 + 20, outer(s0 + 20)), (s1 - 20, outer(s1 - 20))) for t in (th - TAU / n * w * 0.45, th + TAU / n * w * 0.45)], M["dark"])
+                       for i, th in enumerate([0.2 + TAU * k / n for k in range(n)])]
+        nacp = part(f"gondola.{tagname}", [nac] + recess, "airframe", 7, (12000, 0, 0), f"Góndola {tagname} con el labio de la toma y sus compuertas")
+        attach(nacp, doors)
 
     # ── derivas enterizas sobre las góndolas, inclinadas 15° hacia dentro ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):

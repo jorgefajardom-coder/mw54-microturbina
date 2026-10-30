@@ -9,7 +9,7 @@ import math
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
-from sr72 import catmull, blade_ring, rect_duct, smooth
+from sr72 import catmull, blade_ring, rect_duct, smooth, hinged_ring, attach
 
 GROUND = -2150.0
 NAC_Y = 1450.0
@@ -96,14 +96,10 @@ def build_f110(prefix, M, parent, location, meta, detailed=True):
         ab.append(cylinder_between(f"sb{i}", point(F, 3520, 120, th), point(F, 3520, 500, th), 8, M["inco"], steps=8))
     part("postquemador", ab, 17, (-2600, 0, 0), out=2)
     # tobera de pétalos: la garganta se cierra en seco y se abre con el postquemador (la controla el núcleo)
-    petals = []
-    for i in range(18):
-        th = TAU * i / 18
-        a0, a1 = point(F, 5300, 560, th), point(F, 5300, 560, th + TAU / 18 * 0.92)
-        b0, b1 = point(F, 5900, 470, th), point(F, 5900, 470, th + TAU / 18 * 0.92)
-        n = Vector((0, math.cos(th), math.sin(th))) * 18
-        petals.append(hull(f"pt{i}", [tuple(a0), tuple(a1), tuple(b0), tuple(b1), tuple(a0 + n), tuple(a1 + n), tuple(b0 + n), tuple(b1 + n)], M["petal"]))
-    part("tobera", petals, 18, (-3600, 0, 0), out=1)
+    # tobera de pétalos: anillo de montaje y 18 pétalos que cierran la garganta en seco y se abren con el postquemador
+    ring = lathe("nzring", F, [(5260, 530), (5260, 590), (5330, 590), (5330, 530)], M["petal"], steps=64)
+    nz = part("tobera", [ring], 18, (-3600, 0, 0), out=1)
+    attach(nz, hinged_ring("pt", F, 5300, 5900, 555, 470, 18, M["petal"], "iris", width=0.95, thick=18))
     return root, parts
 
 

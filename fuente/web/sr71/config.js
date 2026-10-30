@@ -39,6 +39,11 @@ export default {
     spike: (o) => o.spike,
     elevon: (o, s, c) => Math.max(-1, Math.min(1, s.pitch - s.roll * c.sign)) * c.range[1],
     rudder: (o, s, c) => s.yaw * c.range[1],
+    // ángulo positivo: el borde de salida va hacia el eje (la puerta entra o el flap cierra); negativo: hacia fuera
+    suckin: (o) => 22 * o.suckin,
+    tertiary: (o) => 24 * o.tertiary,
+    bypass: (o) => -16 * o.bypass,
+    ejector: (o) => 5 - 11 * o.ejector,
   },
   // llama del J58: gradiente tomado de la foto del J58 en el banco de pruebas de noche (penacho violeta translúcido con
   // nudos claros) y del SR-71 despegando (núcleo blanco amarillento y diamantes amarillos muy marcados); al arrancar,

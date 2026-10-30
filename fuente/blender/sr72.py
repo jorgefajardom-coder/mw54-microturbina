@@ -129,6 +129,38 @@ def blade_ring(name, F, s, r0, r1, n, chord, tw0, tw1, thick, mat, phase=0.0):
     return to_object(name, bm, mat, smooth=False)
 
 
+def hinged_ring(name, F, s0, s1, r0, r1, n, mat, kind, width=0.9, thick=14, phase=0.0, pitch=None, at=None):
+    """Corona de paneles con bisagra en su borde delantero (compuertas, aletas de eyector, pétalos de tobera).
+
+    Cada panel es un objeto propio con `subcontrol` = kind y su eje de bisagra (la tangente a la corona en el borde
+    delantero); el visor lo gira según el Mach o el postquemador. Se cuelgan de una pieza con `attach`. Ángulo positivo
+    = el borde de salida va hacia el eje (cierra); negativo = hacia fuera (abre). `at` limita los paneles a unos ángulos."""
+    o, a, u, v = F
+    pitch = pitch or TAU / n
+    panels = []
+    angles = at if at is not None else [phase + TAU * i / n for i in range(n)]
+    for i, th in enumerate(angles):
+        th0, th1 = th - pitch * width / 2, th + pitch * width / 2
+        pts = []
+        for ss, rr in ((s0, r0), (s1, r1)):
+            for t in (th0, th1):
+                for dr in (0, thick):
+                    pts.append(tuple(point(F, ss, rr + dr, t)))
+        ob = hull(f"{name}{i}", pts, mat)
+        mid = point(F, s0, r0 + thick / 2, th)
+        tangent = -u * math.sin(th) + v * math.cos(th)
+        set_pivot(ob, mid)
+        tag(ob, subcontrol=kind, hinge=list(tangent.normalized()))
+        panels.append(ob)
+    return panels
+
+
+def attach(parent, children):
+    for c in children:
+        c.parent = parent
+    return children
+
+
 def rect_duct(name, x0, x1, y0, y1, z0, z1, t, mat, y0b=None, y1b=None, z0b=None, z1b=None):
     """Conducto rectangular de pared t, que puede abrirse hacia atrás (secciones distintas en x0 y x1)."""
     y0b, y1b = y0 if y0b is None else y0b, y1 if y1b is None else y1b
