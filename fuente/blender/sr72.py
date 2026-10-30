@@ -1,9 +1,11 @@
-# Lockheed Martin SR-72 según el concepto público de Skunk Works (2013): cuerpo sustentador con aristas (chines), ala en
-# delta cortada con elevones, dos derivas inclinadas hacia fuera y dos motores de ciclo combinado con turbina (TBCC) en
-# disposición "over-under": un turbofán de la clase F100/F110 arriba y un estatorreactor de modo dual (ramjet/scramjet)
-# abajo, que comparten la entrada de aire y la tobera. Una compuerta divisora pasa el aire de un camino al otro hacia
-# Mach 3. Escala real, 1 unidad = 1 mm, +X morro, +Y izquierda, +Z arriba. Las cotas son estimaciones a partir de las
-# imágenes del concepto; Lockheed no ha publicado planos.
+# Lockheed Martin SR-72 con la forma del Darkstar de Top Gun: Maverick, que Skunk Works diseñó con el equipo de la
+# película a partir de este concepto (21,18 m de largo y 10,06 m de envergadura según su diseñador, Daniel Simon).
+# Cuerpo sustentador en punta de flecha: un morro largo y plano de filo cortante cuyas aristas se abren en línea recta
+# hasta las puntas del ala; cabina de un piloto sin parabrisas, con ventanas ovaladas laterales y la ventana circular
+# del rastreador de estrellas en el lomo; dos grandes tomas rectangulares bajo el ala; jorobas de los motores sobre la
+# cola, dos derivas enterizas inclinadas hacia fuera y elevones en el borde de salida. Dentro, dos motores de ciclo
+# combinado (TBCC) en disposición "over-under": turbofán arriba y estatorreactor de modo dual abajo, con la entrada y la
+# tobera compartidas, como en el esquema de modos del Darkstar. 1 unidad = 1 mm, +X morro, +Y izquierda, +Z arriba.
 import math
 import bmesh
 import bpy
@@ -11,17 +13,11 @@ from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, to_object, empty, hull)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
 
-GROUND = -3600.0
-ENGINE_Y = 1350.0
-ENGINE_X = 3600.0
-
-# Fuselaje: (x, ancho, alto por encima de la arista, alto por debajo, z de la arista)
-ST = [
-    (15000, 40, 10, 10, -40), (14200, 760, 190, 130, -40), (12500, 1800, 470, 330, -20), (10000, 3000, 780, 520, 0),
-    (7000, 3800, 1000, 700, 20), (3500, 4200, 1080, 820, 20), (0, 4300, 1060, 880, 10), (-4000, 4200, 960, 900, 0),
-    (-8000, 3950, 820, 880, 0), (-12000, 3600, 640, 820, 0), (-15500, 3200, 420, 720, 0),
-]
-
+GROUND = -2300.0
+NOSE, TAIL = 11000.0, -10200.0
+TIP_X, HALF_SPAN = -6200.0, 5030.0
+ENGINE_X, ENGINE_Y, ENGINE_Z = 2300.0, 1600.0, -250.0
+ENGINE_SCALE = 0.6
 
 def catmull(stations, x):
     """Interpolación suave de la tabla de secciones (Catmull-Rom por columnas)."""
@@ -40,31 +36,60 @@ def catmull(stations, x):
     return stations[0] if x > xs[0] else stations[-1]
 
 
-def chine_section(x, n=64):
-    _, w, ht, hb, zc = catmull(ST, x)
-    pts = []
-    for k in range(n):
-        t = TAU * k / n
-        c, s = math.cos(t), math.sin(t)
-        p = 1.7 if s >= 0 else 2.6
-        pts.append((x, w / 2 * math.copysign(abs(c) ** (2 / p), c), zc + (ht if s >= 0 else hb) * math.copysign(abs(s) ** (2 / p), s)))
-    return pts
+def smooth(a, b, x):
+    t = min(1.0, max(0.0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
 
 
-def body_bottom(x, y):
-    """z de la panza del fuselaje en (x, y), para apoyar góndolas, tren y alas."""
-    _, w, ht, hb, zc = catmull(ST, x)
-    q = min(0.999, abs(y) / (w / 2))
-    return zc - hb * (1 - q ** 2.6) ** (1 / 2.6)
+# ── la forma, como funciones del punto (x, y): contorno en planta, fuselaje, ala fina y jorobas de los motores ──
+def half_width(x):
+    if x >= TIP_X:
+        return HALF_SPAN * ((NOSE - x) / (NOSE - TIP_X)) ** 1.15
+    return HALF_SPAN + (2000 - HALF_SPAN) * (TIP_X - x) / (TIP_X - TAIL)
+
+
+def body_width(x):
+    return 1150 * smooth(NOSE, 2500, x) ** 0.55 if x > 2500 else 1150
+
+
+def z_top(x, y):
+    a, half, rb = abs(y), half_width(x), body_width(x)
+    hb = 720 * smooth(NOSE, 4500, x) ** 0.8 - 470 * smooth(4500, TAIL, x)
+    body = hb * max(0.0, 1 - (a / rb) ** 2) ** 0.6 if a < rb else 0.0
+    wing = 170 * max(0.0, 1 - a / half) ** 0.85 if half > 1 else 0.0
+    hump = (430 * smooth(-200, -3200, x) - 250 * smooth(-7600, TAIL, x)) * math.exp(-(((a - 1600) / 760) ** 2)) * max(0.0, 1 - a / half) ** 0.3 if half > 1 else 0.0
+    cockpit = 260 * math.exp(-(((x - 4300) / 1500) ** 2)) * max(0.0, 1 - (a / 650) ** 2) ** 0.7 if a < 650 else 0.0
+    return max(body, wing) + hump + cockpit
+
+
+def z_bottom(x, y):
+    a, half, rb = abs(y), half_width(x), body_width(x)
+    hl = 420 * smooth(NOSE, 4000, x) ** 0.8 - 200 * smooth(-3000, TAIL, x)
+    body = hl * max(0.0, 1 - (a / rb) ** 2) ** 0.5 if a < rb else 0.0
+    wing = 110 * max(0.0, 1 - a / half) ** 0.85 if half > 1 else 0.0
+    return -max(body, wing)
+
+
+SEC_N = 56
+
+
+def section(x):
+    """Sección cerrada de todo el cuerpo con el ala: de borde a borde por arriba y de vuelta por abajo."""
+    half = max(half_width(x), 2.0)
+    ys = [half * math.cos(math.pi * k / SEC_N) for k in range(SEC_N + 1)]
+    up = [(x, y, z_top(x, y)) for y in ys]
+    lo = [(x, y, z_bottom(x, y)) for y in reversed(ys[1:-1])]
+    return up + lo
 
 
 def materials():
-    skin = (0.024, 0.025, 0.029)
+    skin = (0.017, 0.018, 0.021)
     c, nrm, rgh = panel_textures(skin, seed=11)
     nrm, rgh = image_of("sr72_normal", nrm), image_of("sr72_rough", rgh)
     return {
-        "skin": material("Recubrimiento de alta emisividad", (1, 1, 1), 0.0, 0.5, image=image_of("sr72_skin", c), normal=nrm, rough=rgh, strength=0.6),
-        "edge": material("Borde de ataque de C/SiC", (0.16, 0.155, 0.15), 0.0, 0.62),
+        "skin": material("Recubrimiento negro satinado de alta emisividad", (1, 1, 1), 0.25, 0.42, image=image_of("sr72_skin", c), normal=nrm, rough=rgh, strength=0.5),
+        "edge": material("Borde de carbono-carbono", (0.085, 0.085, 0.09), 0.1, 0.55),
+        "window": material("Ventana de cuarzo", (0.05, 0.08, 0.14), 0.6, 0.03, coat=1.0, coat_rough=0.01),
         "nacelle": material("Góndola de titanio", (0.05, 0.05, 0.055), 0.4, 0.45),
         "cmc": material("C/SiC", (0.11, 0.11, 0.11), 0.0, 0.68),
         "cc": material("Carbono-carbono", (0.07, 0.07, 0.075), 0.0, 0.55),
@@ -172,7 +197,7 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
         p = 8 * (1 - f) + 2 * f
         rows.append([(x, w * math.copysign(abs(math.cos(t)) ** (2 / p), math.cos(t)), (zt + zb) / 2 + (zt - zb) / 2 * math.copysign(abs(math.sin(t)) ** (2 / p), math.sin(t)))
                      for t in [TAU * j / 48 for j in range(48)]])
-    part("conducto", [loft("sduct", rows, M["ti"], uvscale=4000)], 4, (0, 0, 1600))
+    part("conducto", [loft("sduct", rows, M["dark"], uvscale=4000)], 4, (0, 0, 1600))
 
     # ── turbofán (clase F100/F110): fan de 3 etapas, compresor de 10, cámara anular, turbinas, postquemador ──
     if detailed:
@@ -253,86 +278,97 @@ def build_sr72(M, root, meta, log=lambda msg: None):
         log(label)
         return ob
 
-    # ── fuselaje en tres tramos ──
-    def body(x0, x1, n):
-        return [chine_section(x0 - (x0 - x1) * k / n) for k in range(n + 1)]
-    part("fuselaje.morro", [loft("fwd", body(15000, 6000, 24), M["skin"], uvscale=4000)], "airframe", 2, (5000, 0, 0), "Morro y cuerpo delantero con aristas")
-    part("fuselaje.central", [loft("mid", body(6000, -6000, 16), M["skin"], uvscale=4000)], "airframe", 0, (0, 0, 0), "Fuselaje central")
-    part("fuselaje.trasero", [loft("aft", body(-6000, -15500, 14), M["skin"], uvscale=4000, caps=True)], "airframe", 1, (-5000, 0, 0), "Fuselaje trasero")
+    # ── cuerpo con el ala en una sola superficie, en tres tramos; los bordes en carbono-carbono ──
+    edge = lambda i, j: 1 if j <= 1 or SEC_N - 2 <= j <= SEC_N + 1 or j >= 2 * SEC_N - 2 else 0
 
-    # ── ala en delta cortada: flecha de ~67°, perfil del 3,5 %, elevones en el 22 % trasero ──
-    LE = lambda y: 7000 - (y - 1700) * (17500 / 7300)
-    TE = lambda y: -15000 + (y - 1700) * 0.08
-    HINGE = 0.78
+    def body(x0, x1, step=250):
+        xs = [x0 - step * k for k in range(int((x0 - x1) / step) + 1)]
+        if xs[-1] != x1:
+            xs.append(x1)
+        return [section(x) for x in xs]
+    part("fuselaje.morro", [loft("fwd", body(NOSE - 40, 3000), [M["skin"], M["edge"]], uvscale=4000, matof=edge)], "airframe", 2, (3500, 0, 0), "Morro de filo cortante y cabina")
+    part("fuselaje.central", [loft("mid", body(3000, -4000), [M["skin"], M["edge"]], uvscale=4000, matof=edge)], "airframe", 0, (0, 0, 0), "Cuerpo central con el ala integrada")
+    part("fuselaje.trasero", [loft("aft", body(-4000, TAIL), [M["skin"], M["edge"]], uvscale=4000, caps=True, matof=edge)], "airframe", 1, (-3500, 0, 0), "Cola con las jorobas de los motores")
 
-    def wrow(y, side, a, b, t=0.035):
-        ch = LE(y) - TE(y)
-        return [(LE(y) - x, side * y, -40 + z) for x, z in naca_cut(ch, t, a, b)]
+    # cabina sin parabrisas: dos ventanas ovaladas que miran a los lados y la del rastreador de estrellas en el lomo
+    def window(name, cx, cy, rx, ry):
+        pts = []
+        for k in range(28):
+            t = TAU * k / 28
+            x, y = cx + rx * math.cos(t), cy + ry * math.sin(t)
+            z = z_top(x, y)
+            pts += [(x, y, z + 4), (x, y, z - 30)]
+        return hull(name, pts, M["window"])
+    wins = [window(f"win{s}", 4500, s * 430, 520, 170) for s in (1, -1)]
+    part("cabina", wins + [window("star", 1300, 0, 130, 130)], "airframe", 30, (0, 0, 1500), "Cabina de un piloto: ventanas laterales de cuarzo y rastreador de estrellas")
+
+    # ── elevones en el borde de salida, dos por lado ──
+    def te(y):
+        return TIP_X + (TAIL - TIP_X) * (HALF_SPAN - y) / (HALF_SPAN - 2000)
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
-        ys = [1700, 2400, 3000, 4500, 5600, 5700, 7000, 8400, 9000]
-        wing = loft(f"wing{side}", [wrow(y, side, 0, HINGE) for y in ys], [M["skin"], M["edge"]], caps=True, uvscale=4000,
-                    matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)
-        fill = [loft(f"fill{side}{a}", [wrow(y, side, HINGE, 1) for y in (a, b)], M["skin"], caps=True, uvscale=4000) for a, b in ((1700, 2400), (5600, 5700))]
-        part(f"ala.{tagname}", [wing] + fill, "airframe", 3, (0, side * 4000, 0), f"Ala {tagname}")
-        for k, (a, b) in enumerate(((2400, 5600), (5700, 9000))):
-            ob = part(f"elevon.{tagname}.{k}", [loft(f"elev{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 20, b - 20)], M["skin"], caps=True, uvscale=4000)],
-                      "airframe", 4, (-1500, side * 4500, 0), f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
-            p0 = Vector((LE(a) - HINGE * (LE(a) - TE(a)), side * a, -40))
-            p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, -40))
+        for k, (y0, y1) in enumerate(((2400, 3500), (3650, 4750))):
+            p0 = Vector((te(y0) + 850, side * y0, 0))
+            p1 = Vector((te(y1) + 850, side * y1, 0))
+            pts = []
+            for (y, p) in ((y0, p0), (y1, p1)):
+                xt = te(y) + 5
+                for dz in (-35, 35):
+                    pts += [(p.x, side * y, dz * 1.6), (xt, side * y, dz * 0.3)]
+            ob = part(f"elevon.{tagname}.{k}", [hull(f"ev{side}{k}", pts, M["skin"])], "airframe", 4, (-1200, side * 2600, 0),
+                      f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
             ob["hinge"] = list((p1 - p0).normalized() * side)
             set_pivot(ob, p0)
 
-    # ── derivas gemelas inclinadas 12° hacia fuera, con timón ──
+    # ── derivas enterizas sobre las jorobas, inclinadas 12° hacia fuera ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         cant = math.tan(math.radians(12)) * side
-        def frow(z, le, c, a, b):
-            return [(le - x, side * 6400 + y + cant * z, z) for x, y in naca_cut(c, 0.04, a, b)]
-        FIN = ((0, -9400, 4400), (3600, -12800, 1800))
-        fin = loft(f"fin{side}", [frow(z, le, c, 0, 0.7) for z, le, c in FIN], [M["skin"], M["edge"]], caps=True, uvscale=4000,
-                   matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)
-        part(f"deriva.{tagname}", [fin], "airframe", 5, (0, side * 1500, 3500), f"Deriva {tagname}")
-        rud = part(f"timon.{tagname}", [loft(f"rud{side}", [frow(z, le, c, 0.705, 1) for z, le, c in FIN], M["skin"], caps=True, uvscale=4000)],
-                   "airframe", 6, (-1500, side * 1500, 3500), f"Timón {tagname}", control="rudder", range=[-25, 25])
-        a = Vector((FIN[0][1] - 0.7 * FIN[0][2], side * 6400, 0))
-        b = Vector((FIN[1][1] - 0.7 * FIN[1][2], side * 6400 + cant * 3600, 3600))
-        rud["hinge"] = list((b - a).normalized())
-        set_pivot(rud, a)
+        base = z_top(-7600, 1700) - 40
 
-    # ── góndolas: la piel exterior de cada TBCC, abierta por delante (entrada) y por detrás (tobera) ──
+        def frow(h, le, c):
+            return [(le - x, side * 1700 + y + cant * h, base + h) for x, y in naca_cut(c, 0.05)]
+        FIN = ((0, -5600, 4000), (2300, -8200, 1500))
+        ob = part(f"deriva.{tagname}", [loft(f"fin{side}", [frow(h, le, c) for h, le, c in FIN], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)],
+                  "airframe", 6, (0, side * 1800, 2400), f"Deriva enteriza {tagname}", control="rudder", range=[-20, 20])
+        ob["hinge"] = list(Vector((0, cant, 1)).normalized())
+        set_pivot(ob, (-7800, side * 1700, base))
+
+    # ── góndolas bajo el ala: la boca rectangular de la toma y la piel que cubre cada TBCC ──
+    S = ENGINE_SCALE
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         rows = []
-        for k in range(15):
-            x = ENGINE_X - 15800 * k / 14 + 300
-            w, h, zc = 1640, 2150, -1060
-            top = body_bottom(x, side * ENGINE_Y) + 200
-            rows.append([(x, side * ENGINE_Y + w / 2 * math.copysign(abs(math.cos(t)) ** (2 / 6), math.cos(t)),
-                          ((top + COWL_Z - 80) / 2) + (top - COWL_Z + 80) / 2 * math.copysign(abs(math.sin(t)) ** (2 / 6), math.sin(t)))
+        for k in range(17):
+            x = ENGINE_X + 60 - (ENGINE_X + 60 + 9200) * k / 16
+            w = 1640 * S * (1.25 - 0.35 * smooth(-4000, -9200, x))
+            yc = side * ENGINE_Y
+            top = z_bottom(x, yc) + 80
+            bot = ENGINE_Z + (COWL_Z - 80) * S + 300 * smooth(-5000, -9200, x)
+            rows.append([(x, yc + w / 2 * math.copysign(abs(math.cos(t)) ** (2 / 6), math.cos(t)),
+                          (top + bot) / 2 + (top - bot) / 2 * math.copysign(abs(math.sin(t)) ** (2 / 6), math.sin(t)))
                          for t in [TAU * j / 40 for j in range(40)]])
-        part(f"gondola.{tagname}", [loft(f"nac{side}", rows, M["nacelle"], uvscale=4000)], "airframe", 7, (0, side * 3200, -500), f"Góndola {tagname}")
+        part(f"gondola.{tagname}", [loft(f"nac{side}", rows, M["nacelle"], uvscale=4000)], "airframe", 7, (0, side * 2600, -900), f"Toma y góndola {tagname}")
 
-    # ── tren: dos ruedas en el morro, cuatro en cada pata principal ──
+    # ── tren fijo: el de morro adelante, los principales bajo las tomas ──
     def wheel(name, c, r, w):
         F = frame(Vector(c) - Vector((0, w / 2, 0)), (0, 1, 0))
         return [lathe(f"{name}_t", F, [(0, r * 0.62), (0, r * 0.9), (w * 0.15, r), (w * 0.85, r), (w, r * 0.9), (w, r * 0.62)], M["rubber"], steps=40),
                 lathe(f"{name}_h", F, [(w * 0.1, 0), (w * 0.1, r * 0.62), (w * 0.9, r * 0.62), (w * 0.9, 0)], M["alu"], steps=32)]
-    nose = [cylinder_between("nstrut", (9600, 0, body_bottom(9600, 0) + 100), (9600, 0, GROUND + 380), 110, M["steel"], steps=24)]
-    for y in (-260, 260):
-        nose += wheel(f"nw{y}", (9600, y, GROUND + 380), 380, 300)
-    part("tren.morro", nose, "airframe", 8, (4000, 0, 0), "Tren de morro")
+    nose = [cylinder_between("nstrut", (6800, 0, z_bottom(6800, 0) + 60), (6800, 0, GROUND + 330), 90, M["steel"], steps=24)]
+    for y in (-200, 200):
+        nose += wheel(f"nw{y}", (6800, y, GROUND + 330), 330, 220)
+    part("tren.morro", nose, "airframe", 8, (3000, 0, 0), "Tren de morro")
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
-        y = side * 3300
-        g = [cylinder_between(f"mstrut{side}", (-3400, y, -60), (-3400, y, GROUND + 520), 150, M["steel"], steps=24),
-             box(f"bogie{side}", (-3400, y, GROUND + 520), (1500, 160, 120), M["steel"])]
-        for dx in (-560, 560):
-            for dy in (-300, 300):
-                g += wheel(f"mw{side}{dx}{dy}", (-3400 + dx, y + dy, GROUND + 520), 520, 360)
-        part(f"tren.{tagname}", g, "airframe", 9, (0, side * 3000, 0), f"Tren principal {tagname}")
+        y = side * ENGINE_Y
+        g = [cylinder_between(f"mstrut{side}", (-1500, y, ENGINE_Z + (COWL_Z - 80) * S + 40), (-1500, y, GROUND + 420), 120, M["steel"], steps=24)]
+        for dy in (-260, 260):
+            g += wheel(f"mw{side}{dy}", (-1500, y + dy, GROUND + 420), 420, 300)
+        part(f"tren.{tagname}", g, "airframe", 9, (0, side * 2600, 0), f"Tren principal {tagname}")
 
-    # ── los dos TBCC: el derecho con todas sus piezas, el izquierdo armado ──
+    # ── los dos TBCC, a la escala de este avión: el derecho con todas sus piezas, el izquierdo armado ──
     eng = {}
     for side, prefix, detailed in ((-1, "TBCC", True), (1, "TBCC.L", False)):
-        er, ep = build_tbcc(prefix, M, root, (ENGINE_X, side * ENGINE_Y, 0), meta, detailed)
-        tag(er, part=prefix, group="engine", order=40, explode=[-2000, -17000, 1800] if detailed else [0, 0, 0], label="TBCC derecho" if detailed else "TBCC izquierdo", system="engines")
+        er, ep = build_tbcc(prefix, M, root, (ENGINE_X, side * ENGINE_Y, ENGINE_Z), meta, detailed)
+        er.scale = (S, S, S)
+        tag(er, part=prefix, group="engine", order=40, explode=[-1000, -9000, 1600] if detailed else [0, 0, 0], label="TBCC derecho" if detailed else "TBCC izquierdo", system="engines")
         eng[prefix] = (er, ep)
         log(f"Motor {prefix}")
     return parts, eng

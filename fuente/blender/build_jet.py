@@ -1,5 +1,5 @@
 # Construye uno de los aviones a escala real y exporta web/<avión>/<avión>.glb sin abrir Blender (bpy como módulo).
-# Uso: python blender/build_jet.py sr72|f22|sr71
+# Uso: python blender/build_jet.py sr72|f22|sr71|f14
 import importlib
 import json
 import os
@@ -11,7 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import lib  # noqa: E402
 
-name = next((a for a in sys.argv[1:] if a in ("sr72", "f22", "sr71")), "sr72")
+name = next((a for a in sys.argv[1:] if a in ("sr72", "f22", "sr71", "f14")), "sr72")
 mod = importlib.import_module(name)
 ROOT = os.path.dirname(HERE)
 out = os.path.join(ROOT, "web", name, f"{name}.glb")
