@@ -26,6 +26,7 @@ pip install bpy                      # Blender como módulo de Python
 python blender/build_headless.py     # web/mw54.glb
 python blender/build_jet.py sr72     # web/sr72/sr72.glb (también f22, f14 y sr71)
 python blender/check_overlap.py sr72 # piezas que se atraviesan (también hawk, f22, f14 y sr71)
+python blender/export_cad.py         # cad/*.fbx y cad/*.obj para Autodesk Fusion
 python blender/assets/make_insignia.py
 node src/serve.mjs web               # http://127.0.0.1:8765/
 node src/to-pages.mjs                # publica el sitio en la raíz del repositorio
@@ -61,6 +62,7 @@ pip install bpy                      # Blender as a Python module
 python blender/build_headless.py     # web/mw54.glb
 python blender/build_jet.py sr72     # web/sr72/sr72.glb (also f22, f14 and sr71)
 python blender/check_overlap.py sr72 # parts that pass through each other (also hawk, f22, f14 and sr71)
+python blender/export_cad.py         # cad/*.fbx and cad/*.obj for Autodesk Fusion
 python blender/assets/make_insignia.py
 node src/serve.mjs web               # http://127.0.0.1:8765/
 node src/to-pages.mjs                # publishes the site at the repository root
