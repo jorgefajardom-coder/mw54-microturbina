@@ -139,7 +139,7 @@ def build_tbcc(prefix, M, parent, location, meta, detailed=True):
     def part(key, obs, order, explode, pivot=None, **extra):
         ob = join(f"{prefix}.{key}", obs, root)
         info = meta.get(key, {})
-        tag(ob, part=key, group=prefix if detailed else "TBCC.L", order=order, explode=list(explode), label=info.get("name", key),
+        tag(ob, part=key, group=prefix if detailed else "TBCC.L", order=order, explode=list(explode) if detailed else [0, 0, 0], label=info.get("name", key),
             material=info.get("material", ""), melt=list(info.get("melt", [0, 0])), service=info.get("service", 0), system="engines", **extra)
         if pivot is not None:
             set_pivot(ob, pivot)

@@ -59,3 +59,8 @@ body[data-orient="landscape"] nav.sections { bottom: calc(10px + env(safe-area-i
 body[data-orient="landscape"] #steps { bottom: calc(56px + env(safe-area-inset-bottom)); }
 body[data-orient="landscape"] .padkeys { grid-template-columns: repeat(4, 64px); top: auto; right: 50%; transform: translateX(50%); bottom: calc(14px + env(safe-area-inset-bottom)); }
 body[data-orient="landscape"] .stick { width: min(26vw, 150px); }
+
+#mode { top: calc(56px + env(safe-area-inset-top)); font-size: 11px; padding: 6px 10px; }
+body:has(#legend[style*="block"]) #mode, body:has(#sheet[data-open]) #mode { display: none !important; }
+body:has(#mode[style*="block"]) #legend { top: calc(58px + env(safe-area-inset-top)); }
+body[data-orient="landscape"] #mode { max-width: calc(100% - 120px); transform: translateX(calc(-50% - 42px)); }
