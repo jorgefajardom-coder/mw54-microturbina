@@ -119,6 +119,12 @@ export async function start(profile, cfg) {
     axis: e.data.hinge ? fromBlender(e.data.hinge).normalize() : null,
     slide: e.data.slide ? fromBlender(e.data.slide).normalize() : null,
   }));
+  // compuertas y flaps que van dentro de una pieza (puertas de la góndola, flaps del eyector, pétalos de la tobera):
+  // giran sobre su bisagra y viajan con la pieza en el despiece
+  const subControls = [];
+  model.traverse((o) => {
+    if (o.userData.subcontrol) subControls.push({ obj: o, kind: o.userData.subcontrol, rest: o.quaternion.clone(), axis: fromBlender(o.userData.hinge).normalize(), value: null });
+  });
   $("loading")?.remove();
   const meshes = [];
   for (const e of parts) for (const m of e.materials) { m.userData.entry = e; meshes.push(m); }
@@ -197,6 +203,14 @@ export async function start(profile, cfg) {
       if (!drive) continue;
       const v = drive(o, surf, c);
       if (c.axis) c.e.quat.copy(c.rest).multiply(new THREE.Quaternion().setFromAxisAngle(c.axis, v * D));
+      c.value = v;
+    }
+    for (const c of subControls) {
+      const drive = cfg.drive[c.kind];
+      if (!drive) continue;
+      const v = drive(o, surf, c);
+      if (v === c.value) continue;
+      c.obj.quaternion.copy(c.rest).multiply(new THREE.Quaternion().setFromAxisAngle(c.axis, v * D));
       c.value = v;
     }
   }

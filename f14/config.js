@@ -39,6 +39,8 @@ export default {
     ramp: (o) => -o.ramp,
     stabilator: (o, s, c) => Math.max(-1, Math.min(1, s.pitch - 0.6 * s.roll * c.sign)) * c.range[1],
     rudder: (o, s, c) => s.yaw * c.range[1],
+    // pétalos de la tobera: cerrados en seco, se abren con el postquemador
+    iris: (o) => 6 - 14 * o.ab,
   },
   // llama del F110: gradiente tomado de fotos del F110 en banco de pruebas y del F-14 al despegar (núcleo blanco rosado,
   // lavanda y cola azul violeta); diamantes con la separación de la tobera de pétalos
