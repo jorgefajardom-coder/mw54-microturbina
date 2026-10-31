@@ -1,0 +1,21 @@
+/* Exhibición: cielo a pantalla completa, cámaras y modos abajo, datos del avión seguido arriba. */
+#view canvas { width: 100%; height: 100%; touch-action: none; }
+#loading { background: var(--bg); z-index: 8; }
+#loading[hidden] { display: none; }
+header h1, header p { text-shadow: 0 1px 6px #0009; }
+footer { text-shadow: 0 1px 6px #0009; }
+#bar { left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px); }
+#bar .group { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+#bar .chip[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
+#bar .chip { color: var(--muted); }
+#readout { left: 50%; transform: translateX(-50%); top: 64px; padding: 8px 14px; border-radius: 12px; background: #000a; font: 12.5px/1.6 ui-monospace, Menlo, monospace; color: #cfd6dd; text-align: center; white-space: nowrap; }
+#readout:empty { display: none; }
+@media (max-width: 760px) {
+  header p { display: none; }
+  nav.sections { left: 0; right: 0; transform: none; top: 52px; overflow-x: auto; padding: 0 16px; justify-content: flex-start; flex-wrap: nowrap; scrollbar-width: none; }
+  nav.sections a { white-space: nowrap; flex: none; }
+  footer { display: none; }
+  #readout { top: 96px; font-size: 11.5px; }
+  #bar { gap: 8px; }
+  #bar .chip { padding: 0 10px; }
+}
