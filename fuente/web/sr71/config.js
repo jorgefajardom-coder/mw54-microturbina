@@ -43,7 +43,7 @@ export default {
     suckin: (o) => 22 * o.suckin,
     tertiary: (o) => 16 * o.tertiary,
     bypass: (o) => -16 * o.bypass,
-    ejector: (o) => 5 - 11 * o.ejector,
+    ejector: (o) => 5 - 8 * o.ejector,   // cerrados en tierra; a Mach 3,2 quedan casi en línea con la góndola
   },
   // llama del J58: gradiente tomado de la foto del J58 en el banco de pruebas de noche (penacho violeta translúcido con
   // nudos claros) y del SR-71 despegando (núcleo blanco amarillento y diamantes amarillos muy marcados); al arrancar,
