@@ -580,11 +580,13 @@ def build_hawk(M, root, log=lambda msg: None):
         tz = WZ + DZ(half)
         wing.append(cylinder_between(f"navlight{side}", (LE(half) - 0.35 * CH(half), side * half, tz), (LE(half) - 0.35 * CH(half), side * (half + 3), tz), 3.0, M["light_red" if side > 0 else "light_green"], steps=12))
         part(f"ala.{tagname}", wing, "airframe", 69, (0, side * 420, 0), f"Ala {tagname}", "airframe")
-        flap = part(f"flap.{tagname}", [loft(f"flap{side}", rows(HINGE_F + 0.004, 1, [110.3, 200, 329.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Flap {tagname}", "airframe", control="flap", range=[0, 40], sign=side)
-        ail = part(f"aleron.{tagname}", [loft(f"ail{side}", rows(HINGE_A + 0.004, 1, [380.5, 520, 640, half - 22.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Alerón {tagname}", "airframe", control="aileron", range=[-22, 22], sign=side)
+        flap = part(f"flap.{tagname}", [loft(f"flap{side}", rows(HINGE_F + 0.012, 1, [110.3, 200, 329.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Flap {tagname}", "airframe", control="flap", range=[0, 40], sign=side)
+        ail = part(f"aleron.{tagname}", [loft(f"ail{side}", rows(HINGE_A + 0.012, 1, [380.5, 520, 640, half - 22.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Alerón {tagname}", "airframe", control="aileron", range=[-22, 22], sign=side)
         for ob, (ya, yb), frac in ((flap, (110.3, 329.5), HINGE_F), (ail, (380.5, half - 22.5), HINGE_A)):
-            pa = Vector((LE(ya) - frac * CH(ya), side * ya, WZ + DZ(ya)))
-            pb = Vector((LE(yb) - frac * CH(yb), side * yb, WZ + DZ(yb)))
+            # bisagra en el intradós: al bajar, el borde de ataque del flap se aleja del ala en vez de meterse en ella
+            low = lambda y: WZ + DZ(y) - naca_t(frac, TT(y)) * CH(y)
+            pa = Vector((LE(ya) - frac * CH(ya), side * ya, low(ya)))
+            pb = Vector((LE(yb) - frac * CH(yb), side * yb, low(yb)))
             ob["hinge"] = list((pb - pa).normalized())
             set_pivot(ob, pa)
 
