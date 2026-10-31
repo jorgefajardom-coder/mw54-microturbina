@@ -416,7 +416,7 @@ function stepFocus(dt) {
 
 // ── acciones: lo que las interfaces pueden pedir; cada una deja el estado listo y avisa a quien escuche ──
 const listeners = new Set();
-const state = () => ({ exploded, running: motor.on, heat: heatOn, gear: !!gearState.target, surfaces: demoSurfaces, cockpit: inCockpit, flying, pip: pipOn, throttle: motor.target });
+const state = () => ({ exploded, running: motor.on, heat: heatOn, gear: !!gearState.target, surfaces: demoSurfaces, cockpit: inCockpit, flying, pip: pipOn, throttle: motor.target, cut: cutOn, mission: !!mission });
 const notify = () => { const st = state(); for (const fn of listeners) fn(st); };
 let pipOn = false;
 function settle() { if (parts.some((e) => e.t > 0.02)) { timeline = null; setExploded(0); } }
@@ -438,12 +438,15 @@ const actions = {
   },
   fly() {
     flying = !flying;
+    if (flying) { setCut(false); mission = null; }
     document.body.toggleAttribute("data-flying", flying);
-    if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; flight.enter(); }
+    if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; gearState.target = 0; gearState.t = 0; flight.enter(); }
     else { flight.exit(); controls.enabled = true; ground.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; flyCamera(inCockpit ? "cockpit" : "home"); }
     notify();
   },
   pip() { pipOn = !pipOn; $("pip").style.display = pipOn ? "block" : "none"; notify(); },
+  cut() { setCut(!cutOn); if (cutOn) settle(); flyCamera(cutOn ? "cut" : inCockpit ? "cockpit" : "home"); notify(); },
+  mission() { mission = mission ? null : { start: performance.now() / 1000 }; if (mission && !motor.on) { motor.on = true; settle(); } notify(); },
 };
 let demoSurfaces = false;
 let flying = false;
@@ -455,6 +458,34 @@ const VIEWS = {
   home: { pos: homeView(), target: new THREE.Vector3(0, -0.05, 0) },
   cockpit: { pos: new THREE.Vector3(0.405, 0.16, 0.07), target: new THREE.Vector3(0.53, 0.055, 0) },
 };
+// corte: el avión partido por su plano de simetría, mirando la MW54 de lado
+const hawkCut = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+let cutOn = false;
+if (engineRoot) {
+  const b = new THREE.Box3().setFromObject(engineRoot.obj);
+  const c = b.getCenter(new THREE.Vector3());
+  const len = b.max.x - b.min.x;
+  VIEWS.cut = { pos: c.clone().add(new THREE.Vector3(0.1 * len, 0.35 * len, 2.6 * len)), target: c };
+}
+const hawkMats = new Set();
+model.traverse((o) => o.isMesh && hawkMats.add(o.material));
+const hawkSides = new Map([...hawkMats].map((m) => [m, m.side]));
+function setCut(on) {
+  cutOn = on;
+  for (const m of hawkMats) if (!m.transparent) m.side = on ? THREE.DoubleSide : hawkSides.get(m);
+}
+// misión: un vuelo de exhibición de la maqueta, sólo con la palanca de gas (rodaje, despegue, subida, crucero,
+// acrobacia, aproximación y aterrizaje)
+const MISSION = [[0, 0.05, "Rodaje"], [6, 0.05, "Rodaje"], [9, 1, "Despegue"], [20, 1, "Subida"], [26, 0.7, "Crucero"], [42, 0.7, "Crucero"], [46, 1, "Acrobacia"], [60, 1, "Acrobacia"], [64, 0.35, "Aproximación"], [80, 0.3, "Aproximación"], [84, 0.05, "Aterrizaje"], [92, 0.05, "Rodaje"]];
+let mission = null;
+function missionAt(t) {
+  for (let i = 0; i < MISSION.length - 1; i++) {
+    const [t0, g0] = MISSION[i];
+    const [t1, g1, name] = MISSION[i + 1];
+    if (t <= t1) { const k = (t - t0) / (t1 - t0); return { g: g0 + (g1 - g0) * (k * k * (3 - 2 * k)), name }; }
+  }
+  return null;
+}
 let camTween = null;
 let inCockpit = false;
 function flyCamera(view) {
@@ -505,9 +536,14 @@ function frame() {
   if (hovered && (heatTick % 0.2) < dt) showCard(hovered);
   const rpm = o.n * motor.spin;
   const fuel = ((o.thrust * 0.15) / 3600 / 0.8) * 1e6 * 60 / 1000;
-  $("readout").innerHTML = motor.heat > 0.02
+  if (mission) {
+    const m = missionAt(performance.now() / 1000 - mission.start);
+    if (!m) { mission = null; motor.target = 0.6; notify(); }
+    else { motor.target = m.g; mission.name = m.name; }
+  }
+  $("readout").innerHTML = (mission ? `<b>${mission.name}</b> · ` : "") + (motor.heat > 0.02
     ? `<b>${fmt(rpm)}</b> rpm · <b>${o.thrust.toFixed(1)}</b> N · EGT <b>${fmt(15 + (o.egt - 15) * motor.heat)}</b> °C · <b>${fmt(fuel)}</b> ml/min`
-    : `Parada · ${SPEC.mass} g · ${parts.length} piezas`;
+    : `Parada · ${SPEC.mass} g · ${parts.length} piezas`);
   const air = o.flow * motor.spin;
   const fuelKg = (o.thrust * 0.15) / 3600;
   $("chem").innerHTML = `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`;
@@ -517,8 +553,9 @@ function frame() {
   renderer.setScissorTest(false);
   const [W, H] = profile.size();
   renderer.setViewport(0, 0, W, H);
-  renderer.clippingPlanes = [];
+  renderer.clippingPlanes = cutOn && !flying ? [hawkCut] : [];
   composer.render();
+  renderer.clippingPlanes = [];
   // la cámara de combustión: el motor cortado por su plano vertical, mirando la cámara anular desde un lado
   if (pipOn && engineRoot) {
     const r = $("pipFrame").getBoundingClientRect();

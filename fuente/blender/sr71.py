@@ -12,7 +12,10 @@ from sr72 import catmull, blade_ring, hinged_ring, attach
 GROUND = -2700.0
 NAC_Y = 4100.0    # góndolas a media ala, como en el plano de tres vistas
 NAC_Z = -150.0
-FACE_X = -4200.0   # cara del compresor (mundo): la punta del cono queda en x = −800, como en el plano
+FACE_X = -4200.0   # referencia de la góndola (mundo): la punta del cono queda en x = −800, como en el plano
+# el J58 (5,4 m de la cara del compresor a la tobera) va 1,5 m más atrás: la toma real es larga y la tobera queda
+# dentro del eyector, que la rodea con el aire secundario
+ENGINE_AFT = 1500.0
 OUTER = [(-2300, 840), (-1000, 960), (2000, 980), (4800, 950), (7300, 880)]   # radio exterior de la góndola
 # hueco que la góndola y el eyector abren en el ala: el ala llega hasta la piel de la góndola y no sigue por dentro
 HOLE = [(-4700, 0), (-4700, 830), (-2300, 834), (-1000, 954), (2000, 974), (4800, 944), (7300, 874), (7300, 920), (10300, 920), (10300, 0)]
@@ -86,7 +89,7 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
     O = (0, 0, 0)
     # cono de entrada: punta 3,4 m por delante de la cara del compresor, 1,1 m por delante del labio; se desliza
     # 660 mm hacia atrás con el Mach
-    spike = lathe("spike", F, [(-3400, 0), (-2720, 260), (-2040, 560), (-1740, 640), (-900, 520), (-300, 330), (0, 300), (0, 0)], M["ti"], steps=64)
+    spike = lathe("spike", F, [(-4900, 0), (-4220, 260), (-3540, 560), (-3240, 640), (-2400, 560), (-1200, 420), (0, 300), (0, 0)], M["ti"], steps=64)
     part("cono", [spike], 1, (3500, 0, 0), out=1, control="spike", slide=[-1.0, 0.0, 0.0], range=[0, 660])
     comp = [lathe("drum", F, [(0, 80), (0, 300), (1600, 330), (1600, 80)], M["wasp"], steps=48)]   # con el agujero del eje
     for k in range(9):
@@ -125,19 +128,21 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
     a, b = halves(join(f"{prefix}.case", case), f"{prefix}.case.b")
     part("carcasa", [a], 15, (0, 2000, 0), out=6)
     part("carcasa.b", [b], 15, (0, -2000, 0), out=6)
-    ab = [lathe("abl", F, [(2950, 640), (2950, 690), (6500, 690), (6500, 640)], M["hast"], steps=64),
-          lathe("cone", F, [(2800, 0), (2800, 330), (3900, 150), (4200, 0)], M["inco"], steps=48)]
+    # postquemador de 1,95 m: la mitad trasera del motor, como en el J58
+    ab = [lathe("abl", F, [(2950, 640), (2950, 690), (4900, 690), (4900, 640)], M["hast"], steps=64),
+          lathe("cone", F, [(2800, 0), (2800, 330), (3500, 150), (3750, 0)], M["inco"], steps=48)]
     for r in (260, 470):
         ab.append(lathe(f"gut{r}", F, [(3300, r - 40), (3410, r), (3300, r + 40), (3320, r)], M["inco"], steps=64))
     for i in range(12):
         th = TAU * i / 12
         ab.append(cylinder_between(f"sb{i}", point(F, 3150, 140, th), point(F, 3150, 630, th), 9, M["inco"], steps=8))
     part("postquemador", ab, 16, (-3000, 0, 0), out=4)
-    part("tobera", [lathe("cd", F, [(6500, 640), (6500, 690), (7100, 560), (7300, 600), (7300, 570), (7100, 530)], M["inco"], steps=48)], 17, (-4200, 0, 0), out=3)
+    part("tobera", [lathe("cd", F, [(4900, 640), (4900, 690), (5300, 560), (5440, 600), (5440, 570), (5300, 530)], M["inco"], steps=48)], 17, (-4200, 0, 0), out=3)
     # eyector: anillo de montaje y 16 aletas libres; convergen a baja velocidad y el propio flujo las abre hasta Mach 3,2
-    ring = lathe("ejring", F, [(7350, 700), (7350, 790), (7460, 790), (7460, 700)], M["hot"], steps=64)
+    E = 7350 - ENGINE_AFT   # el eyector sigue en su sitio de la góndola
+    ring = lathe("ejring", F, [(E, 700), (E, 790), (E + 110, 790), (E + 110, 700)], M["hot"], steps=64)
     ej = part("eyector", [ring], 18, (-5400, 0, 0), out=2)
-    attach(ej, hinged_ring("ejf", F, 7430, 9900, 760, 610, 16, M["hot"], "ejector", width=0.94, thick=28))
+    attach(ej, hinged_ring("ejf", F, E + 80, E + 2550, 760, 610, 16, M["hot"], "ejector", width=0.94, thick=28))
     return root, parts
 
 
@@ -235,7 +240,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         # al despegar) y terciarias delante del eyector (abiertas a baja velocidad, cerradas al pasar Mach 1)
         outer = lambda s_: next(r0 + (r1 - r0) * (s_ - a0) / (a1 - a0) for (a0, r0), (a1, r1) in zip(OUTER, OUTER[1:]) if a0 <= s_ <= a1)
         doors, recess = [], []
-        for name, s0, s1, n, kind, w in (("bp", -1750, -1300, 6, "bypass", 0.55), ("si", -300, 350, 8, "suckin", 0.6), ("te", 6000, 6600, 12, "tertiary", 0.7)):
+        for name, s0, s1, n, kind, w in (("bp", -1750, -1300, 6, "bypass", 0.55), ("si", 1200, 1850, 8, "suckin", 0.6), ("te", 6000, 6600, 12, "tertiary", 0.7)):
             r0, r1 = outer(s0) + 4, outer(s1) + 4
             at = door_angles(n, w, fin=0.5 if kind == "tertiary" else 0.0)
             doors += hinged_ring(f"{name}{side}", F, s0, s1, r0, r1, n, M["skin"], kind, width=w, thick=12, at=at)
@@ -284,7 +289,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
 
     eng = {}
     for side, prefix, detailed in ((-1, "J58", True), (1, "J58.L", False)):
-        er, ep = build_j58(prefix, M, root, (FACE_X, side * NAC_Y, NAC_Z), meta, detailed)
+        er, ep = build_j58(prefix, M, root, (FACE_X - ENGINE_AFT, side * NAC_Y, NAC_Z), meta, detailed)
         tag(er, part=prefix, group="engine", order=40, explode=[-16000, 0, -1300], label="J58 derecho" if detailed else "J58 izquierdo", system="engines")
         eng[prefix] = (er, ep)
         log(f"Motor {prefix}")

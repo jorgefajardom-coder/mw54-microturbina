@@ -19,3 +19,4 @@ footer { text-shadow: 0 1px 6px #0009; }
   #bar { gap: 8px; }
   #bar .chip { padding: 0 10px; }
 }
+@media (min-width: 761px) and (max-width: 1440px) { #readout { top: 104px; } }

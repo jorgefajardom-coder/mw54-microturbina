@@ -142,7 +142,8 @@ export function blackbody(T) {
 //    revés si su dato `path` es "v", o pasando por el punto `via`), sólo gira cuando ya está fuera, se asienta con un leve rebote al volver y, ya
 //    separada, flota despacio ──
 const eio = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-const back = (t) => { const c = 1.25; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+// al llegar a su sitio la pieza frena sin pasarse: un rebote la metería un instante dentro de la vecina
+const back = (t) => 1 - Math.pow(1 - t, 3);
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const H = new THREE.Vector3();
 const V = new THREE.Vector3();
@@ -161,7 +162,8 @@ export function organicPose(e, time, { up, float = 1, dir = 1 }) {
   else e.obj.position.addScaledVector(first, k < 0.5 ? k * 2 : 1).addScaledVector(second, k > 0.5 ? (k - 0.5) * 2 : 0);
   const bob = float * Math.pow(t, 6) * L * 0.012 * Math.sin(time * 0.9 + e.seed.phase);
   e.obj.position.addScaledVector(up, bob);
-  const tumble = e.seed.spin * Math.sin(Math.PI * t) * sm(0.5, 0.8, t) + Math.pow(t, 6) * 0.02 * Math.sin(time * 0.7 + e.seed.phase);
+  // sólo gira cuando ya está bien lejos de su sitio, nunca mientras entra o sale
+  const tumble = (e.seed.spin * Math.sin(Math.PI * t) * sm(0.75, 0.95, t) + Math.pow(t, 6) * 0.02 * Math.sin(time * 0.7 + e.seed.phase)) * (dir < 0 ? sm(0.8, 1, t) : 1);
   e.obj.quaternion.copy(e.quat).multiply(new THREE.Quaternion().setFromAxisAngle(e.seed.axis, tumble));
 }
 
@@ -178,7 +180,7 @@ export function disassemblyOrder(parts, { isGear, isLate, root, isEngine }) {
   return [...gear, ...late, ...(root && root.offset.length() > 1e-6 ? [root] : []), ...engine, ...rest];
 }
 
-// Pasos de una secuencia: uno detrás de otro, cada uno empieza cuando el anterior va por la mitad.
+// Pasos de una secuencia: uno detrás de otro, cada uno empieza cuando el anterior ya casi ha llegado.
 export function sequenceSteps(order, target, { speed = 1, label }) {
   const list = target ? order : order.slice().reverse();
   const maxL = Math.max(...list.map((e) => e.offset.length()), 1e-6);
@@ -186,7 +188,7 @@ export function sequenceSteps(order, target, { speed = 1, label }) {
   return list.map((e) => {
     const dur = (0.75 + 0.55 * (e.offset.length() / maxL)) / speed;
     const step = { e, at, dur, from: target ? 0 : 1, to: target, say: `${target ? "Desarmando" : "Montando"} · ${label(e)}` };
-    at += dur * 0.55;
+    at += dur * 0.8;   // casi una detrás de otra: se ve qué entra y por dónde
     return step;
   });
 }

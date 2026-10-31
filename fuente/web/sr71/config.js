@@ -9,6 +9,8 @@ export default {
   parts: "./parts.json",
   sim,
   engine: "J58",
+  // vuelo: masa al despegar (kg), superficie alar (m²), envergadura y cuerda media (m), motores
+  fly: { m: 55000, S: 167, b: 16.94, c: 11, engines: 2 },
   engineAlt: "J58.L",
   coreZone: "hpc",
   maxMach: 3.3,
@@ -62,14 +64,14 @@ export default {
       return { w: { dry: (1 - o.ab) * (1 - teb), ab: o.ab * (1 - teb), teb }, level: Math.max(teb, motor.heat * (0.25 + 0.75 * motor.thr)), optimal: o.ab * sm(0.88, 1, motor.thr) * (1 - teb), reach: 0.55 + 0.45 * o.ab };
     },
   },
-  // boca del eyector ≈ 0,62 m de radio: r · 0,62 (lo que mide la llama al salir) = radio de la boca
-  plumes: [4100, -4100].map((y) => ({ at: [-14150, y, -150], length: 14, r: 1.0, tail: 0.5 })),
-  cut: { z: 4.1, pos: [-6, -1.6, 26], target: [-6.5, -0.4, 4.1] },
+  // la llama nace en la tobera del J58 (0,6 m de radio), dentro del eyector, y sale por él
+  plumes: [4100, -4100].map((y) => ({ at: [-11140, y, -150], length: 16.5, r: 0.95, tail: 0.5 })),
+  cut: { z: 4.1, pos: [-7.5, -1.6, 26], target: [-8, -0.4, 4.1] },
   flow: {
     paths: {
-      core: [[5400, 700], [3400, 760], [2300, 650], [0, 420], [-1600, 330], [-2300, 360], [-2800, 300], [-3130, 300], [-6500, 320], [-7300, 300], [-11000, 280]],
-      bleed: [[5400, 760], [3400, 800], [2300, 700], [0, 500], [-700, 480], [-850, 700], [-2900, 710], [-3130, 560], [-6500, 480], [-11000, 420]],
-      secondary: [[5400, 860], [3400, 880], [2300, 830], [0, 820], [-2985, 800], [-6500, 790], [-7400, 740], [-11000, 640]],
+      core: [[6900, 700], [4900, 760], [3800, 650], [1500, 480], [0, 420], [-1600, 330], [-2300, 360], [-2800, 300], [-3130, 300], [-4900, 320], [-5440, 300], [-9500, 280]],
+      bleed: [[6900, 760], [4900, 800], [3800, 700], [1500, 520], [0, 500], [-700, 480], [-850, 700], [-2900, 710], [-3130, 560], [-4900, 480], [-9500, 420]],
+      secondary: [[6900, 860], [4900, 880], [3800, 830], [1500, 820], [0, 820], [-2985, 800], [-4900, 790], [-5900, 740], [-9500, 640]],
     },
     share: (path, o) => (path === "core" ? 1 : path === "bleed" ? o.bleed * 2 : 0.25 + 0.5 * Math.min(1, Math.max(0, (o.M - 2) / 1.2))),
     speed: (path) => (path === "core" ? 0.12 : 0.14),
