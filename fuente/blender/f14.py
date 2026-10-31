@@ -182,19 +182,20 @@ def build_f14(M, root, meta, log=lambda msg: None):
         # rampas: forman el techo del conducto, por debajo de él, y salen hacia delante por la boca de la toma
         ramp = hull(f"ramp{side}", [(2300, side * NAC_Y - 420, AX_Z + 520), (2300, side * NAC_Y + 420, AX_Z + 520), (700, side * NAC_Y - 350, AX_Z + 490), (700, side * NAC_Y + 350, AX_Z + 490),
                                     (2300, side * NAC_Y - 420, AX_Z + 560), (2300, side * NAC_Y + 420, AX_Z + 560), (700, side * NAC_Y - 350, AX_Z + 525), (700, side * NAC_Y + 350, AX_Z + 525)], M["skin"])
-        ob = part(f"rampa.{tagname}", [ramp], "airframe", 8, (2600, 0, 900), f"Rampas de la toma {tagname}", control="ramp", hinge=[0.0, 1.0, 0.0], range=[0, 18])
+        ob = part(f"rampa.{tagname}", [ramp], "airframe", 8, (2600, 0, 1900), f"Rampas de la toma {tagname}", control="ramp", hinge=[0.0, 1.0, 0.0], range=[0, 18])
         set_pivot(ob, (2300, side * NAC_Y, AX_Z + 540))
 
     # ── guantes fijos (flecha de ~67°) y alas de geometría variable sobre su pivote ──
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         glove = []
-        # el guante nace en el costado exterior de la góndola (por dentro de ella sólo hay toma y motor)
+        # el guante es la cubierta que va del costado del fuselaje al pivote del ala, por encima de las tomas, y en
+        # su raíz es grueso para cerrarse sobre ellas (por dentro de las góndolas se recorta: allí sólo hay toma y motor)
         f = (2000 - 900) / (PIVOT[1] + 200 - 900)
-        for y, le, te in ((2000, 3600 - 4000 * f, -4200 + 600 * f), (PIVOT[1] + 200, -400, -3600)):
-            glove.append([(le - x, side * y, WING_Z + z) for x, z in naca_cut(le - te, 0.06)])
+        for y, le, te, t in ((900, 3600, -4200, 0.10), (2000, 3600 - 4000 * f, -4200 + 600 * f, 0.08), (PIVOT[1] + 200, -400, -3600, 0.06)):
+            glove.append([(le - x, side * y, WING_Z + z) for x, z in naca_cut(le - te, t)])
         gl = loft(f"glove{side}", glove, M["skin"], caps=True, uvscale=4000)
         boolean_cut(gl, [loft(f"glcut{side}", nacelle_rows(side, 6), None, caps=True)])
-        part(f"guante.{tagname}", [gl], "airframe", 4, (0, side * 2200, 600), f"Guante {tagname}")
+        part(f"guante.{tagname}", [gl], "airframe", 4, (0, side * 2200, 600), f"Guante {tagname}", path="v")
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         # ala dibujada a 20° de flecha; el visor la gira sobre el pivote hasta 68°
         sw = math.tan(math.radians(20))
@@ -243,7 +244,7 @@ def build_f14(M, root, meta, log=lambda msg: None):
     part("tren.morro", nose, "airframe", 11, (0, 2200, 0), "Tren de morro con barra de lanzamiento")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         y = side * 2350   # bajo el guante, por dentro de la raíz del ala
-        part(f"tren.{tagname}", [cylinder_between(f"ms{side}", (-1300, y, 475), (-1300, y, GROUND + 450), 110, M["steel"], steps=20)] + wheel(f"mw{side}", (-1300, y + side * 200, GROUND + 450), 450, 300),
+        part(f"tren.{tagname}", [cylinder_between(f"ms{side}", (-1300, y, 425), (-1300, y, GROUND + 450), 110, M["steel"], steps=20)] + wheel(f"mw{side}", (-1300, y + side * 200, GROUND + 450), 450, 300),
              "airframe", 11, (2500, side * 1800, 0), f"Tren principal {tagname}", via=[2500, 0, 0])
     part("gancho", [cylinder_between("hook", (-6200, 0, -150), (-8800, 0, -450), 60, M["steel"], steps=16)], "airframe", 12, (-2000, 0, -800), "Gancho de apontaje")
 

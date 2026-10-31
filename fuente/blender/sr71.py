@@ -106,6 +106,10 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
         th = TAU * i / 8
         Fc = frame(point(F, 1720, 465, th), (-1, 0, 0))
         comb.append(lathe(f"can{i}", Fc, [(0, 0), (0, 95), (600, 95), (600, 0)], M["hot"], steps=24))
+    # soportes de la cámara a la carcasa: ocho patas radiales que la centran en el motor
+    for i in range(8):
+        th = TAU * (i + 0.5) / 8
+        comb.append(cylinder_between(f"cmbleg{i}", point(F, 2020, 600, th), point(F, 2020, 638, th), 22, M["hast"], steps=8))
     part("camara", comb, 12, (-1200, 0, 0), out=8)
     turb = [lathe("tdisc", F, [(2400, 80), (2400, 330), (2750, 340), (2750, 80)], M["wasp"], steps=48)]
     for k, s in enumerate((2470, 2660)):
