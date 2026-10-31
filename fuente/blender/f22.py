@@ -17,8 +17,8 @@ AX_Z = -150.0
 BOOM_Y = 1800.0   # eje de las vigas de cola
 
 ST = [
-    (9500, 30, 10, 10, -150), (8600, 600, 240, 200, -150), (7200, 1150, 400, 330, -120), (5800, 1450, 520, 430, -80),
-    (4200, 1750, 560, 520, -60), (3200, 2500, 580, 600, -60), (1500, 3200, 600, 650, -80), (-1500, 3400, 620, 660, -100),
+    (9500, 30, 10, 10, -150), (8600, 920, 240, 200, -150), (7200, 1500, 400, 330, -120), (5800, 1800, 520, 430, -80),
+    (4200, 1950, 560, 520, -60), (3200, 2500, 580, 600, -60), (1500, 3200, 600, 650, -80), (-1500, 3400, 620, 660, -100),
     (-4500, 3250, 620, 660, -120), (-6500, 2800, 620, 630, -150), (-8000, 2600, 620, 620, -150), (-8700, 2500, 600, 600, -150),
 ]
 N = 64
@@ -206,7 +206,7 @@ def build_f22(M, root, meta, log=lambda msg: None):
                 dx = -(420 * (z - zb) / (zt - zb) + 260 * (y - 1150) / (wy[1] - 1150)) if rake else 0.0
                 out.append((x + dx, side * y, z))
             return out
-        STA = ((3700, (1950, 2060), -620, 120, True), (3100, (1930, 2030), -610, 110, False), (2300, (1880, 1950), -590, 90, False), (1500, (1780, 1820), -560, 60, False))
+        STA = ((4400, (1950, 2060), -620, 120, True), (3800, (1930, 2030), -610, 110, False), (2900, (1880, 1950), -590, 90, False), (1500, (1780, 1820), -560, 60, False))
         outer = loft(f"inlet{side}", [ring(*st) for st in STA], M["skin"], uvscale=4000)
         inner = loft(f"inletin{side}", [ring(*st, inset=45) for st in STA], M["dark"], uvscale=4000)
         mouth = loft(f"inletlip{side}", [ring(*STA[0]), ring(*STA[0], inset=45)], M["skin"], uvscale=4000)
@@ -252,14 +252,15 @@ def build_f22(M, root, meta, log=lambda msg: None):
             set_pivot(ob, p0)
 
     # ── estabilizadores enterizos ──
-    SLE = lambda y: -7100 - 0.9 * (y - 2150)
-    STE = lambda y: -9800 + 0.41 * (y - 2150)
+    # estabilizadores como en el plano de tres vistas: grandes, con la punta a 4,5 m del eje y por detrás de los flaperones
+    SLE = lambda y: -6700 - 0.55 * (y - 2150)
+    STE = lambda y: -9300 + 0.36 * (y - 2150)
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
-        rows = [[(SLE(y) - x, side * y, -150 + z) for x, z in naca_cut(SLE(y) - STE(y), 0.04)] for y in (2150, 3100, 4100)]
+        rows = [[(SLE(y) - x, side * y, -150 + z) for x, z in naca_cut(SLE(y) - STE(y), 0.04)] for y in (2150, 3300, 4510)]
         ob = part(f"estabilizador.{tagname}", [loft(f"stab{side}", rows, [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)],
                   "airframe", 6, (-2500, side * 2200, 1500), f"Estabilizador enterizo {tagname}", control="stabilator", range=[-25, 25], sign=side, path="v")
         ob["hinge"] = [0.0, 1.0, 0.0]
-        set_pivot(ob, (-8300, side * 2150, -150))
+        set_pivot(ob, (-7400, side * 2150, -150))
 
     # ── derivas gemelas inclinadas 28° hacia fuera, con timón ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
