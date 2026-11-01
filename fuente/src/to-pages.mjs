@@ -52,11 +52,10 @@ writeFileSync(join(OUT, "aero", "index.html"), readFileSync(join(ROOT, "web", "a
   description: `Visor 3D interactivo por ${AUTHOR}: cada avión en vuelo con las líneas de corriente del aire, el cono de Mach, la atmósfera a su altitud, la presión dinámica, la temperatura de remanso, la sustentación, la resistencia de forma, de onda e inducida y la finura, del Mach 0,1 al Mach 6.`,
   url: `${SITE}aero/`,
   name: "Aerodinámica de los aviones del visor",
-  image: `${SITE}sr71/og.png`,
 })));
 for (const [jet, meta] of Object.entries(JETS)) {
-  for (const f of ["app.js", "config.js", "sim.js", "parts.json", `${jet}.glb`, "og.png"]) copyFileSync(join(ROOT, "web", jet, f), join(OUT, jet, f));
-  const html = readFileSync(join(ROOT, "web", jet, "index.html"), "utf8").replace("<!--SEO-->", seoHead({ ...meta, url: `${SITE}${jet}/`, image: `${SITE}${jet}/og.png` }));
+  for (const f of ["app.js", "config.js", "sim.js", "parts.json", `${jet}.glb`]) copyFileSync(join(ROOT, "web", jet, f), join(OUT, jet, f));
+  const html = readFileSync(join(ROOT, "web", jet, "index.html"), "utf8").replace("<!--SEO-->", seoHead({ ...meta, url: `${SITE}${jet}/` }));
   writeFileSync(join(OUT, jet, "index.html"), html);
 }
 copyFileSync(join(ROOT, "dist", "index.html"), join(OUT, "anatomia", "index.html"));
@@ -72,5 +71,4 @@ writeFileSync(
 );
 // la imagen para redes sale de una captura del visor; si no la hay, se conserva la que ya tiene el sitio
 if (existsSync(join(ROOT, "shots", "hawk-v3.png"))) execFileSync("python", ["-c", `from PIL import Image, ImageOps; im = Image.open(r"${join(ROOT, "shots", "hawk-v3.png")}").convert("RGB"); im = ImageOps.fit(im, (1200, 630), centering=(0.5, 0.5)); im.save(r"${join(OUT, "og.png")}", "PNG", optimize=True)`], { stdio: "inherit" });
-else copyFileSync(join(ROOT, "web", "og-hawk.png"), join(OUT, "og.png"));
 console.log("sitio listo en", OUT);

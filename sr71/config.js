@@ -43,7 +43,7 @@ export default {
     suckin: (o) => 22 * o.suckin,
     tertiary: (o) => 16 * o.tertiary,
     bypass: (o) => -16 * o.bypass,
-    ejector: (o) => 5 - 8 * o.ejector,   // cerrados en tierra; a Mach 3,2 quedan casi en línea con la góndola
+    ejector: (o) => 5 - 11 * o.ejector,
   },
   // llama del J58: gradiente tomado de la foto del J58 en el banco de pruebas de noche (penacho violeta translúcido con
   // nudos claros) y del SR-71 despegando (núcleo blanco amarillento y diamantes amarillos muy marcados); al arrancar,
@@ -63,13 +63,13 @@ export default {
     },
   },
   // boca del eyector ≈ 0,62 m de radio: r · 0,62 (lo que mide la llama al salir) = radio de la boca
-  plumes: [4100, -4100].map((y) => ({ at: [-14150, y, -150], length: 14, r: 1.0, tail: 0.5 })),
-  cut: { z: 4.1, pos: [-6, -1.6, 26], target: [-6.5, -0.4, 4.1] },
+  plumes: [3300, -3300].map((y) => ({ at: [-14450, y, -150], length: 14, r: 1.0, tail: 0.5 })),
+  cut: { z: 3.3, pos: [-5, -1.6, 25], target: [-5.5, -0.4, 3.3] },
   flow: {
     paths: {
-      core: [[5400, 700], [3400, 760], [2300, 650], [0, 420], [-1600, 330], [-2300, 360], [-2800, 300], [-3130, 300], [-6500, 320], [-7300, 300], [-11000, 280]],
-      bleed: [[5400, 760], [3400, 800], [2300, 700], [0, 500], [-700, 480], [-850, 700], [-2900, 710], [-3130, 560], [-6500, 480], [-11000, 420]],
-      secondary: [[5400, 860], [3400, 880], [2300, 830], [0, 820], [-2985, 800], [-6500, 790], [-7400, 740], [-11000, 640]],
+      core: [[6500, 700], [4500, 760], [2300, 650], [0, 420], [-1600, 330], [-2300, 360], [-2800, 300], [-3200, 300], [-8000, 320], [-8800, 300], [-12500, 280]],
+      bleed: [[6500, 760], [4500, 800], [2300, 700], [0, 500], [-700, 480], [-850, 700], [-2900, 710], [-3200, 560], [-8000, 480], [-12500, 420]],
+      secondary: [[6500, 860], [4500, 880], [2300, 830], [0, 820], [-3000, 800], [-8000, 790], [-8900, 740], [-12500, 640]],
     },
     share: (path, o) => (path === "core" ? 1 : path === "bleed" ? o.bleed * 2 : 0.25 + 0.5 * Math.min(1, Math.max(0, (o.M - 2) / 1.2))),
     speed: (path) => (path === "core" ? 0.12 : 0.14),
