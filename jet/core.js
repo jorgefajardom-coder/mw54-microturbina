@@ -38,6 +38,11 @@ export async function start(profile, cfg) {
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // la luz es fija y la cámara no cambia las sombras: el mapa sólo se rehace si algo se movió (montaje, mandos, tren),
+  // y cada medio segundo por si acaso; en el teléfono ahorra redibujar la escena entera en cada cuadro
+  renderer.shadowMap.autoUpdate = false;
+  let shadowDirty = true;
+  let shadowAt = 0;
   renderer.localClippingEnabled = true;
   $("view").appendChild(renderer.domElement);
   guardContext(renderer);
@@ -86,6 +91,15 @@ export async function start(profile, cfg) {
     if (o.isMesh) {
       o.castShadow = o.receiveShadow = true;
       o.material.side = cfg.doubleSided?.test(o.material.name) ? THREE.DoubleSide : THREE.FrontSide;
+      // en el teléfono la transmisión del parabrisas obliga a pintar la escena dos veces por cuadro (SR-71 en un Adreno
+      // 610: de 35 a 56 fps al quitarla): el mismo tinte con transparencia se ve igual a esta distancia
+      if (profile.kind === "celular" && o.material.transmission > 0) {
+        o.material.opacity = Math.min(o.material.opacity, 1 - 0.55 * o.material.transmission);
+        o.material.transmission = 0;
+        o.material.transparent = true;
+        o.material.depthWrite = false;
+        o.castShadow = false;
+      }
       allMaterials.add(o.material);
     }
     const d = o.userData;
@@ -198,6 +212,7 @@ export async function start(profile, cfg) {
       const drive = cfg.drive[c.kind];
       if (!drive) continue;
       const v = drive(o, surf, c);
+      if (v !== c.value) shadowDirty = true;
       if (c.axis) c.e.quat.copy(c.rest).multiply(new THREE.Quaternion().setFromAxisAngle(c.axis, v * D));
       c.value = v;
     }
@@ -206,6 +221,7 @@ export async function start(profile, cfg) {
       if (!drive) continue;
       const v = drive(o, surf, c);
       if (v === c.value) continue;
+      shadowDirty = true;
       c.obj.quaternion.copy(c.rest).multiply(new THREE.Quaternion().setFromAxisAngle(c.axis, v * D));
       c.value = v;
     }
@@ -437,7 +453,8 @@ export async function start(profile, cfg) {
     if (hovered && heatTick % 0.2 < dt) showCard(hovered);
     const md = modeOf(motor.M);
     if (md.key !== lastMode) { lastMode = md.key; $("mode").innerHTML = `<b>${md.name}</b> · ${md.say}`; }
-    $("mode").style.display = motor.on && !timeline ? "block" : "none";
+    const modeShown = motor.on && !timeline ? "block" : "none";
+    if (modeShown !== frame.mode) { frame.mode = modeShown; $("mode").style.display = modeShown; }
     // sólo si cambió: reescribir el mismo texto cada cuadro recalcula estilos y diseño
     const ro = motor.on || motor.M > 0.05 ? cfg.readout(o, motor, md, K) : `En tierra · ${parts.length} piezas · ${cfg.say.engines}`;
     if (ro !== frame.ro) { frame.ro = ro; $("readout").innerHTML = ro; }
@@ -446,6 +463,7 @@ export async function start(profile, cfg) {
     controls.update();
     // el cambio de resolución va antes de dibujar: si va después, ese cuadro se ve negro
     adapt(dt);
+    if (shadowDirty || timeline || demo || now - shadowAt > 0.5) { renderer.shadowMap.needsUpdate = true; shadowAt = now; shadowDirty = false; }
     composer.render();
     requestAnimationFrame(frame);
   }

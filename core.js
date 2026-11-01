@@ -33,6 +33,10 @@ renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// la luz es fija y la cámara no cambia las sombras: el mapa sólo se rehace si algo se mueve (montaje, mandos, tren,
+// vuelo) y cada medio segundo por si acaso; en el teléfono ahorra redibujar la escena entera en cada cuadro
+renderer.shadowMap.autoUpdate = false;
+let shadowAt = 0;
 renderer.localClippingEnabled = true;
 $("view").appendChild(renderer.domElement);
 guardContext(renderer);
@@ -549,6 +553,7 @@ function frame() {
   const [W, H] = profile.size();
   renderer.setViewport(0, 0, W, H);
   renderer.clippingPlanes = [];
+  if (timeline || demoSurfaces || flying || gearState.t !== gearState.target || now - shadowAt > 0.5) { renderer.shadowMap.needsUpdate = true; shadowAt = now; }
   composer.render();
   // la cámara de combustión: el motor cortado por su plano vertical, mirando la cámara anular desde un lado
   if (pipOn && engineRoot) {
