@@ -319,6 +319,7 @@ export async function start(profile, cfg) {
     const y = H - r.bottom;
     const flowWas = flow.visible;
     flow.visible = true;
+    for (const stream of streams) stream.material.uniforms.onlyFlame.value = 1;
     // las piezas cortadas se ven por dentro: un instante con las dos caras
     const sides = [...allMaterials].map((m) => [m, m.side]);
     for (const m of allMaterials) m.side = THREE.DoubleSide;
@@ -335,6 +336,7 @@ export async function start(profile, cfg) {
     renderer.setScissorTest(false);
     renderer.setViewport(0, 0, ...profile.size());
     flow.visible = flowWas;
+    for (const stream of streams) stream.material.uniforms.onlyFlame.value = 0;
     const burn = Number.isFinite(o.burner) ? o.burner - K : null;
     $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
     $("chem").innerHTML = `<b>${FUEL[1]}</b><br>Combustible ${FUEL[0]} · aire de la toma a <b>${fmt(o.T0 - K)}</b> °C` +
@@ -345,39 +347,84 @@ export async function start(profile, cfg) {
   // ── corte por el plano medio del motor, con el aire que lo recorre coloreado por su temperatura ──
   const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), cfg.cut.z);
   let cutOn = false;
-  const FLOW = profile.tier === "baja" ? 700 : 1400;
-  const flowGeo = new THREE.BufferGeometry();
-  const fpos = new Float32Array(FLOW * 3);
-  const fcol = new Float32Array(FLOW * 3);
-  const fseed = Float32Array.from({ length: FLOW }, () => Math.random());
-  flowGeo.setAttribute("position", new THREE.BufferAttribute(fpos, 3));
-  flowGeo.setAttribute("color", new THREE.BufferAttribute(fcol, 3));
-  const flow = new THREE.Points(flowGeo, new THREE.PointsMaterial({ size: cfg.flow.size ?? 0.11, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending }));
-  flow.frustumCulled = false;
+  // Superficies continuas para el gas y la llama; sin sprites ni partículas.
+  const flow = new THREE.Group();
   flow.visible = false;
   scene.add(flow);
   const names = Object.keys(cfg.flow.paths);
   const curves = Object.fromEntries(names.map((n) => [n, new THREE.CatmullRomCurve3(cfg.flow.paths[n].map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal", 0.2)]));
-  const tmpV = new THREE.Vector3();
+  const segments = profile.tier === "baja" ? 64 : 112, sides = 24;
+  const streams = names.map((path) => {
+    const positions = [], coords = [], indices = [];
+    for (let i = 0; i <= segments; i++) {
+      const u = i / segments, p = curves[path].getPointAt(u);
+      const [ry, rz] = cfg.flow.spread(path, u);
+      for (let j = 0; j <= sides; j++) {
+        const th = j / sides * Math.PI * 2;
+        positions.push(...fromBlender([p.x, ry * Math.cos(th), p.z + rz * Math.sin(th)]).toArray());
+        coords.push(u, j / sides);
+        if (i < segments && j < sides) {
+          const a = i * (sides + 1) + j, b = a + sides + 1;
+          indices.push(a, b, a + 1, b, b + 1, a + 1);
+        }
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(coords, 2));
+    geometry.setAttribute("burn", new THREE.Float32BufferAttribute(new Float32Array(positions.length / 3), 1));
+    geometry.setIndex(indices);
+    const material = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, clipping: true,
+      uniforms: { time: { value: 0 }, heat: { value: 0 }, share: { value: 0 }, onlyFlame: { value: 0 } },
+      vertexShader: `#include <clipping_planes_pars_vertex>
+        attribute float burn; varying vec2 vUv; varying float vBurn;
+        void main(){ vUv=uv; vBurn=burn;
+          vec4 mvPosition=modelViewMatrix*vec4(position,1.);
+          gl_Position=projectionMatrix*mvPosition;
+          #include <clipping_planes_vertex>
+        }`,
+      fragmentShader: `#include <clipping_planes_pars_fragment>
+        uniform float time, heat, share, onlyFlame; varying vec2 vUv; varying float vBurn;
+        void main(){
+          #include <clipping_planes_fragment>
+          float hot=smoothstep(.03,.35,vBurn)*heat;
+          float tongues=.76+.14*sin(vUv.y*37.7-vUv.x*22.+time*4.)
+            +.1*sin(vUv.y*69.1+vUv.x*31.-time*6.);
+          float fade=smoothstep(0.,.035,vUv.x)*(1.-smoothstep(.9,1.,vUv.x));
+          vec3 color=mix(vec3(.16,.38,1.),vec3(1.,.36,.055),smoothstep(.15,.8,vBurn));
+          color=mix(color,vec3(1.,.85,.45),smoothstep(.75,1.2,vBurn)*.6);
+          float alpha=fade*share*tongues*(.13*(1.-onlyFlame)*(1.-hot)+.5*hot);
+          gl_FragColor=vec4(color*(.6+hot),alpha);
+        }`,
+    });
+    const roots = parts.filter((e) => e.data.group === "engine" && e.data.part === cfg.engine);
+    for (const root of roots) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.matrixAutoUpdate = false;
+      mesh.frustumCulled = false;
+      mesh.userData.root = root.obj;
+      flow.add(mesh);
+    }
+    return { path, geometry, material };
+  });
   function stepFlow(dt) {
     if ((!flow.visible && !pipOn) || !engineRoot) return;
-    const M = engineRoot.obj.matrixWorld;
+    for (const mesh of flow.children) mesh.matrix.copy(mesh.userData.root.matrixWorld);
     const running = motor.on && motor.spin > 0.3;
-    for (let i = 0; i < FLOW; i++) {
-      const path = names[i % names.length];
-      const share = cfg.flow.share(path, o);
-      const alive = i / FLOW < Math.max(0.04, share);
-      fseed[i] = (fseed[i] + dt * cfg.flow.speed(path, o) * (0.7 + 0.6 * ((i * 0.618) % 1))) % 1;
-      const u = fseed[i];
-      const p = curves[path].getPointAt(u);
-      const [sy, sz] = cfg.flow.spread(path, u);
-      tmpV.copy(fromBlender([p.x, alive ? sy * (((i * 0.37) % 1) - 0.5) * 2 : 1e6, p.z + sz * (((i * 0.73) % 1) - 0.5) * 2])).applyMatrix4(M);
-      fpos.set([tmpV.x, tmpV.y, tmpV.z], i * 3);
-      const c = turbo(gasAlong(path, u, o, running) / 2200);
-      fcol.set([c.r, c.g, c.b], i * 3);
+    for (const { path, geometry, material } of streams) {
+      material.uniforms.time.value += dt * (.5 + motor.thr);
+      material.uniforms.heat.value = motor.heat;
+      material.uniforms.share.value = Math.max(0, cfg.flow.share(path, o));
+      const burn = geometry.attributes.burn;
+      for (let i = 0; i <= segments; i++) {
+        const u = i / segments;
+        // La llama aparece donde la combustión añade calor, también en postquemador y ramjet.
+        const added = Math.max(0, gasAlong(path, u, o, running) - gasAlong(path, u, o, false)) / 1200;
+        for (let j = 0; j <= sides; j++) burn.setX(i * (sides + 1) + j, added);
+      }
+      burn.needsUpdate = true;
     }
-    flowGeo.attributes.position.needsUpdate = true;
-    flowGeo.attributes.color.needsUpdate = true;
   }
 
   // ── mapa de calor ──
