@@ -24,8 +24,6 @@ export default async function mobile(profile) {
       <button id="assemble">Montaje</button>
       <button id="heat">Mapa de calor</button>
       <button id="cam">Combustión</button>
-      <button id="cut">Corte</button>
-      <button id="mission">Misión</button>
       <button id="gear">Tren</button>
       <button id="surfaces">Mandos</button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="60" aria-label="Palanca de gas"></label>
@@ -57,15 +55,13 @@ export default async function mobile(profile) {
   tap("assemble", A.assemble);
   tap("heat", A.heat);
   tap("cam", A.pip);
-  tap("cut", A.cut);
-  tap("mission", A.mission);
   tap("gear", A.gear, true);
   tap("surfaces", A.surfaces, true);
   tap("more", () => { const open = !sheet.hasAttribute("data-open"); sheet.toggleAttribute("data-open", open); $("more").toggleAttribute("data-on", open); }, true);
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   document.querySelector('[data-action="salir"]').onclick = () => { haptic(); A.fly(); setFlying(false); };
   api.onChange((st) => {
-    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, heat: st.heat, cam: st.pip, gear: st.gear, surfaces: st.surfaces, cockpit: st.cockpit, fly: st.flying, cut: st.cut, mission: st.mission })) $(id).toggleAttribute("data-on", on);
+    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, heat: st.heat, cam: st.pip, gear: st.gear, surfaces: st.surfaces, cockpit: st.cockpit, fly: st.flying })) $(id).toggleAttribute("data-on", on);
     $("run").lastChild.textContent = st.running ? "Apagar" : "Motor";
   });
 

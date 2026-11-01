@@ -19,28 +19,14 @@ const WHEELS = [
 ];
 const BELLY = [[0.5, -0.06, 0], [-0.3, -0.06, 0], [-0.04, -0.07, 0.24], [-0.04, -0.07, -0.24]].map((p) => ({ p: new THREE.Vector3(...p) }));
 
-// `spec` adapta el simulador a otro avión (los jets a escala real): masa y ala, ruedas, panza, suelo, pista, cámaras,
-// empuje y la línea del motor en el HUD. Sin `spec`, es la maqueta del Hawk con su MW54.
-export function createFlight({ scene, camera, model, op, motor, setGear, setSurfaces, gearState, pad, spec = {} }) {
-  const ac = spec.ac ?? AC;
-  const wheels = spec.wheels ?? WHEELS;
-  const belly = spec.belly ?? BELLY;
-  const W = { runway: [14, 320], at: 120, trees: 1, ground: 6000, fog: [200, 2500], start: 0.185, ...spec.world };
-  const chase = spec.chase ?? [3.6, 1.0, 2];
-  const eye = spec.eye ?? [0.486, 0.09, 1.7];
-  const nears = spec.near ?? [0.05, 0.004];
-  const thrustOf = spec.thrust ?? ((thr) => { motor.target = thr; const o = op(motor.f); return motor.on ? o.thrust * motor.spin : 0; });
-  const engineHud = spec.engineHud ?? ((info, s) => { const o = op(motor.f); return `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : `apagada (${pad?.touch ? "Motor" : "E"} para arrancar)`} · gas ${(s.throttle * 100).toFixed(0)} %`; });
+export function createFlight({ scene, camera, model, op, motor, setGear, setSurfaces, gearState, pad }) {
   const world = new THREE.Group();
   world.visible = false;
   scene.add(world);
   // ── terreno, pista y cielo ──
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(W.ground, W.ground), new THREE.MeshStandardMaterial({ color: 0x3d5a2c, roughness: 0.95 }));
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x3d5a2c, roughness: 0.95 }));
   grass.rotation.x = -Math.PI / 2;
   grass.receiveShadow = true;
-  // el pasto es lo más bajo de la escena: se dibuja primero y sin escribir profundidad, así la pista nunca se pelea con él
-  grass.material.depthWrite = false;
-  grass.renderOrder = -1;
   world.add(grass);
   const cv = document.createElement("canvas");
   cv.width = 256;
@@ -57,24 +43,23 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
-  const runway = new THREE.Mesh(new THREE.PlaneGeometry(W.runway[0], W.runway[1]), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+  const runway = new THREE.Mesh(new THREE.PlaneGeometry(14, 320), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
   runway.rotation.x = -Math.PI / 2;
   runway.rotation.z = Math.PI / 2;
-  runway.position.set(W.at, 0.005 * W.trees, 0);
+  runway.position.set(120, 0.005, 0);
   runway.receiveShadow = true;
   world.add(runway);
   for (let i = 0; i < 40; i++) {
-    const tree = new THREE.Mesh(new THREE.ConeGeometry((2 + Math.random() * 2) * Math.sqrt(W.trees), (7 + Math.random() * 6) * Math.sqrt(W.trees), 7), new THREE.MeshStandardMaterial({ color: 0x24401f, roughness: 1 }));
+    const tree = new THREE.Mesh(new THREE.ConeGeometry(2 + Math.random() * 2, 7 + Math.random() * 6, 7), new THREE.MeshStandardMaterial({ color: 0x24401f, roughness: 1 }));
     const a = Math.random() * Math.PI * 2;
-    const r = (60 + Math.random() * 400) * W.trees;
-    tree.position.set(W.at + Math.cos(a) * r * 1.5, 4 * Math.sqrt(W.trees), Math.sin(a) * r);
-    if (Math.abs(tree.position.z) < 25 * W.trees) tree.position.z += 60 * W.trees;
+    const r = 60 + Math.random() * 400;
+    tree.position.set(120 + Math.cos(a) * r * 1.5, 4, Math.sin(a) * r);
+    if (Math.abs(tree.position.z) < 25) tree.position.z += 60;
     tree.castShadow = true;
     world.add(tree);
   }
   const sky = new Sky();
   sky.scale.setScalar(10000);
-  sky.renderOrder = -2;   // antes que el pasto, que no escribe profundidad
   const sun = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(60), THREE.MathUtils.degToRad(160));
   Object.assign(sky.material.uniforms.sunPosition.value, sun);
   sky.material.uniforms.turbidity.value = 4;
@@ -86,7 +71,7 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   const keys = new Set();
   const home = { pos: model.position.clone(), quat: model.quaternion.clone() };
   function reset() {
-    s.p.set(0, W.start, 0);
+    s.p.set(0, 0.185, 0);
     s.v.set(0, 0, 0);
     s.q.identity();
     s.w.set(0, 0, 0);
@@ -128,6 +113,9 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     if (ax?.throttle != null) s.throttle = ax.throttle;
     if (ax?.throttleRate) s.throttle = Math.min(1, Math.max(0, s.throttle + ax.throttleRate * dt * 0.6));
     s.brake = keys.has("b") || keys.has(" ") ? 1 : 0;
+    motor.target = s.throttle;
+    const o = op(motor.f);
+    const thrust = motor.on ? o.thrust * motor.spin : 0;
 
     const R = new THREE.Matrix4().makeRotationFromQuaternion(s.q);
     const Rt = R.clone().transpose();
@@ -136,7 +124,6 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     const alpha = Math.atan2(-vb.y, vb.x);
     const beta = Math.asin(THREE.MathUtils.clamp(vb.z / V, -1, 1));
     const qbar = 0.5 * RHO * V * V;
-    const thrust = thrustOf(s.throttle, V);
     // tirar (S) sube el morro: borde de salida del estabilizador hacia arriba, deflexión negativa
     const de = -s.pitch * THREE.MathUtils.degToRad(16);
     const da = s.roll * THREE.MathUtils.degToRad(20);
@@ -151,18 +138,18 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     if (V > 0.5) {
       const vdir = vb.clone().normalize();
       const liftDir = new THREE.Vector3(0, 0, 1).cross(vdir).normalize();
-      F.addScaledVector(liftDir, qbar * ac.S * cl);
-      F.addScaledVector(vdir, -qbar * ac.S * cd);
-      F.z += -qbar * ac.S * 0.6 * beta;
+      F.addScaledVector(liftDir, qbar * AC.S * cl);
+      F.addScaledVector(vdir, -qbar * AC.S * cd);
+      F.z += -qbar * AC.S * 0.6 * beta;
     }
     F.x += thrust;
-    const p = (s.w.x * ac.b) / (2 * V);
-    const r = (s.w.y * ac.b) / (2 * V);
-    const qd = (s.w.z * ac.c) / (2 * V);
+    const p = (s.w.x * AC.b) / (2 * V);
+    const r = (s.w.y * AC.b) / (2 * V);
+    const qd = (s.w.z * AC.c) / (2 * V);
     const M = new THREE.Vector3(
-      qbar * ac.S * ac.b * (CR.b * beta + CR.p * p + CR.da * da + CR.r * r),
-      qbar * ac.S * ac.b * (CN.b * -beta + CN.r * r + CN.dr * dr),
-      qbar * ac.S * ac.c * (CM.z + CM.a * alpha + CM.q * qd + CM.de * de + CM.flap * flap),
+      qbar * AC.S * AC.b * (CR.b * beta + CR.p * p + CR.da * da + CR.r * r),
+      qbar * AC.S * AC.b * (CN.b * -beta + CN.r * r + CN.dr * dr),
+      qbar * AC.S * AC.c * (CM.z + CM.a * alpha + CM.q * qd + CM.de * de + CM.flap * flap),
     );
     // giroscopio estabilizador (como los que llevan los reactores de radiocontrol): con la palanca suelta nivela las
     // alas y sostiene la trayectoria; con palanca, sólo amortigua
@@ -170,16 +157,16 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
       const right = new THREE.Vector3(0, 0, 1).applyQuaternion(s.q);
       const bank = Math.asin(THREE.MathUtils.clamp(-right.y, -1, 1));
       const gamma = Math.asin(THREE.MathUtils.clamp(s.v.y / V, -1, 1));
-      const kq = qbar * ac.S;
-      M.x += Math.abs(s.roll) < 0.05 ? kq * ac.b * (-0.06 * bank - 0.25 * p) : kq * ac.b * -0.05 * p;
-      M.z += Math.abs(s.pitch) < 0.05 ? kq * ac.c * (-0.35 * gamma - 2.5 * qd) : kq * ac.c * -1.0 * qd;
+      const kq = qbar * AC.S;
+      M.x += Math.abs(s.roll) < 0.05 ? kq * AC.b * (-0.06 * bank - 0.25 * p) : kq * AC.b * -0.05 * p;
+      M.z += Math.abs(s.pitch) < 0.05 ? kq * AC.c * (-0.35 * gamma - 2.5 * qd) : kq * AC.c * -1.0 * qd;
     }
     // gravedad y suelo, en ejes de mundo
     const Fw = F.clone().applyMatrix4(R);
-    Fw.y -= ac.m * G0;
+    Fw.y -= AC.m * G0;
     const Mw = new THREE.Vector3();
     let onGround = false;
-    const contacts = gearState.t < 0.05 ? wheels : belly;
+    const contacts = gearState.t < 0.05 ? WHEELS : BELLY;
     for (const c of contacts) {
       const rp = c.p.clone().applyQuaternion(s.q);
       const pw = rp.clone().add(s.p);
@@ -187,29 +174,29 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
       if (pen <= 0) continue;
       onGround = true;
       const vel = s.v.clone().add(new THREE.Vector3().copy(s.w).applyQuaternion(s.q).cross(rp));
-      const n = Math.max(0, 1250 * ac.m * pen - 36 * ac.m * vel.y);
+      const n = Math.max(0, 9000 * pen - 260 * vel.y);
       const fc = new THREE.Vector3(0, n, 0);
       // rozamiento: rodadura y freno en las ruedas, arrastre en la panza
       const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(s.q).setY(0).normalize();
       const side = new THREE.Vector3(0, 1, 0).cross(fwd);
-      const mu = contacts === belly ? 0.5 : 0.02 + 0.5 * s.brake;
-      fc.addScaledVector(fwd, -Math.sign(vel.dot(fwd)) * Math.min(Math.abs(vel.dot(fwd)) * 5.5 * ac.m, mu * n));
+      const mu = contacts === BELLY ? 0.5 : 0.02 + 0.5 * s.brake;
+      fc.addScaledVector(fwd, -Math.sign(vel.dot(fwd)) * Math.min(Math.abs(vel.dot(fwd)) * 40, mu * n));
       const steerV = c.steer ? vel.dot(side) - fwd.dot(vel) * dr * 0.8 : vel.dot(side);
-      fc.addScaledVector(side, -THREE.MathUtils.clamp(steerV * 8.3 * ac.m, -0.9 * n, 0.9 * n));
+      fc.addScaledVector(side, -THREE.MathUtils.clamp(steerV * 60, -0.9 * n, 0.9 * n));
       Fw.add(fc);
       Mw.add(rp.clone().cross(fc));
-      if (contacts === belly && -vel.y > 2.5) s.crashed = true;
-      if (contacts === wheels && -vel.y > 4) s.crashed = true;
+      if (contacts === BELLY && -vel.y > 2.5) s.crashed = true;
+      if (contacts === WHEELS && -vel.y > 4) s.crashed = true;
     }
-    s.v.addScaledVector(Fw, dt / ac.m);
+    s.v.addScaledVector(Fw, dt / AC.m);
     s.p.addScaledVector(s.v, dt);
     // dinámica angular en ejes del cuerpo
     const Mb = M.add(Mw.applyMatrix4(Rt));
-    const Iw = new THREE.Vector3(ac.I.x * s.w.x, ac.I.y * s.w.y, ac.I.z * s.w.z);
+    const Iw = new THREE.Vector3(AC.I.x * s.w.x, AC.I.y * s.w.y, AC.I.z * s.w.z);
     const gyro = s.w.clone().cross(Iw);
-    s.w.x += ((Mb.x - gyro.x) / ac.I.x) * dt;
-    s.w.y += ((Mb.y - gyro.y) / ac.I.y) * dt;
-    s.w.z += ((Mb.z - gyro.z) / ac.I.z) * dt;
+    s.w.x += ((Mb.x - gyro.x) / AC.I.x) * dt;
+    s.w.y += ((Mb.y - gyro.y) / AC.I.y) * dt;
+    s.w.z += ((Mb.z - gyro.z) / AC.I.z) * dt;
     if (onGround) s.w.multiplyScalar(0.995);
     const dq = new THREE.Quaternion(s.w.x * dt * 0.5, s.w.y * dt * 0.5, s.w.z * dt * 0.5, 0).multiply(s.q);
     s.q.x += dq.x; s.q.y += dq.y; s.q.z += dq.z; s.q.w += dq.w;
@@ -220,7 +207,7 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
 
   let info = { V: 0, alpha: 0, onGround: true, thrust: 0 };
   let analog = null;
-  const camPos = new THREE.Vector3(-chase[0], chase[1], 0);
+  const camPos = new THREE.Vector3(-4, 1.5, 0);
   function update(dt) {
     if (s.crashed) { $hud(`<b>Accidente</b> · ${pad?.touch ? "Reinicio" : "R"} para volver a la pista`); return; }
     analog = pad?.read() ?? null;
@@ -231,27 +218,28 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.q);
     const fov = s.cam === "chase" ? 32 : 70;
     // plano cercano según la cámara: en la de persecución no hace falta acercarlo tanto, y así la pista no parpadea sobre el pasto
-    const near = s.cam === "chase" ? nears[0] : nears[1];
+    const near = s.cam === "chase" ? 0.05 : 0.004;
     if (camera.fov !== fov || camera.near !== near) { camera.fov = fov; camera.near = near; camera.updateProjectionMatrix(); }
     if (s.cam === "chase") {
-      const want = s.p.clone().addScaledVector(fwd, -chase[0]).add(new THREE.Vector3(0, chase[1], 0));
+      const want = s.p.clone().addScaledVector(fwd, -3.6).add(new THREE.Vector3(0, 1.0, 0));
       camPos.lerp(want, Math.min(1, dt * 3));
       camera.position.copy(camPos);
       camera.up.set(0, 1, 0);
-      camera.lookAt(s.p.clone().addScaledVector(fwd, chase[2]));
+      camera.lookAt(s.p.clone().addScaledVector(fwd, 2));
     } else {
       // ojos del piloto delantero: sobre el asiento, a la altura del cabezal, mirando por encima del HUD
-      camera.position.copy(s.p).addScaledVector(fwd, eye[0]).addScaledVector(up, eye[1]);
+      camera.position.copy(s.p).addScaledVector(fwd, 0.486).addScaledVector(up, 0.09);
       camera.up.copy(up);
-      camera.lookAt(camera.position.clone().addScaledVector(fwd, 10).addScaledVector(up, -eye[2]));
+      camera.lookAt(camera.position.clone().addScaledVector(fwd, 10).addScaledVector(up, -1.7));
     }
+    const o = op(motor.f);
     const alt = Math.max(0, s.p.y);
     const kmh = info.V * 3.6;
     const vs = s.v.y;
     $hud(
       `<b>${kmh.toFixed(0)}</b> km/h · <b>${alt.toFixed(1)}</b> m · ${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s · α ${THREE.MathUtils.radToDeg(info.alpha).toFixed(0)}°<br>` +
-      `${engineHud(info, s)}<br>` +
-      `Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * 40).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${info.alpha > CL.stall && info.V > 3 ? " · <b>PÉRDIDA</b>" : ""}`,
+      `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : `apagada (${pad?.touch ? "Motor" : "E"} para arrancar)`} · gas ${(s.throttle * 100).toFixed(0)} %<br>` +
+      `Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * 40).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${info.alpha > CL.stall ? " · <b>PÉRDIDA</b>" : ""}`,
     );
   }
   function $hud(html) { document.getElementById("hud").innerHTML = html; }
@@ -259,14 +247,14 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   return {
     enter() {
       world.visible = true;
-      scene.fog = new THREE.Fog(0xb8c8d8, W.fog[0], W.fog[1]);
+      scene.fog = new THREE.Fog(0xb8c8d8, 200, 2500);
       reset();
       addEventListener("keydown", kd);
       addEventListener("keyup", ku);
-      camPos.set(-chase[0], chase[1], 0);
+      camPos.set(-4, 1.5, 0);
       pad?.reset(0);
-      camera.near = nears[1];
-      camera.far = Math.max(12000, W.ground);
+      camera.near = 0.004;
+      camera.far = 12000;
       camera.updateProjectionMatrix();
     },
     exit() {

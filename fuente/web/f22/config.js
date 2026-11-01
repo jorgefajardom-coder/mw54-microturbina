@@ -9,10 +9,6 @@ export default {
   parts: "./parts.json",
   sim,
   engine: "F119",
-  // vuelo: masa al despegar (kg), superficie alar (m²), envergadura y cuerda media (m), motores
-  fly: { m: 29000, S: 78, b: 13.56, c: 6.6, engines: 2 },
-  // ojos del piloto (mm del modelo)
-  cockpit: { eye: [4520, 830], look: [6200, 480] },
   engineAlt: "F119.L",
   coreZone: "hpc",
   maxMach: 2.3,

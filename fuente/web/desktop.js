@@ -14,9 +14,7 @@ export default async function desktop(profile) {
       <button id="explode">Despiece</button>
       <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="60" aria-label="Palanca de gas"></label>
-      <button id="mission">Misión</button>
       <button id="heat">Mapa de calor</button>
-      <button id="cut">Corte</button>
       <button id="cam">Cámara de combustión</button>
       <button id="gear">Tren</button>
       <button id="surfaces">Mandos</button>
@@ -29,10 +27,10 @@ export default async function desktop(profile) {
   profile.onStats = debugPanel(profile);
   const api = await start(profile);
   const A = api.actions;
-  for (const [id, fn] of Object.entries({ assemble: A.assemble, explode: A.explode, run: A.run, heat: A.heat, cam: A.pip, gear: A.gear, surfaces: A.surfaces, cockpit: A.cockpit, fly: A.fly, cut: A.cut, mission: A.mission })) $(id).onclick = fn;
+  for (const [id, fn] of Object.entries({ assemble: A.assemble, explode: A.explode, run: A.run, heat: A.heat, cam: A.pip, gear: A.gear, surfaces: A.surfaces, cockpit: A.cockpit, fly: A.fly })) $(id).onclick = fn;
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   api.onChange((st) => {
-    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, heat: st.heat, cam: st.pip, gear: st.gear, surfaces: st.surfaces, cockpit: st.cockpit, fly: st.flying, cut: st.cut, mission: st.mission })) $(id).toggleAttribute("data-on", on);
+    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, heat: st.heat, cam: st.pip, gear: st.gear, surfaces: st.surfaces, cockpit: st.cockpit, fly: st.flying })) $(id).toggleAttribute("data-on", on);
     $("run").lastChild.textContent = st.running ? "Apagar" : "Arrancar";
     $("fly").textContent = st.flying ? "Volver al taller" : "Volar";
   });

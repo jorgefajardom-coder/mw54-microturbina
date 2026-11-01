@@ -2,7 +2,6 @@
 // calor, corte, mandos), tarjeta que sigue al cursor y clic para acercarse a la pieza.
 import { start, fmt } from "./core.js";
 import { debugPanel } from "../device.js";
-import { createPad } from "../controls.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -19,14 +18,8 @@ export default async function desktop(profile, cfg) {
       <button id="heat">Mapa de calor</button>
       <button id="cut">Corte</button>
       <button id="surfaces">Mandos</button>
-      <button id="cam">Cámara de combustión</button>
-      <button id="gear">Tren</button>
-      <button id="cockpit">Cabina</button>
-      <button id="fly">Volar</button>
-    </div>
-    <div class="ui" id="keys">E arrancar · Mayús/Ctrl gas · W/S cabeceo · A/D alabeo · Z/X timón · G tren · F flaps · B frenos · T giróscopo · C cámara · R reiniciar</div>`,
+    </div>`,
   );
-  profile.pad = createPad({ touch: false });
   profile.onStats = debugPanel(profile);
   profile.onFrame = (motor) => {
     if (motor.mission) $("mach").value = Math.round(motor.Mtarget * 10);
@@ -34,14 +27,12 @@ export default async function desktop(profile, cfg) {
   };
   const api = await start(profile, cfg);
   const A = api.actions;
-  for (const id of ["assemble", "explode", "run", "mission", "heat", "cut", "surfaces", "gear", "cockpit", "fly"]) $(id).onclick = A[id];
-  $("cam").onclick = A.pip;
+  for (const id of ["assemble", "explode", "run", "mission", "heat", "cut", "surfaces"]) $(id).onclick = A[id];
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   $("mach").oninput = (e) => A.mach(e.target.value / 10);
   api.onChange((st) => {
-    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces, cam: st.pip, gear: st.gear, cockpit: st.cockpit, fly: st.flying })) $(id).toggleAttribute("data-on", on);
+    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces })) $(id).toggleAttribute("data-on", on);
     $("run").lastChild.textContent = st.running ? "Apagar" : "Arrancar";
-    $("fly").textContent = st.flying ? "Volver al hangar" : "Volar";
   });
   const tip = $("tip");
   api.canvas.addEventListener("pointermove", (ev) => {
