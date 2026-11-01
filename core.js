@@ -1,16 +1,16 @@
-import { createCombustion, reactionAt } from "./combustion.js?v=20261031-motion5";
+import { createCombustion, reactionAt } from "./combustion.js?v=20261031-intro6";
 // Núcleo del visor del Hawk con su MW54, común a escritorio y celular: escena, modelo, montaje, motor, combustible,
 // cámara de combustión, mapa de calor, cabina y simulador. No escucha ratón, teclado ni toques: cada interfaz
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js?v=20261031-motion5";
+import { setupEnvironment } from "./environment.js?v=20261031-intro6";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-motion5";
-import { createFlight } from "./flight.js?v=20261031-motion5";
-import { createFloor } from "./floor.js?v=20261031-motion5";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-motion5";
-import { createFlame } from "./flame.js?v=20261031-motion5";
+import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-intro6";
+import { createFlight } from "./flight.js?v=20261031-intro6";
+import { createFloor } from "./floor.js?v=20261031-intro6";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-intro6";
+import { createFlame } from "./flame.js?v=20261031-intro6";
 
 const $ = (id) => document.getElementById(id);
 
@@ -631,9 +631,9 @@ function resize() {
   composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
 }
 setExploded(1);
-  // Breve pausa inicial para ver el despiece antes del montaje.
-  assemble();
-  if (timeline) timeline.start += .4;
+  // Introducción pausada: 0,8 s de despiece y 6,4 s de montaje.
+  assemble(.5);
+  if (timeline) timeline.start += .8;
 frame();
 return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, renderer };
 }

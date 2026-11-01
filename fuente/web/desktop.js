@@ -1,8 +1,8 @@
 // Interfaz de escritorio del Hawk: barra completa de botones, tarjeta que sigue al cursor, clic para acercarse a una
 // pieza, teclado para volar (W/S, A/D, Z/X, Mayús/Ctrl…) y mando de juego si hay uno conectado.
-import { start } from "./core.js?v=20261031-motion5";
-import { createPad } from "./controls.js?v=20261031-motion5";
-import { debugPanel } from "./device.js?v=20261031-motion5";
+import { start } from "./core.js?v=20261031-intro6";
+import { createPad } from "./controls.js?v=20261031-intro6";
+import { debugPanel } from "./device.js?v=20261031-intro6";
 
 const $ = (id) => document.getElementById(id);
 
