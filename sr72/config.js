@@ -10,6 +10,10 @@ export default {
   parts: "./parts.json",
   sim,
   engine: "TBCC",
+  // vuelo: masa al despegar (kg), superficie alar (m²), envergadura y cuerda media (m), motores
+  fly: { m: 35000, S: 90, b: 13, c: 9, engines: 2 },
+  // ojos del piloto (mm del modelo)
+  cockpit: { x: 4400, drop: -260, look: 1800 },   // sin parabrisas: la vista va sobre el lomo, a la altura de las ventanas
   engineAlt: "TBCC.L",
   coreZone: "hpc",
   maxMach: 6,

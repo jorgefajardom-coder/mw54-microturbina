@@ -225,19 +225,27 @@ void main(){
     vec3 p=g0+t*V;
     float seen=1.-hidden(p,V);
     if(seen<.01)continue;
-    // Chorro: se abre y se enfría al alejarse de la tobera.
+    // Chorro de una microturbina: núcleo caliente y nítido pegado a la boca de la tobera (unos cinco radios de largo),
+    // capa de mezcla que se abre despacio (≈ 5° de semiángulo) y, al final, sólo calima. No es humo: el gas es claro.
     float L=XE-p.x;
     if(L>0.&&uHeat>.001){
       vec2 q=vec2(p.y,p.z-ZC);
-      float w=RX+.16*L;
-      float core=exp(-pow(length(q)/w,2.)*2.2);
-      // Remolinos estirados a lo largo del chorro: se lee como calima caliente, no como humo.
-      float turb=fbm3(vec3(p.x*.022+uClock*(1.2+3.*uFlow),q*.07));
-      float wisp=smoothstep(.35,.85,turb);
-      float life=smoothstep(0.,8.,L)*(1.-smoothstep(90.,280.,L));
-      float temp=exp(-L/120.);
-      vec3 c=mix(vec3(.5,.42,.4),vec3(1.,.5,.18),temp);
-      hot+=c*core*(.12+1.1*wisp)*life*seen*uHeat*(.45+.55*uFlow);
+      float r=length(q);
+      float lc=RX*(4.+2.*uFlow);
+      float rc=RX*max(0.,1.-L/lc);
+      float core=(1.-smoothstep(rc*.75,rc+1.5,r))*step(.5,rc);
+      float w=RX+.09*L;
+      float shear=exp(-pow(max(0.,r-rc)/(w-rc*.6+1.),2.)*3.);
+      // vetas estiradas a lo largo del eje: el gas caliente tiembla, no se arremolina
+      float turb=fbm3(vec3(p.x*.035-uClock*(2.+5.*uFlow),q*.11));
+      float streak=.65+.7*smoothstep(.3,.8,turb);
+      float temp=exp(-L/(70.+60.*uFlow));
+      float start=smoothstep(0.,3.,L);
+      vec3 cCore=mix(vec3(1.,.62,.3),vec3(1.,.9,.75),uFlow);
+      vec3 cMix=mix(vec3(.55,.36,.28),vec3(1.,.45,.15),temp);
+      hot+=(cCore*core*2.4*temp+cMix*shear*streak*temp*.9)*start*seen*uHeat*(.5+.5*uFlow);
+      // calima: apenas se nota, más allá del final del color
+      hot+=vec3(.4,.38,.42)*shear*(1.-temp)*.06*streak*seen*uHeat*smoothstep(260.,120.,L);
     }
   }
   vec3 col=(cold+hot)*dt*.04;

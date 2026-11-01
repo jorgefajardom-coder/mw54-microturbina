@@ -1,0 +1,267 @@
+{
+  "model": "hawk",
+  "nearest": [
+    {
+      "part": "aleron.izquierda",
+      "to": "ala.izquierda",
+      "gap_mm": 0.493
+    },
+    {
+      "part": "aleron.derecha",
+      "to": "ala.derecha",
+      "gap_mm": 0.493
+    },
+    {
+      "part": "flap.izquierda",
+      "to": "ala.izquierda",
+      "gap_mm": 0.292
+    },
+    {
+      "part": "flap.derecha",
+      "to": "ala.derecha",
+      "gap_mm": 0.292
+    },
+    {
+      "part": "estabilizador.derecho",
+      "to": "fuselaje.trasero",
+      "gap_mm": 0.281
+    },
+    {
+      "part": "radio",
+      "to": "bandeja.morro",
+      "gap_mm": 0.001
+    },
+    {
+      "part": "deposito",
+      "to": "bandeja",
+      "gap_mm": 0.001
+    },
+    {
+      "part": "ecu",
+      "to": "bandeja",
+      "gap_mm": 0.001
+    },
+    {
+      "part": "ala.derecha",
+      "to": "compuerta.derecho",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "ala.izquierda",
+      "to": "compuerta.izquierdo",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "asientos",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "bandeja",
+      "to": "fuselaje.central",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "bandeja.morro",
+      "to": "fuselaje.delantero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "bomba",
+      "to": "lineas",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "cabina",
+      "to": "cabina.tablero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "cabina.cubeta",
+      "to": "asientos",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "cabina.tablero",
+      "to": "cabina",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "cabina.tablero_trasero",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "compuerta.derecho",
+      "to": "ala.derecha",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "compuerta.izquierdo",
+      "to": "ala.izquierda",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "compuerta.morro.derecha",
+      "to": "fuselaje.delantero.b",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "compuerta.morro.izquierda",
+      "to": "fuselaje.delantero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "deriva",
+      "to": "timon",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "escotilla",
+      "to": "fuselaje.central",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "estabilizador.izquierdo",
+      "to": "fuselaje.trasero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "fuselaje.central",
+      "to": "bandeja",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "fuselaje.delantero",
+      "to": "bandeja.morro",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "fuselaje.delantero.b",
+      "to": "bandeja.morro",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "fuselaje.trasero",
+      "to": "estabilizador.izquierdo",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "gas",
+      "to": "lineas",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "gases.delantero",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "gases.trasero",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "hopper",
+      "to": "lineas",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "lineas",
+      "to": "bomba",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "lineas.motor",
+      "to": "lineas",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "motor.montura",
+      "to": "fuselaje.central",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "motor.montura.sup",
+      "to": "motor.montura",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "MW54",
+      "to": "lineas.motor",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "palanca.delantero",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "palanca.trasero",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "pedal.delantero.der",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "pedal.delantero.izq",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "pedal.trasero.der",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "pedal.trasero.izq",
+      "to": "cabina.cubeta",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "pozo.morro",
+      "to": "fuselaje.delantero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "timon",
+      "to": "deriva",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "tren.derecho",
+      "to": "ala.derecha",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "tren.izquierdo",
+      "to": "ala.izquierda",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "tren.morro",
+      "to": "pozo.morro",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "tubo_empuje",
+      "to": "fuselaje.trasero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "valvula.combustible",
+      "to": "lineas",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "valvula.gas",
+      "to": "lineas",
+      "gap_mm": 0.0
+    }
+  ],
+  "tolerance_mm": 1.0,
+  "disconnected": []
+}

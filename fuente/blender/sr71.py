@@ -4,6 +4,8 @@
 # postquemador, compresor de 9 etapas, turbina de 2, seis tubos que llevan aire del 4.º escalón al postquemador por
 # encima de Mach 2 y eyector con aletas libres al final de la góndola. 1 unidad = 1 mm, +X morro, +Y izquierda.
 import math
+
+import bpy
 from attachments import hinge_pins, surface_link
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, tube_path, boolean_cut, halves)
@@ -11,12 +13,15 @@ from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
 from sr72 import catmull, blade_ring, hinged_ring, attach
 
 GROUND = -2700.0
-NAC_Y = 3300.0
+NAC_Y = 4100.0    # góndolas a media ala, como en el plano de tres vistas
 NAC_Z = -150.0
-FACE_X = -3000.0   # cara del compresor (mundo)
-OUTER = [(-2300, 840), (-1000, 960), (2000, 980), (6000, 950), (8800, 880)]   # radio exterior de la góndola
+FACE_X = -4200.0   # referencia de la góndola (mundo): la punta del cono queda en x = −800, como en el plano
+# el J58 (5,4 m de la cara del compresor a la tobera) va 1,5 m más atrás: la toma real es larga y la tobera queda
+# dentro del eyector, que la rodea con el aire secundario
+ENGINE_AFT = 1500.0
+OUTER = [(-2300, 840), (-1000, 960), (2000, 980), (4800, 950), (7300, 880)]   # radio exterior de la góndola
 # hueco que la góndola y el eyector abren en el ala: el ala llega hasta la piel de la góndola y no sigue por dentro
-HOLE = [(-4700, 0), (-4700, 830), (-2300, 834), (-1000, 954), (2000, 974), (6000, 944), (8800, 874), (8800, 920), (11800, 920), (11800, 0)]
+HOLE = [(-4700, 0), (-4700, 830), (-2300, 834), (-1000, 954), (2000, 974), (4800, 944), (7300, 874), (7300, 920), (10300, 920), (10300, 0)]
 
 
 def door_angles(n, w, keep=0.45, fin=0.0):
@@ -85,8 +90,9 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
 
     F = frame((0, 0, 0), (-1, 0, 0))
     O = (0, 0, 0)
-    # cono de entrada: punta 4,5 m por delante de la cara del compresor; se desliza 660 mm hacia atrás con el Mach
-    spike = lathe("spike", F, [(-4500, 0), (-3600, 260), (-2700, 560), (-2300, 640), (-1200, 520), (-400, 330), (0, 300), (0, 0)], M["ti"], steps=64)
+    # cono de entrada: punta 3,4 m por delante de la cara del compresor, 1,1 m por delante del labio; se desliza
+    # 660 mm hacia atrás con el Mach
+    spike = lathe("spike", F, [(-4900, 0), (-4220, 260), (-3540, 560), (-3240, 640), (-2400, 560), (-1200, 420), (0, 300), (0, 0)], M["ti"], steps=64)
     part("cono", [spike], 1, (3500, 0, 0), out=1, control="spike", slide=[-1.0, 0.0, 0.0], range=[0, 660])
     comp = [lathe("drum", F, [(0, 80), (0, 300), (1600, 330), (1600, 80)], M["wasp"], steps=48)]   # con el agujero del eje
     for k in range(9):
@@ -107,6 +113,10 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
         th = TAU * i / 8
         Fc = frame(point(F, 1720, 465, th), (-1, 0, 0))
         comb.append(lathe(f"can{i}", Fc, [(0, 0), (0, 95), (600, 95), (600, 0)], M["hot"], steps=24))
+    # soportes de la cámara a la carcasa: ocho patas radiales que la centran en el motor
+    for i in range(8):
+        th = TAU * (i + 0.5) / 8
+        comb.append(cylinder_between(f"cmbleg{i}", point(F, 2020, 600, th), point(F, 2020, 638, th), 22, M["hast"], steps=8))
     part("camara", comb, 12, (-1200, 0, 0), out=8)
     turb = [lathe("tdisc", F, [(2400, 80), (2400, 330), (2750, 340), (2750, 80)], M["wasp"], steps=48)]
     for k, s in enumerate((2470, 2660)):
@@ -121,19 +131,21 @@ def build_j58(prefix, M, parent, location, meta, detailed=True):
     a, b = halves(join(f"{prefix}.case", case), f"{prefix}.case.b")
     part("carcasa", [a], 15, (0, 2000, 0), out=6)
     part("carcasa.b", [b], 15, (0, -2000, 0), out=6)
-    ab = [lathe("abl", F, [(2950, 640), (2950, 690), (8000, 690), (8000, 640)], M["hast"], steps=64),
-          lathe("cone", F, [(2800, 0), (2800, 330), (3900, 150), (4200, 0)], M["inco"], steps=48)]
+    # postquemador de 1,95 m: la mitad trasera del motor, como en el J58
+    ab = [lathe("abl", F, [(2950, 640), (2950, 690), (4900, 690), (4900, 640)], M["hast"], steps=64),
+          lathe("cone", F, [(2800, 0), (2800, 330), (3500, 150), (3750, 0)], M["inco"], steps=48)]
     for r in (260, 470):
         ab.append(lathe(f"gut{r}", F, [(3300, r - 40), (3410, r), (3300, r + 40), (3320, r)], M["inco"], steps=64))
     for i in range(12):
         th = TAU * i / 12
         ab.append(cylinder_between(f"sb{i}", point(F, 3150, 140, th), point(F, 3150, 630, th), 9, M["inco"], steps=8))
     part("postquemador", ab, 16, (-3000, 0, 0), out=4)
-    part("tobera", [lathe("cd", F, [(8000, 640), (8000, 690), (8600, 560), (8800, 600), (8800, 570), (8600, 530)], M["inco"], steps=48)], 17, (-4200, 0, 0), out=3)
+    part("tobera", [lathe("cd", F, [(4900, 640), (4900, 690), (5300, 560), (5440, 600), (5440, 570), (5300, 530)], M["inco"], steps=48)], 17, (-4200, 0, 0), out=3)
     # eyector: anillo de montaje y 16 aletas libres; convergen a baja velocidad y el propio flujo las abre hasta Mach 3,2
-    ring = lathe("ejring", F, [(8850, 700), (8850, 790), (8960, 790), (8960, 700)], M["hot"], steps=64)
+    E = 7350 - ENGINE_AFT   # el eyector sigue en su sitio de la góndola
+    ring = lathe("ejring", F, [(E, 700), (E, 790), (E + 110, 790), (E + 110, 700)], M["hot"], steps=64)
     ej = part("eyector", [ring], 18, (-5400, 0, 0), out=2)
-    attach(ej, hinged_ring("ejf", F, 8930, 11400, 760, 610, 16, M["hot"], "ejector", width=0.94, thick=28))
+    attach(ej, hinged_ring("ejf", F, E + 80, E + 2550, 760, 610, 16, M["hot"], "ejector", width=0.94, thick=28))
     return root, parts
 
 
@@ -155,7 +167,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
     part("fuselaje.trasero", [loft("aft", body(-6000, -16700), M["skin"], uvscale=4000, caps=True)], "airframe", 1, (-5000, 0, 0), "Fuselaje trasero")
     # cabina en tándem: parabrisas y dos cúpulas que siguen el lomo
     cockpit = []
-    for k, (x0, x1) in enumerate(((9600, 8300), (8100, 6900))):
+    for k, (x0, x1) in enumerate(((10400, 9100), (8900, 7400))):   # como en el plano: la cabina empieza a 5,5 m de la punta
         rows = []
         for i in range(9):
             x = x0 - (x0 - x1) * i / 8
@@ -169,19 +181,34 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         cockpit.append(loft(f"can{k}", rows, M["glass"] if k == 0 else M["skin"], closed=False))
     part("cabina", cockpit, "airframe", 30, (0, 0, 1800), "Cabina en tándem: piloto y oficial de reconocimiento")
 
-    # ── aristas (chines): láminas finas desde el morro hasta el borde de ataque del ala ──
+    # ── aristas (chines): láminas finas desde el morro hasta el borde de ataque del ala; su borde sigue la ojiva del
+    #    plano de tres vistas (media anchura en mm según x) y se queda en 1945 mm hasta la raíz del ala ──
+    CHINE = [(15182, 123), (14363, 410), (13544, 737), (12726, 1024), (11908, 1229), (11089, 1413), (10270, 1556), (9452, 1679), (8634, 1781), (7815, 1843), (6996, 1904), (6178, 1925), (5360, 1945), (-400, 1945)]
+    chine_edge = lambda x: next(e0 + (e1 - e0) * (x0 - x) / (x0 - x1) for (x0, e0), (x1, e1) in zip(CHINE, CHINE[1:]) if x0 >= x >= x1) if x <= CHINE[0][0] else CHINE[0][1]
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         rows = []
-        for x in range(13500, 1999, -500):
+        for x in [15180] + list(range(14800, -401, -400)):
             half = catmull(ST, x)[1] / 2 - 60
-            edge = half + (x < 13000) * (13000 - x) * 0.12
+            edge = max(half + 20, chine_edge(x))
             rows.append([(x, side * half, 25), (x, side * edge, 0), (x, side * half, -25)])
         part(f"arista.{tagname}", [loft(f"chine{side}", rows, M["skin"], closed=True, caps=True, uvscale=4000)], "airframe", 3, (2000, side * 2200, 0), f"Arista {tagname}")
 
     # ── ala en delta: 60° de flecha, perfil fino; elevones exteriores e interiores ──
-    LE = lambda y: 2600 - 1.75 * (y - 1300)
+    LINE = lambda y: -400 - 1.88 * (y - 1945)   # del fin de las aristas (x = −400) a la punta (x ≈ −12 650), como en el plano
+    # por fuera de la góndola el borde de ataque nace casi en su boca y se curva hasta la línea del ala (carenado)
+    FAIR = lambda y: -2600 - max(0.0, y - (NAC_Y + 900)) ** 2 / 1300 ** 2 * (-2600 - LINE(NAC_Y + 2200))
+    LE = lambda y: max(LINE(y), FAIR(y)) if y > NAC_Y else LINE(y)
     TE = lambda y: -14300 + 0.03 * (y - 1300)
     HINGE = 0.84
+
+    SPANS = ((1500, 3100), (5100, 8100))
+    # charnela recta en cada elevón aunque el borde de ataque se curve junto a la góndola: el elevón gira sin rozar el ala
+    def split(y):
+        for a, b in SPANS:
+            if a <= y <= b:
+                ha, hb = LE(a) - HINGE * (LE(a) - TE(a)), LE(b) - HINGE * (LE(b) - TE(b))
+                return (LE(y) - (ha + (hb - ha) * (y - a) / (b - a))) / (LE(y) - TE(y))
+        return HINGE
 
     def wrow(y, side, a, b, t=0.04):
         ch = LE(y) - TE(y)
@@ -189,16 +216,17 @@ def build_sr71(M, root, meta, log=lambda msg: None):
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         hole = lambda: lathe(f"hole{side}", frame((FACE_X, side * NAC_Y, NAC_Z), (-1, 0, 0)), HOLE, steps=64)
         for key, ys, fills, order, explode, title in (
-                ("ala", [1300, 2000, 2400, 2800], ((1300, 1500), (2300, 2800)), 4, (0, side * 2200, 0), "Ala interior"),
-                ("ala.ext", [3800, 4200, 4600, 6200, 8100, 8470], ((3800, 4300), (8100, 8470)), 4, (0, side * 5000, 0), "Ala exterior")):
-            wing = loft(f"wing{side}{key}", [wrow(y, side, 0, HINGE) for y in ys], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)
+                ("ala", [1300, 2000, 2800, 3600], ((1300, 1500), (3100, 3600)), 4, (0, side * 2200, 0), "Ala interior"),
+                ("ala.ext", [4600, 5000, 5300, 5600, 5900, 6300, 6800, 8100, 8470], ((4600, 5100), (8100, 8470)), 4, (0, side * 5000, 0), "Ala exterior")):
+            wing = loft(f"wing{side}{key}", [wrow(y, side, 0, split(y)) for y in ys], [M["skin"], M["edge"]], caps=True, uvscale=4000, matof=lambda i, j: 1 if j <= 1 or j >= 43 else 0)
             fill = [loft(f"wf{side}{a}", [wrow(y, side, HINGE, 1) for y in (a, b)], M["skin"], caps=True, uvscale=4000) for a, b in fills]
             for ob in [wing] + fill:
                 boolean_cut(ob, [hole()])   # cada pieza por separado: juntas, el corte falla en sus caras comunes
             part(f"{key}.{tagname}", [wing] + fill, "airframe", order, explode, f"{title} {tagname}")
         # elevones: el interior sale hacia atrás y el exterior hacia fuera, ninguno pasa por la góndola ni por el otro
-        for k, (a, b) in enumerate(((1500, 2300), (4300, 8100))):
-            ob = part(f"elevon.{tagname}.{k}", [loft(f"ev{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 20, b - 20)], M["skin"], caps=True, uvscale=4000)],
+        for k, (a, b) in enumerate(SPANS):
+            rows = [a + 20] + [y for y in (2000, 2800, 5300, 5600, 5900, 6300, 6800) if a < y < b] + [b - 20]
+            ob = part(f"elevon.{tagname}.{k}", [loft(f"ev{side}{k}", [wrow(y, side, split(y) + 0.004, 1) for y in rows], M["skin"], caps=True, uvscale=4000)],
                       "airframe", 5, (-2600, 0, 0), f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
             p0 = Vector((LE(a) - HINGE * (LE(a) - TE(a)), side * a, NAC_Z))
             p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, NAC_Z))
@@ -210,7 +238,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
 
     # ── góndolas: piel exterior desde el labio de la toma hasta el eyector ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
-        prof = [(-2300, 800), (-2300, 840), (-1000, 960), (2000, 980), (6000, 950), (8800, 880), (8800, 840), (2000, 940), (-1000, 920), (-2250, 805)]
+        prof = [(-2300, 800), (-2300, 840), (-1000, 960), (2000, 980), (4800, 950), (7300, 880), (7300, 840), (2000, 940), (-1000, 920), (-2250, 805)]
         F = frame((FACE_X, side * NAC_Y, NAC_Z), (-1, 0, 0))
         nac = lathe(f"nac{side}", F, prof, M["skin"], steps=64)
         # compuertas de la góndola, como en el SR-71: de derivación delanteras junto a la toma (abren hacia fuera por
@@ -218,7 +246,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         # al despegar) y terciarias delante del eyector (abiertas a baja velocidad, cerradas al pasar Mach 1)
         outer = lambda s_: next(r0 + (r1 - r0) * (s_ - a0) / (a1 - a0) for (a0, r0), (a1, r1) in zip(OUTER, OUTER[1:]) if a0 <= s_ <= a1)
         doors, recess = [], []
-        for name, s0, s1, n, kind, w in (("bp", -1750, -1300, 6, "bypass", 0.55), ("si", -300, 350, 8, "suckin", 0.6), ("te", 7450, 8050, 12, "tertiary", 0.7)):
+        for name, s0, s1, n, kind, w in (("bp", -1750, -1300, 6, "bypass", 0.55), ("si", 1200, 1850, 8, "suckin", 0.6), ("te", 6000, 6600, 12, "tertiary", 0.7)):
             r0, r1 = outer(s0) + 4, outer(s1) + 4
             at = door_angles(n, w, fin=0.5 if kind == "tertiary" else 0.0)
             doors += hinged_ring(f"{name}{side}", F, s0, s1, r0, r1, n, M["skin"], kind, width=w, thick=12, at=at)
@@ -236,7 +264,7 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         def frow(h, le, c):
             if h == 0:
                 # la raíz copia el lomo de la góndola, 30 mm por encima (gira sin rozarla y no queda en el aire)
-                top = lambda x: NAC_Z + next(r0 + (r1 - r0) * (s_ - a0) / (a1 - a0) for s_ in [min(8800, max(-2300, FACE_X - x))]
+                top = lambda x: NAC_Z + next(r0 + (r1 - r0) * (s_ - a0) / (a1 - a0) for s_ in [min(7300, max(-2300, FACE_X - x))]
                                              for (a0, r0), (a1, r1) in zip(OUTER, OUTER[1:]) if a0 <= s_ <= a1) + 30
                 return [(le - x, side * NAC_Y + y, top(le - x)) for x, y in naca_cut(c, 0.05)]
             return [(le - x, side * NAC_Y + y + cant * h, base + h) for x, y in naca_cut(c, 0.05)]
@@ -253,15 +281,20 @@ def build_sr71(M, root, meta, log=lambda msg: None):
         Fw = frame(Vector(c) - Vector((0, w / 2, 0)), (0, 1, 0))
         return [lathe(f"{name}_t", Fw, [(0, r * 0.6), (0, r * 0.9), (w * 0.15, r), (w * 0.85, r), (w, r * 0.9), (w, r * 0.6)], M["rubber"], steps=40),
                 lathe(f"{name}_h", Fw, [(w * 0.1, 0), (w * 0.1, r * 0.6), (w * 0.9, r * 0.6), (w * 0.9, 0)], M["alu"], steps=32)]
-    nose = [cylinder_between("ns", (7600, 0, -440), (7600, 0, GROUND + 330), 90, M["steel"], steps=20)]
+    # tren en su sitio del plano de tres vistas: el de morro a 10,9 m de la punta, los principales bajo las góndolas
+    NOSE_GX, MAIN_GX = 5100, -7100
+    belly = catmull(ST, NOSE_GX)
+    # el puntal entra 3 mm en la panza: sin junta abierta (check_connections --strict)
+    nose = [cylinder_between("ns", (NOSE_GX, 0, belly[4] - belly[3] + 3), (NOSE_GX, 0, GROUND + 330), 90, M["steel"], steps=20)]
     for y in (-200, 200):
-        nose += wheel(f"nw{y}", (7600, y, GROUND + 330), 330, 220)
+        nose += wheel(f"nw{y}", (NOSE_GX, y, GROUND + 330), 330, 220)
     part("tren.morro", nose, "airframe", 8, (0, 2600, 0), "Tren de morro")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         y = side * 1900
-        g = [cylinder_between(f"ms{side}", (-3200, y, -450), (-3200, y, GROUND + 450), 130, M["steel"], steps=20)]
+        # en la estación del plano el intradós está 76 mm más arriba que en la anterior: el puntal sube hasta él
+        g = [cylinder_between(f"ms{side}", (MAIN_GX, y, -390), (MAIN_GX, y, GROUND + 450), 130, M["steel"], steps=20)]
         for dy in (-330, 0, 330):
-            g += wheel(f"mw{side}{dy}", (-3200, y + dy, GROUND + 450), 450, 260)
+            g += wheel(f"mw{side}{dy}", (MAIN_GX, y + dy, GROUND + 450), 450, 260)
         part(f"tren.{tagname}", g, "airframe", 9, (5500, 0, 0), f"Tren principal {tagname}")
 
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
@@ -270,8 +303,15 @@ def build_sr71(M, root, meta, log=lambda msg: None):
             surface_link(host, host, (x, side * NAC_Y, NAC_Z + 689), (0, 0, 1), 600, 55, M["steel"])
     eng = {}
     for side, prefix, detailed in ((-1, "J58", True), (1, "J58.L", False)):
-        er, ep = build_j58(prefix, M, root, (FACE_X, side * NAC_Y, NAC_Z), meta, detailed)
+        er, ep = build_j58(prefix, M, root, (FACE_X - ENGINE_AFT, side * NAC_Y, NAC_Z), meta, detailed)
         tag(er, part=prefix, group="engine", order=40, explode=[-16000, 0, -1300], label="J58 derecho" if detailed else "J58 izquierdo", system="engines")
         eng[prefix] = (er, ep)
+        # el J58 a escala deja 70 mm de holgura con la góndola: va colgado de ella por soportes arriba y abajo, como el real
+        host = next(p for p in parts if p.name == ("gondola.derecha" if side < 0 else "gondola.izquierda"))
+        bpy.context.view_layer.update()
+        case_key = max(ep, key=lambda k: ep[k].dimensions.y * ep[k].dimensions.z)
+        for x in (FACE_X - ENGINE_AFT - 800, FACE_X - ENGINE_AFT - 3600):
+            for dz in (1, -1):
+                ep[case_key] = surface_link(ep[case_key], host, (x, side * NAC_Y, NAC_Z), (0, 0, dz), 1400, 45, M["steel"])
         log(f"Motor {prefix}")
     return parts, eng

@@ -176,7 +176,7 @@ REST = {}
 for o in movers:
     o.rotation_mode = "QUATERNION"
     REST[o] = o.rotation_quaternion.copy()
-EXTREMES = {"ramp": (0, -18), "suckin": (0, 22), "tertiary": (0, 16), "bypass": (0, -16), "ejector": (5, -6), "iris": (6, -8)}
+EXTREMES = {"ramp": (0, -18), "suckin": (0, 22), "tertiary": (0, 16), "bypass": (0, -16), "ejector": (5, -3), "iris": (6, -8)}
 for o in movers:
     kind = o.get("control") or o.get("subcontrol")
     if kind == "sweep":

@@ -1,0 +1,132 @@
+{
+  "model": "f14",
+  "nearest": [
+    {
+      "part": "ala.derecha",
+      "to": "guante.derecho",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "ala.izquierda",
+      "to": "guante.izquierdo",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "cabina",
+      "to": "cabina.interior",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "cabina.interior",
+      "to": "cabina",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "deriva.derecha",
+      "to": "gondola.derecha",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "deriva.izquierda",
+      "to": "gondola.izquierda",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "estabilizador.derecho",
+      "to": "F110",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "estabilizador.izquierdo",
+      "to": "F110.L",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "F110",
+      "to": "estabilizador.derecho",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "F110.L",
+      "to": "estabilizador.izquierdo",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "fuselaje.central",
+      "to": "fuselaje.delantero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "fuselaje.delantero",
+      "to": "cabina",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "gancho",
+      "to": "fuselaje.central",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "gondola.derecha",
+      "to": "deriva.derecha",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "gondola.izquierda",
+      "to": "deriva.izquierda",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "guante.derecho",
+      "to": "ala.derecha",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "guante.izquierdo",
+      "to": "ala.izquierda",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "radomo",
+      "to": "fuselaje.delantero",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "rampa.derecha",
+      "to": "gondola.derecha",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "rampa.izquierda",
+      "to": "gondola.izquierda",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "timon.derecha",
+      "to": "deriva.derecha",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "timon.izquierda",
+      "to": "deriva.izquierda",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "tren.derecho",
+      "to": "guante.derecho",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "tren.izquierdo",
+      "to": "guante.izquierdo",
+      "gap_mm": 0.0
+    },
+    {
+      "part": "tren.morro",
+      "to": "fuselaje.delantero",
+      "gap_mm": 0.0
+    }
+  ],
+  "tolerance_mm": 1.0,
+  "disconnected": []
+}

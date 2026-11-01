@@ -142,7 +142,7 @@ export function disassemblyOrder(parts, { isGear, isLate, root, isEngine }) {
   return [...gear, ...late, ...(root && root.offset.length() > 1e-6 ? [root] : []), ...engine, ...rest];
 }
 
-// Pasos de una secuencia: uno detrás de otro, cada uno empieza cuando el anterior va por la mitad.
+// Pasos de una secuencia: uno detrás de otro, cada uno empieza cuando el anterior ya casi ha llegado.
 export function sequenceSteps(order, target, { speed = 1, label }) {
   const list = target ? order : order.slice().reverse();
   const maxL = Math.max(...list.map((e) => e.offset.length()), 1e-6);
@@ -150,7 +150,7 @@ export function sequenceSteps(order, target, { speed = 1, label }) {
   return list.map((e) => {
     const dur = (0.75 + 0.55 * (e.offset.length() / maxL)) / speed;
     const step = { e, at, dur, from: target ? 0 : 1, to: target, say: `${target ? "Desarmando" : "Montando"} · ${label(e)}` };
-    at += dur * 0.55;
+    at += dur * 0.8;   // casi una detrás de otra: se ve qué entra y por dónde
     return step;
   });
 }

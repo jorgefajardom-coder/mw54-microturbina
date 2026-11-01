@@ -77,16 +77,16 @@ function regime(M) {
 }
 
 // ── escena ──
-const profile = await profileFor(detect());
-const renderer = new THREE.WebGLRenderer({ antialias: profile.antialias, powerPreference: "high-performance" });
-renderer.setPixelRatio(profile.pixelRatio);
+const device = await profileFor(detect());
+const renderer = new THREE.WebGLRenderer({ antialias: device.antialias, powerPreference: "high-performance" });
+renderer.setPixelRatio(device.pixelRatio);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NeutralToneMapping;
 $("view").appendChild(renderer.domElement);
 guardContext(renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
-await setupEnvironment(renderer, scene, profile);
+await setupEnvironment(renderer, scene, device);
 scene.environmentIntensity = 0.7;
 const sun = new THREE.DirectionalLight(0xffffff, 2.2);
 sun.position.set(30, 50, 20);
@@ -109,7 +109,7 @@ coneHolder.add(cone);
 scene.add(coneHolder);
 
 // partículas del aire: cada una sigue una línea de corriente de la que se ve un trazo corto
-const small = profile.kind === "celular";
+const small = device.kind === "celular";
 const COUNT = small ? 900 : 2200;
 const TRAIL = 6;
 const flowGeo = new THREE.BufferGeometry();
@@ -124,6 +124,36 @@ const seeds = Array.from({ length: COUNT }, () => [Math.random(), Math.random() 
 
 let current = null;
 let box = null;
+let profile = null;
+
+// sección del avión a lo largo de x: en cada franja, cuánto se extiende hacia arriba/abajo y hacia los lados desde el
+// eje. El aire de cada franja rodea esa elipse (por fuera de las alas, por encima y por debajo del fuselaje)
+const BINS = 72;
+function sectionsOf(model, box) {
+  const hy = new Float32Array(BINS);
+  const hz = new Float32Array(BINS);
+  const cy = (box.min.y + box.max.y) / 2;
+  const cz = (box.min.z + box.max.z) / 2;
+  const L = box.max.x - box.min.x;
+  const v = new THREE.Vector3();
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    const step = Math.max(1, Math.floor(pos.count / 6000));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      const b = Math.min(BINS - 1, Math.max(0, Math.floor(((v.x - box.min.x) / L) * BINS)));
+      hy[b] = Math.max(hy[b], Math.abs(v.y - cy));
+      hz[b] = Math.max(hz[b], Math.abs(v.z - cz));
+    }
+  });
+  // se suaviza a lo largo de x (envolvente de las vecinas y media) para que las líneas no zigzagueen entre franjas
+  const soften = (arr) => {
+    const env = arr.map((_, i) => Math.max(...arr.slice(Math.max(0, i - 2), i + 3)));
+    return env.map((_, i) => { const w = env.slice(Math.max(0, i - 4), i + 5); return w.reduce((a, b) => a + b, 0) / w.length; });
+  };
+  return { hy: soften(hy), hz: soften(hz), cy, cz };
+}
 let M = 0;
 const models = {};
 const cold = new THREE.Color(0x7fb2ff);
@@ -136,7 +166,7 @@ async function show(id) {
   if (current) scene.remove(models[current]);
   $("loading").hidden = false;
   if (!models[id]) {
-    const gltf = await loadModel(c.glb, "../draco/", { workerLimit: profile.dracoWorkers ?? 2 });
+    const gltf = await loadModel(c.glb, "../draco/", { workerLimit: device.dracoWorkers ?? 2 });
     models[id] = gltf.scene;
   }
   $("loading").hidden = true;
@@ -145,6 +175,7 @@ async function show(id) {
   scene.add(model);
   model.updateMatrixWorld(true);
   box = new THREE.Box3().setFromObject(model);
+  profile = sectionsOf(model, box);
   const size = box.getSize(new THREE.Vector3());
   const L = size.x;
   if (lights) scene.remove(lights.fill, lights.rim);
@@ -216,13 +247,8 @@ function stepFlow(time) {
   if (!box) return;
   const L = box.max.x - box.min.x;
   const span = box.max.z - box.min.z;
-  const hgt = box.max.y - box.min.y;
-  const cx = (box.min.x + box.max.x) / 2;
   const cy = (box.min.y + box.max.y) / 2;
   const cz = (box.min.z + box.max.z) / 2;
-  const a = L / 2;
-  const b = Math.max(hgt, L * 0.06) / 2;
-  const w = Math.max(span * 0.35, L * 0.08) / 2;
   const x0 = box.max.x + L * 0.6;
   const x1 = box.min.x - L * 1.2;
   const R = Math.max(span, L * 0.5) * 0.75;
@@ -238,23 +264,31 @@ function stepFlow(time) {
     for (let k = 0; k < TRAIL; k++) {
       for (let e = 0; e < 2; e++) {
         const xi = x + (k + e) * dx;
-        const ex = (xi - cx) / a;
-        const ey = (yr - cy) / b;
-        const ez = (zr - cz) / w;
-        const rho2 = ex * ex + ey * ey + ez * ez;
         const behind = box.max.x - xi;
         const r = Math.hypot(yr - cy, zr - cz);
         const shocked = M > 1 ? behind > 0 && r < behind * tanMu : true;
         let y = yr;
         let z = zr;
         let gain = 0;
-        if (shocked && rho2 < 9) {
-          // empuje hacia fuera tipo flujo potencial alrededor de un elipsoide
-          const push = 1 / Math.max(rho2, 1);
-          const nl = Math.hypot(ey, ez) || 1;
-          y += (ey / nl) * b * push * 0.9;
-          z += (ez / nl) * w * push * 0.9;
-          gain = push;
+        if (shocked && profile) {
+          // la sección del avión en esta x (con su vecina, para que no salte) y un margen para la capa de aire
+          const f = ((xi - box.min.x) / L) * BINS - 0.5;
+          const b0 = Math.floor(f);
+          const t = f - b0;
+          const at = (arr, b) => (b < 0 || b >= BINS ? 0 : arr[b]);
+          const near = smooth(-L * 0.25, 0, xi - box.min.x) * smooth(L * 0.15, 0, xi - box.max.x);
+          const sy = (at(profile.hy, b0) * (1 - t) + at(profile.hy, b0 + 1) * t + L * 0.012) * near;
+          const sz = (at(profile.hz, b0) * (1 - t) + at(profile.hz, b0 + 1) * t + L * 0.012) * near;
+          if (sy > 1e-6 && sz > 1e-6) {
+            const dy = yr - cy;
+            const dz = zr - cz;
+            const rho = Math.max(1e-3, Math.hypot(dy / sy, dz / sz));
+            // como un cuerpo de Rankine: cada línea se aparta hasta quedar fuera de la sección, menos cuanto más lejos
+            const grow = Math.sqrt(rho * rho + 1) / rho;
+            y = cy + dy * grow;
+            z = cz + dz * grow;
+            gain = Math.min(1, (grow - 1) * 2.2);
+          }
         }
         const o = ((i * TRAIL + k) * 2 + e) * 3;
         flowPos[o] = xi;

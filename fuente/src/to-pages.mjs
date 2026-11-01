@@ -52,10 +52,20 @@ writeFileSync(join(OUT, "aero", "index.html"), readFileSync(join(ROOT, "web", "a
   description: `Visor 3D interactivo por ${AUTHOR}: cada avión en vuelo con las líneas de corriente del aire, el cono de Mach, la atmósfera a su altitud, la presión dinámica, la temperatura de remanso, la sustentación, la resistencia de forma, de onda e inducida y la finura, del Mach 0,1 al Mach 6.`,
   url: `${SITE}aero/`,
   name: "Aerodinámica de los aviones del visor",
+  image: `${SITE}sr71/og.png`,
+})));
+mkdirSync(join(OUT, "show"), { recursive: true });
+for (const f of ["show.js", "show.css"]) copyFileSync(join(ROOT, "web", "show", f), join(OUT, "show", f));
+writeFileSync(join(OUT, "show", "index.html"), readFileSync(join(ROOT, "web", "show", "index.html"), "utf8").replace("<!--SEO-->", seoHead({
+  title: `Exhibición: el Hawk, el SR-71, el F-22, el F-14 y el SR-72 en vuelo · ${AUTHOR}`,
+  description: `Visor 3D por ${AUTHOR}: los cinco aviones vuelan solos sobre un aeródromo, en formación o cada uno con su maniobra, con virajes coordinados, rizos, toneles, estelas y llamas de tobera.`,
+  url: `${SITE}show/`,
+  name: "Exhibición aérea de los aviones del visor",
+  image: `${SITE}sr71/og.png`,
 })));
 for (const [jet, meta] of Object.entries(JETS)) {
-  for (const f of ["app.js", "config.js", "sim.js", "parts.json", `${jet}.glb`]) copyFileSync(join(ROOT, "web", jet, f), join(OUT, jet, f));
-  const html = readFileSync(join(ROOT, "web", jet, "index.html"), "utf8").replace("<!--SEO-->", seoHead({ ...meta, url: `${SITE}${jet}/` }));
+  for (const f of ["app.js", "config.js", "sim.js", "parts.json", `${jet}.glb`, "og.png"]) copyFileSync(join(ROOT, "web", jet, f), join(OUT, jet, f));
+  const html = readFileSync(join(ROOT, "web", jet, "index.html"), "utf8").replace("<!--SEO-->", seoHead({ ...meta, url: `${SITE}${jet}/`, image: `${SITE}${jet}/og.png` }));
   writeFileSync(join(OUT, jet, "index.html"), html);
 }
 copyFileSync(join(ROOT, "dist", "index.html"), join(OUT, "anatomia", "index.html"));
@@ -64,11 +74,12 @@ for (const f of ["j58.html", "f119.html", "f110.html", "tbcc.html"]) copyFileSyn
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: ${SITE}sitemap.xml\n`);
 const today = new Date().toISOString().slice(0, 10);
-writeFileSync(join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${SITE}</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}sr72/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}f22/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}f14/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}sr71/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}aero/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}anatomia/</loc><lastmod>${today}</lastmod></url>\n${["j58", "f119", "f110", "tbcc"].map((f) => `  <url><loc>${SITE}anatomia/${f}.html</loc><lastmod>${today}</lastmod></url>\n`).join("")}</urlset>\n`);
+writeFileSync(join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${SITE}</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}sr72/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}f22/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}f14/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}sr71/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}aero/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}show/</loc><lastmod>${today}</lastmod></url>\n  <url><loc>${SITE}anatomia/</loc><lastmod>${today}</lastmod></url>\n${["j58", "f119", "f110", "tbcc"].map((f) => `  <url><loc>${SITE}anatomia/${f}.html</loc><lastmod>${today}</lastmod></url>\n`).join("")}</urlset>\n`);
 writeFileSync(
   join(OUT, "README.md"),
   `# Wren MW54 · visor 3D y anatomía\n\n**Español** · [English](#english)\n\nPor **${AUTHOR}**. La microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador a reacción: montaje y despiece, tren retráctil con compuertas, cabina en tándem con mandos que se mueven, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo con palancas táctiles para celular y mando de juego. Además, a escala real y con sus motores en despiece: el concepto SR-72 de Lockheed Martin y su ciclo combinado en [/sr72/](${SITE}sr72/), el F-22 Raptor con sus F119 en [/f22/](${SITE}f22/), el F-14 Tomcat con sus F110 en [/f14/](${SITE}f14/) y el SR-71 Blackbird con sus J58 en [/sr71/](${SITE}sr71/). Cada página se adapta al dispositivo: interfaz propia para celular y para escritorio. Figura técnica en [/anatomia/](${SITE}anatomia/). El código fuente (modelos de Blender, visor y figura) está en [fuente/](fuente/).\n\nVer en línea: ${SITE} · Portafolio: ${PORTFOLIO}\n\n---\n\n## English\n\nBy **${AUTHOR}**. The Wren MW54 micro-turbine built from its plans and installed in a 1:7 model of a jet trainer: assembly and exploded view, retractable gear with doors, tandem cockpit with moving controls, fuel mixture, combustion camera, live materials heat map and a flight simulator with touch sticks for phones and gamepad support. Also at full scale with their engines in exploded view: the Lockheed Martin SR-72 concept and its combined cycle at [/sr72/](${SITE}sr72/), the F-22 Raptor with its F119s at [/f22/](${SITE}f22/), the F-14 Tomcat with its F110s at [/f14/](${SITE}f14/) and the SR-71 Blackbird with its J58s at [/sr71/](${SITE}sr71/). Every page adapts to the device, with its own phone and desktop interface. Technical figure at [/anatomia/](${SITE}anatomia/). The source code (Blender models, viewer and figure) is in [fuente/](fuente/).\n\nView online: ${SITE} · Portfolio: ${PORTFOLIO}\n`,
 );
 // la imagen para redes sale de una captura del visor; si no la hay, se conserva la que ya tiene el sitio
 if (existsSync(join(ROOT, "shots", "hawk-v3.png"))) execFileSync("python", ["-c", `from PIL import Image, ImageOps; im = Image.open(r"${join(ROOT, "shots", "hawk-v3.png")}").convert("RGB"); im = ImageOps.fit(im, (1200, 630), centering=(0.5, 0.5)); im.save(r"${join(OUT, "og.png")}", "PNG", optimize=True)`], { stdio: "inherit" });
+else copyFileSync(join(ROOT, "web", "og-hawk.png"), join(OUT, "og.png"));
 console.log("sitio listo en", OUT);

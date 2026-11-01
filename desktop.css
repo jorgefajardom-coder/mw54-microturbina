@@ -15,3 +15,5 @@ body[data-hover] #tip { display: block; }
   nav.sections { top: auto; bottom: 62px; left: 12px; transform: none; }
   #card { left: 12px; right: 12px; width: auto; top: auto; bottom: 110px; }
 }
+body[data-flying] #mission, body[data-flying] #cut, body[data-flying] label.chip:has(#mach), body[data-flying] #mode { display: none !important; }
+body[data-flying] #readout { display: none !important; }

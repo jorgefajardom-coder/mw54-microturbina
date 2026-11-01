@@ -9,6 +9,8 @@ export default {
   parts: "./parts.json",
   sim,
   engine: "J58",
+  // vuelo: masa al despegar (kg), superficie alar (m²), envergadura y cuerda media (m), motores
+  fly: { m: 55000, S: 167, b: 16.94, c: 11, engines: 2 },
   engineAlt: "J58.L",
   coreZone: "hpc",
   maxMach: 3.3,
@@ -43,7 +45,7 @@ export default {
     suckin: (o) => 22 * o.suckin,
     tertiary: (o) => 16 * o.tertiary,
     bypass: (o) => -16 * o.bypass,
-    ejector: (o) => 5 - 11 * o.ejector,
+    ejector: (o) => 5 - 8 * o.ejector,   // cerrados en tierra; a Mach 3,2 quedan casi en línea con la góndola
   },
   // llama del J58: gradiente tomado de la foto del J58 en el banco de pruebas de noche (penacho violeta translúcido con
   // nudos claros) y del SR-71 despegando (núcleo blanco amarillento y diamantes amarillos muy marcados); al arrancar,
@@ -62,14 +64,14 @@ export default {
       return { w: { dry: (1 - o.ab) * (1 - teb), ab: o.ab * (1 - teb), teb }, level: Math.max(teb, motor.heat * (0.25 + 0.75 * motor.thr)), optimal: o.ab * sm(0.88, 1, motor.thr) * (1 - teb), reach: 0.55 + 0.45 * o.ab };
     },
   },
-  // boca del eyector ≈ 0,62 m de radio: r · 0,62 (lo que mide la llama al salir) = radio de la boca
-  plumes: [3300, -3300].map((y) => ({ at: [-14450, y, -150], length: 14, r: 1.0, tail: 0.5 })),
-  cut: { z: 3.3, pos: [-5, -1.6, 25], target: [-5.5, -0.4, 3.3] },
+  // la llama nace en la tobera del J58 (0,6 m de radio), dentro del eyector, y sale por él
+  plumes: [4100, -4100].map((y) => ({ at: [-11140, y, -150], length: 16.5, r: 0.95, tail: 0.5 })),
+  cut: { z: 4.1, pos: [-7.5, -1.6, 26], target: [-8, -0.4, 4.1] },
   flow: {
     paths: {
-      core: [[6500, 700], [4500, 760], [2300, 650], [0, 420], [-1600, 330], [-2300, 360], [-2800, 300], [-3200, 300], [-8000, 320], [-8800, 300], [-12500, 280]],
-      bleed: [[6500, 760], [4500, 800], [2300, 700], [0, 500], [-700, 480], [-850, 700], [-2900, 710], [-3200, 560], [-8000, 480], [-12500, 420]],
-      secondary: [[6500, 860], [4500, 880], [2300, 830], [0, 820], [-3000, 800], [-8000, 790], [-8900, 740], [-12500, 640]],
+      core: [[6900, 700], [4900, 760], [3800, 650], [1500, 480], [0, 420], [-1600, 330], [-2300, 360], [-2800, 300], [-3130, 300], [-4900, 320], [-5440, 300], [-9500, 280]],
+      bleed: [[6900, 760], [4900, 800], [3800, 700], [1500, 520], [0, 500], [-700, 480], [-850, 700], [-2900, 710], [-3130, 560], [-4900, 480], [-9500, 420]],
+      secondary: [[6900, 860], [4900, 880], [3800, 830], [1500, 820], [0, 820], [-2985, 800], [-4900, 790], [-5900, 740], [-9500, 640]],
     },
     share: (path, o) => (path === "core" ? 1 : path === "bleed" ? o.bleed * 2 : 0.25 + 0.5 * Math.min(1, Math.max(0, (o.M - 2) / 1.2))),
     speed: (path) => (path === "core" ? 0.12 : 0.14),

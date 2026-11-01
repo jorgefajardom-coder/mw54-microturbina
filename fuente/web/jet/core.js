@@ -8,6 +8,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createFloor } from "../floor.js";
 import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js";
 import { createFlame } from "../flame.js";
+import { createFlight } from "../flight.js";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -53,7 +54,8 @@ export async function start(profile, cfg) {
   controls.minDistance = 4;
   controls.maxDistance = cfg.view.max * profile.fit(camera.aspect);
   const sun = new THREE.DirectionalLight(0xffffff, 2.4);
-  sun.position.set(40, 60, 25);
+  const SUN_OFFSET = new THREE.Vector3(40, 60, 25), ORIGIN = new THREE.Vector3();
+  sun.position.copy(SUN_OFFSET);
   sun.castShadow = true;
   sun.shadow.mapSize.set(profile.shadowSize, profile.shadowSize);
   const S = cfg.shadow;
@@ -63,7 +65,8 @@ export async function start(profile, cfg) {
   scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.4));
   studioLights(scene, cfg.view.max / 4);
   const composer = await createComposer(renderer, scene, camera, profile, { aoRadius: cfg.view.max / 140 });
-  scene.add(createFloor(renderer, { ...cfg.floor, res: profile.textureSize }));
+  const floor = createFloor(renderer, { ...cfg.floor, res: profile.textureSize });
+  scene.add(floor);
 
   // ── modelo ──
   const gltf = await modelLoad;
@@ -208,7 +211,136 @@ export async function start(profile, cfg) {
 
   // ── llama: volumen con el gradiente de las fotos reales de este motor y diamantes de choque (flame.js) ──
   const flame = createFlame(scene, cfg.flame, { steps: profile.tier === "baja" ? 20 : profile.tier === "media" ? 28 : 40 });
-  for (const p of cfg.plumes) flame.add(scene, fromBlender(p.at).multiplyScalar(MM), p);
+  for (const p of cfg.plumes) flame.add(model, fromBlender(p.at).multiplyScalar(MM), p);   // viajan con el avión al volar
+
+
+  // ── tren retráctil: cada pata gira sobre su anclaje y se guarda (la de morro hacia delante, las principales hacia el
+  //    eje); ya dentro se oculta para que ninguna rueda asome por la piel ──
+  const gearState = { t: 0, target: 0 };
+  const fullBox = new THREE.Box3().setFromObject(model);
+  const gearParts = parts.filter((e) => e.data.part.startsWith("tren")).map((e) => {
+    const b = new THREE.Box3().setFromObject(e.obj);
+    const c = b.getCenter(new THREE.Vector3());
+    const pivot = e.obj.parent.worldToLocal(new THREE.Vector3(c.x, b.max.y, c.z));
+    const nose = e.data.part === "tren.morro";
+    const axis = nose ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+    const angle = nose ? Math.PI / 2 : (c.z < 0 ? -1 : 1) * Math.PI / 2;
+    return { e, pivot, axis, angle, foot: new THREE.Vector3(c.x, b.min.y, c.z) };
+  });
+  const qGear = new THREE.Quaternion();
+  function poseGear(dt) {
+    gearState.t += (gearState.target - gearState.t) * Math.min(1, dt * 0.9);
+    if (Math.abs(gearState.target - gearState.t) < 0.002) gearState.t = gearState.target;
+    const k = gearState.t * gearState.t * (3 - 2 * gearState.t);
+    for (const g of gearParts) {
+      g.e.obj.visible = k < 0.97;
+      if (k <= 0) continue;
+      qGear.setFromAxisAngle(g.axis, g.angle * k);
+      g.e.obj.position.sub(g.pivot).applyQuaternion(qGear).add(g.pivot);
+      g.e.obj.quaternion.premultiply(qGear);
+    }
+  }
+
+  // ── cabina: la cámara se sienta en el puesto delantero, bajo la cúpula, mirando el tablero ──
+  // cada config da los ojos del piloto (mm del modelo) o sólo su estación x; si no, se toman de la cúpula
+  const canopy = parts.find((e) => e.data.part === "cabina");
+  let eye = null;
+  const ck = cfg.cockpit;
+  if (ck?.eye) {
+    eye = { pos: fromBlender([ck.eye[0], 0, ck.eye[1]]).multiplyScalar(MM), target: fromBlender([ck.look[0], 0, ck.look[1]]).multiplyScalar(MM) };
+  } else if (ck?.x) {
+    const hit = new THREE.Raycaster(new THREE.Vector3(ck.x * MM, 100, 0), new THREE.Vector3(0, -1, 0)).intersectObject(model, true)[0];
+    const top = hit ? hit.point.y : 0;
+    // `side`, `lookSide`: desplazamiento lateral (mm, a la izquierda positivo) de los ojos y del punto al que miran
+    eye = { pos: new THREE.Vector3(ck.x * MM, top - ck.drop * MM, -(ck.side ?? 0) * MM), target: new THREE.Vector3((ck.x + ck.look) * MM, top - ck.drop * MM - 0.25, -(ck.lookSide ?? ck.side ?? 0) * MM) };
+  } else if (canopy) {
+    const b = new THREE.Box3().setFromObject(canopy.obj);
+    const len = b.max.x - b.min.x;
+    const hgt = b.max.y - b.min.y;
+    const x = b.max.x - Math.min(0.24 * len, 1.3);
+    // los ojos del piloto, bajo la cúpula: a media altura entre el borde y el techo del vidrio
+    eye = { pos: new THREE.Vector3(x, b.min.y + 0.45 * hgt, 0), target: new THREE.Vector3(x + 1.6, b.min.y + 0.2 * hgt, 0) };
+  }
+  let inCockpit = false;
+
+  // ── vuelo: el mismo simulador del Hawk con la masa, el ala y el empuje de este avión ──
+  const L = fullBox.max.x - fullBox.min.x;
+  const span = fullBox.max.z - fullBox.min.z;
+  const footY = gearParts.length ? Math.min(...gearParts.map((g) => g.foot.y)) : fullBox.min.y;
+  const fly = cfg.fly;
+  const m = fly.m;
+  const wheels = gearParts.map((g) => ({ p: new THREE.Vector3(g.foot.x, footY, g.foot.z), steer: g.e.data.part === "tren.morro" }));
+  const bellyY = footY + 0.6 * (fullBox.min.y < footY + 0.1 ? 1 : 1) * Math.max(0.6, (fly.belly ?? 1.2));
+  const belly = [[0.35 * fullBox.max.x, bellyY, 0], [0.35 * fullBox.min.x, bellyY, 0], [0, bellyY, 0.3 * span], [0, bellyY, -0.3 * span]].map((q) => ({ p: new THREE.Vector3(...q) }));
+  const flight = createFlight({
+    scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), gearState, pad: profile.pad,
+    setSurfaces: (v) => Object.assign(surf, { roll: v.roll, pitch: v.pitch, yaw: v.yaw }),
+    spec: {
+      ac: { m, S: fly.S, b: fly.b, c: fly.c, I: new THREE.Vector3(0.0217, 0.0657, 0.048).multiplyScalar(m * fly.b * fly.b) },
+      wheels, belly,
+      world: { runway: [46, 3600], at: 1700, trees: 10, ground: 60000, fog: [2500, 30000], start: -footY + 0.05 },
+      chase: [2.2 * L, 0.45 * L, 1.0 * L],
+      eye: eye ? [eye.pos.x, eye.pos.y, 1.2] : [0.3 * L, 1, 1.2],
+      near: [0.3, 0.05],
+      // empuje de todos los motores según el Mach que lleva; el Mach del motor sigue al del vuelo (tomas, conos, toberas)
+      thrust: (thr, V) => { motor.target = thr; motor.Mtarget = Math.min(cfg.maxMach, V / 340); return motor.on ? fly.engines * op(motor.M, motor.thr).thrust * 1000 * motor.spin : 0; },
+      engineHud: (info, st) => `${cfg.say.engines}: ${motor.on ? `<b>${fmt(info.thrust / 1000)}</b> kN · Mach <b>${fmt(info.V / 340, 2)}</b>` : `apagados (${profile.pad?.touch ? "Motor" : "E"} para arrancar)`} · gas ${(st.throttle * 100).toFixed(0)} %`,
+    },
+  });
+  let flying = false;
+
+
+  // ── cámara de combustión: un segundo punto de vista, el motor cortado por su plano medio y el gas que lo recorre ──
+  const FUEL = {
+    J58: ["JP-7", "C₁₂H₂₆ + 18,5 O₂ → 12 CO₂ + 13 H₂O"],
+    TBCC: ["JP-7 endotérmico", "C₁₂H₂₆ + 18,5 O₂ → 12 CO₂ + 13 H₂O"],
+  }[cfg.engine] ?? ["JP-8", "C₁₁H₂₁ + 16,25 O₂ → 11 CO₂ + 10,5 H₂O"];
+  if (!$("hud")) document.body.insertAdjacentHTML("beforeend", '<div class="ui" id="hud"></div>');
+  if (!$("pip")) document.body.insertAdjacentHTML("beforeend", '<div class="ui" id="pip"><div class="head"><span>Cámara de combustión</span><span id="pipT"></span></div><div class="frame" id="pipFrame"></div><div class="chem" id="chem"></div></div>');
+  const pipCam = new THREE.PerspectiveCamera(38, 340 / 220, 0.05, 200);
+  const pipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), cfg.cut.z);
+  let pipOn = false;
+  const engBox = engineRoot ? new THREE.Box3().setFromObject(engineRoot.obj) : fullBox;
+  const pipLen = engBox.max.x - engBox.min.x;
+  // la cámara de combustión queda hacia el 40 % del motor contando desde la cara del compresor
+  const pipAim = new THREE.Vector3(engBox.max.x - 0.42 * pipLen, (engBox.min.y + engBox.max.y) / 2, cfg.cut.z);
+  function renderPip() {
+    const r = $("pipFrame").getBoundingClientRect();
+    if (!r.width) return;
+    if (Math.abs(pipCam.aspect - r.width / r.height) > 1e-3) { pipCam.aspect = r.width / r.height; pipCam.updateProjectionMatrix(); }
+    // de lado, a la altura del eje, con la cámara de combustión en el centro
+    const tgt = pipAim.clone().applyMatrix4(model.matrixWorld);
+    const pos = pipAim.clone().add(new THREE.Vector3(0, 0.15 * pipLen, 0.62 * pipLen)).applyMatrix4(model.matrixWorld);
+    pipCam.position.copy(pos);
+    pipCam.lookAt(tgt);
+    pipPlane.normal.set(0, 0, -1).transformDirection(model.matrixWorld);
+    pipPlane.constant = -pipPlane.normal.dot(new THREE.Vector3(0, 0, cfg.cut.z).applyMatrix4(model.matrixWorld));
+    const [, H] = profile.size();
+    const y = H - r.bottom;
+    const flowWas = flow.visible;
+    flow.visible = true;
+    // las piezas cortadas se ven por dentro: un instante con las dos caras
+    const sides = [...allMaterials].map((m) => [m, m.side]);
+    for (const m of allMaterials) m.side = THREE.DoubleSide;
+    renderer.clippingPlanes = [pipPlane];
+    renderer.setScissorTest(true);
+    renderer.setScissor(r.left, y, r.width, r.height);
+    renderer.setViewport(r.left, y, r.width, r.height);
+    const bg = scene.background;
+    scene.background = new THREE.Color(0x050608);
+    renderer.render(scene, pipCam);
+    scene.background = bg;
+    renderer.clippingPlanes = [];
+    for (const [m, side] of sides) m.side = side;
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, ...profile.size());
+    flow.visible = flowWas;
+    const burn = Number.isFinite(o.burner) ? o.burner - K : null;
+    $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
+    $("chem").innerHTML = `<b>${FUEL[1]}</b><br>Combustible ${FUEL[0]} · aire de la toma a <b>${fmt(o.T0 - K)}</b> °C` +
+      (Number.isFinite(o.T3) ? ` · salida del compresor <b>${fmt(o.T3 - K)}</b> °C` : "") +
+      (burn !== null ? `<br>Llama en la cámara ≈ <b>${fmt(motor.on ? burn * motor.heat + (o.T0 - K) * (1 - motor.heat) : o.T0 - K)}</b> °C` : "");
+  }
 
   // ── corte por el plano medio del motor, con el aire que lo recorre coloreado por su temperatura ──
   const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), cfg.cut.z);
@@ -228,7 +360,7 @@ export async function start(profile, cfg) {
   const curves = Object.fromEntries(names.map((n) => [n, new THREE.CatmullRomCurve3(cfg.flow.paths[n].map(([x, z]) => new THREE.Vector3(x, 0, z)), false, "centripetal", 0.2)]));
   const tmpV = new THREE.Vector3();
   function stepFlow(dt) {
-    if (!flow.visible || !engineRoot) return;
+    if ((!flow.visible && !pipOn) || !engineRoot) return;
     const M = engineRoot.obj.matrixWorld;
     const running = motor.on && motor.spin > 0.3;
     for (let i = 0; i < FLOW; i++) {
@@ -349,7 +481,7 @@ export async function start(profile, cfg) {
   const listeners = new Set();
   let heatTick = 0;
   let demo = false;
-  const state = () => ({ exploded, running: motor.on, heat: heatOn, cut: cutOn, surfaces: demo, mission: !!motor.mission, mach: motor.Mtarget, throttle: motor.target });
+  const state = () => ({ exploded, running: motor.on, heat: heatOn, cut: cutOn, surfaces: demo, mission: !!motor.mission, mach: motor.Mtarget, throttle: motor.target, gear: !!gearState.target, cockpit: inCockpit, flying, pip: pipOn });
   const notify = () => { const st = state(); for (const fn of listeners) fn(st); };
   const actions = {
     assemble() { assemble(); notify(); },
@@ -361,8 +493,29 @@ export async function start(profile, cfg) {
     heat() { heatOn = !heatOn; $("legend").style.display = heatOn ? "block" : "none"; paintHeat(); notify(); },
     cut() { setCut(!cutOn); if (cutOn) settle(); flyCamera(cutOn ? "cut" : "home"); if (heatOn) paintHeat(); notify(); },
     surfaces() { demo = !demo; if (!demo) Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); notify(); },
+    gear() { if (!gearState.target) settle(); gearState.target = gearState.target ? 0 : 1; notify(); },
+    cockpit() {
+      if (!eye) return;
+      inCockpit = !inCockpit;
+      controls.minDistance = inCockpit ? 0.05 : 4;
+      if (inCockpit) { settle(); setCut(false); }
+      // desde dentro se ve la cara interior de la piel (en la vista de fuera sólo se dibuja la exterior)
+      for (const mt of allMaterials) if (!cfg.doubleSided?.test(mt.name) && !mt.transparent && !(mt.transmission > 0)) mt.side = inCockpit ? THREE.DoubleSide : THREE.FrontSide;
+      demo = inCockpit;
+      if (!demo) Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 });
+      flyCamera(inCockpit ? eye : "home");
+      notify();
+    },
+    fly() {
+      flying = !flying;
+      document.body.toggleAttribute("data-flying", flying);
+      if (flying) { timeline = null; setExploded(0); setCut(false); demo = false; motor.mission = null; controls.enabled = false; floor.visible = false; gearState.target = 0; gearState.t = 0; flight.enter(); }
+      else { flight.exit(); controls.enabled = true; floor.visible = true; Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); gearState.target = 0; gearState.t = 0; motor.Mtarget = 0; flyCamera(inCockpit ? eye : "home"); }
+      notify();
+    },
+    pip() { pipOn = !pipOn; $("pip").style.display = pipOn ? "block" : "none"; notify(); },
   };
-  window.__sim = { motor, camera, controls, model, op: () => o };
+  window.__sim = { motor, camera, controls, model, op: () => o, pipCam, gearState };
 
   function missionMach(t) {
     const legs = cfg.mission;
@@ -400,7 +553,8 @@ export async function start(profile, cfg) {
       if (m === null) { motor.mission = null; notify(); }
       else motor.Mtarget = m;
     }
-    if (demo) Object.assign(surf, { roll: Math.sin(now * 1.1), pitch: Math.sin(now * 0.8) * 0.8, yaw: Math.sin(now * 0.6) });
+    if (flying) flight.update(dt);
+    if (demo && !flying) Object.assign(surf, { roll: Math.sin(now * 1.1), pitch: Math.sin(now * 0.8) * 0.8, yaw: Math.sin(now * 0.6) });
     const Mwant = motor.on ? motor.Mtarget : 0;
     motor.M += (Mwant - motor.M) * (1 - Math.exp(-dt / 1.8));
     motor.thr += ((motor.on ? motor.target : 0) - motor.thr) * (1 - Math.exp(-dt / 1.2));
@@ -411,6 +565,7 @@ export async function start(profile, cfg) {
     poseControls();
     applyPose(now);
     slideControls();
+    poseGear(dt);
     motor.angle += dt * motor.spin * (8 + 30 * motor.thr) * (o.turbine ?? 1);
     for (const e of spinners) e.obj.rotation.x = motor.angle * (e.data.spin ?? 1);
     const assembled = parts.every((e) => e.t < 0.02);
@@ -425,11 +580,14 @@ export async function start(profile, cfg) {
     $("mode").style.display = motor.on && !timeline ? "block" : "none";
     $("readout").innerHTML = motor.on || motor.M > 0.05 ? cfg.readout(o, motor, md, K) : `En tierra · ${parts.length} piezas · ${cfg.say.engines}`;
     profile.onFrame?.(motor);
-    stepCamera(now);
-    controls.update();
+    if (!flying) { stepCamera(now); controls.update(); }
+    sun.target.position.copy(flying ? model.position : ORIGIN);
+    sun.position.copy(sun.target.position).add(SUN_OFFSET);
+    sun.target.updateMatrixWorld();
     // el cambio de resolución va antes de dibujar: si va después, ese cuadro se ve negro
     adapt(dt);
     composer.render();
+    if (pipOn) renderPip();
     requestAnimationFrame(frame);
   }
   function resize() {
@@ -438,7 +596,7 @@ export async function start(profile, cfg) {
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
     composer.setSize(w, h);
-    if (!camTween && !cutOn) flyCamera("home");
+    if (!camTween && !cutOn && !inCockpit && !flying) flyCamera("home");
     composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
   }
   setExploded(0);

@@ -10,6 +10,10 @@ export default {
   parts: "./parts.json",
   sim,
   engine: "F110",
+  // vuelo: masa al despegar (kg), superficie alar (m²), envergadura y cuerda media (m), motores
+  fly: { m: 27000, S: 52.5, b: 19.55, c: 3.0, engines: 2 },
+  // ojos del piloto (mm del modelo)
+  cockpit: { x: 5450, drop: 300, look: 1500 },
   engineAlt: "F110.L",
   coreZone: "hpc",
   maxMach: 2.3,
