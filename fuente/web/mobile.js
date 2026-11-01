@@ -38,7 +38,7 @@ export default async function mobile(profile) {
     <div id="pad" aria-hidden="true">
       <div class="stick" id="stickL"><span>Gas · timón</span><div class="knob"></div></div>
       <div class="stick" id="stickR"><span>Cabeceo · alabeo</span><div class="knob"></div></div>
-      <div class="padkeys"><button data-key="e">Motor</button><button data-key="g">Tren</button><button data-key="f">Flaps</button><button data-key="b">Freno</button><button data-key="c">Vista</button><button data-key="r">Reinicio</button><button data-action="salir">Salir</button></div>
+      <div class="padkeys"><button data-key="e">Motor</button><button data-key="g">Tren</button><button data-key="f">Flaps</button><button data-key="b">Freno</button><button data-key="c">Vista</button><button data-action="inclinar">Inclinar</button><button data-key="r">Reinicio</button><button data-action="salir">Salir</button></div>
     </div>`,
   );
   profile.pad = createPad({ touch: true, haptic });

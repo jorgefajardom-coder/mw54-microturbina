@@ -51,6 +51,7 @@ body[data-flying] #pad { display: block; }
 .padkeys { position: absolute; right: calc(12px + env(safe-area-inset-right)); top: calc(64px + env(safe-area-inset-top)); display: grid; grid-template-columns: repeat(2, 64px); gap: 8px; pointer-events: auto; }
 .padkeys button { width: 64px; height: 44px; padding: 0; font-size: 10px; background: #000a; }
 .padkeys button[data-key="salir"] { box-shadow: inset 0 0 0 1px var(--accent); }
+.padkeys button[data-on] { background: #2a1a0f; box-shadow: inset 0 0 0 1px var(--accent); }
 
 /* horizontal: la barra pasa a una columna a la derecha y la tarjeta a un panel lateral */
 body[data-orient="landscape"] #bar { left: auto; top: 0; bottom: 0; width: calc(84px + env(safe-area-inset-right)); grid-template-columns: 1fr; grid-auto-rows: 1fr; padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) 8px; box-shadow: -1px 0 0 var(--line); }

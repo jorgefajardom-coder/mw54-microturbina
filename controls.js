@@ -40,6 +40,37 @@ function stick(el, { spring }) {
   return { v, place, held: () => id !== null };
 }
 
+// Inclinación: el giroscopio del teléfono como palanca de cabeceo y alabeo. El centro es la postura en la que se tiene
+// el teléfono al activarla (o al girar la pantalla); ±25° es palanca a fondo, con 2° muertos y la misma curva suave
+// cerca del centro que usan las emisoras. En iPhone Safari pide permiso, y sólo desde un toque.
+function tiltSensor() {
+  const t = { on: false, base: null, roll: 0, pitch: 0 };
+  const expo = (v) => 0.35 * v + 0.65 * v * v * v;
+  const dead = (v) => Math.max(-1, Math.min(1, (Math.sign(v) * Math.max(0, Math.abs(v) - 2)) / 23));
+  function onTilt(e) {
+    if (e.beta == null || e.gamma == null) return;
+    const ang = ((screen.orientation?.angle ?? window.orientation ?? 0) + 360) % 360;
+    // ejes del teléfono → ejes de la pantalla según cómo está girada
+    const r = ang === 90 ? e.beta : ang === 270 ? -e.beta : e.gamma;
+    const p = ang === 90 ? -e.gamma : ang === 270 ? e.gamma : e.beta;
+    if (!t.base || t.base.ang !== ang) t.base = { r, p, ang };
+    t.roll = expo(dead(r - t.base.r));
+    t.pitch = expo(dead(p - t.base.p));
+  }
+  t.set = async (on) => {
+    if (on && typeof DeviceOrientationEvent?.requestPermission === "function") {
+      try { if ((await DeviceOrientationEvent.requestPermission()) !== "granted") return t.on; } catch { return t.on; }
+    }
+    t.on = on;
+    t.base = null;
+    t.roll = t.pitch = 0;
+    if (on) addEventListener("deviceorientation", onTilt);
+    else removeEventListener("deviceorientation", onTilt);
+    return t.on;
+  };
+  return t;
+}
+
 export function createPad({ touch = false, haptic = () => {} } = {}) {
   const L = touch ? stick(document.getElementById("stickL"), { spring: { x: true, y: false } }) : null;
   const R = touch ? stick(document.getElementById("stickR"), { spring: { x: true, y: true } }) : null;
@@ -48,6 +79,10 @@ export function createPad({ touch = false, haptic = () => {} } = {}) {
     b.addEventListener("pointerdown", (ev) => { ev.preventDefault(); haptic(); key(k, true); });
     for (const t of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(t, () => key(k, false));
   }
+  const tilt = tiltSensor();
+  const tiltBtn = document.querySelector('#pad [data-action="inclinar"]');
+  if (tiltBtn && !("DeviceOrientationEvent" in window)) tiltBtn.remove();
+  else tiltBtn?.addEventListener("click", async () => { haptic(); tiltBtn.toggleAttribute("data-on", await tilt.set(!tilt.on)); });
   // mando de juego: A tren, B flaps, X motor, Y vista, gatillo derecho freno, Start reinicio
   const MAP = { 0: "g", 1: "f", 2: "e", 3: "c", 7: "b", 9: "r" };
   const was = {};
@@ -69,6 +104,8 @@ export function createPad({ touch = false, haptic = () => {} } = {}) {
     touch,
     reset(throttle = 0) {
       if (!touch) return;
+      tilt.set(false);
+      tiltBtn?.removeAttribute("data-on");
       L.v.x = 0;
       L.v.y = 1 - 2 * throttle;
       R.v.x = R.v.y = 0;
@@ -78,7 +115,9 @@ export function createPad({ touch = false, haptic = () => {} } = {}) {
     // valores en [-1, 1]; throttle absoluto en [0, 1] si viene de la palanca táctil
     read() {
       const g = gamepad();
-      const t = touch ? { pitch: R.v.y, roll: R.v.x, yaw: -L.v.x, throttle: (1 - L.v.y) / 2 } : null;
+      // la palanca derecha manda sobre la inclinación mientras se toca
+      const useTilt = tilt.on && !R?.held();
+      const t = touch ? { pitch: useTilt ? tilt.pitch : R.v.y, roll: useTilt ? tilt.roll : R.v.x, yaw: -L.v.x, throttle: (1 - L.v.y) / 2 } : null;
       if (!g && !t) return null;
       return {
         pitch: Math.max(-1, Math.min(1, (t?.pitch ?? 0) + (g?.pitch ?? 0))),
