@@ -54,10 +54,68 @@ body[data-flying] #pad { display: block; }
 .stick span { position: absolute; left: 0; right: 0; top: -20px; text-align: center; font: 600 10px ui-monospace, Menlo, monospace; letter-spacing: .1em; color: #cfd6dd; text-transform: uppercase; }
 #stickL { left: calc(16px + env(safe-area-inset-left)); }
 #stickR { right: calc(16px + env(safe-area-inset-right)); }
-.padkeys { position: absolute; right: calc(12px + env(safe-area-inset-right)); top: calc(64px + env(safe-area-inset-top)); display: grid; grid-template-columns: repeat(2, 64px); gap: 8px; pointer-events: auto; }
-.padkeys button { width: 64px; height: 44px; padding: 0; font-size: 10px; background: #000a; }
-.padkeys button[data-key="salir"] { box-shadow: inset 0 0 0 1px var(--accent); }
-.padkeys button[data-on] { background: #2a1a0f; box-shadow: inset 0 0 0 1px var(--accent); }
+/* ── consolas de cabina junto a cada palanca: componentes con la forma de los de un reactor ── */
+.console { position: absolute; top: calc(64px + env(safe-area-inset-top)); display: grid; grid-template-columns: repeat(2, 66px); gap: 6px; padding: 7px; border-radius: 12px; pointer-events: auto;
+  background: linear-gradient(160deg, #3a3f46, #23272c 60%, #1b1e22); box-shadow: inset 0 1px 0 #ffffff22, inset 0 0 0 1px #00000080, 0 6px 18px #0009; }
+.console::before, .console::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #9aa1a8, #3d4248); top: 4px; }
+.console::before { left: 4px; }
+.console::after { right: 4px; }
+#consoleL { left: calc(12px + env(safe-area-inset-left)); }
+#consoleR { right: calc(12px + env(safe-area-inset-right)); }
+.cmp { width: 66px; height: 74px; padding: 0; border-radius: 8px; background: #15171a; box-shadow: inset 0 0 0 1px #000, inset 0 1px 0 #ffffff14; display: flex; flex-direction: column; align-items: center; justify-content: space-between; line-height: 1; }
+.cmp .plate { position: relative; flex: 1; width: 100%; display: block; }
+.cmp b { display: block; width: 100%; padding: 3px 0 4px; font: 700 8.5px ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; color: #e9ecef; background: #0006; border-radius: 0 0 8px 8px; }
+.cmp i, .cmp em { display: block; font-style: normal; position: absolute; }
+/* interruptor de palanca (bat) y su tapa de seguridad roja */
+.sw .bat { left: 50%; top: 50%; width: 8px; height: 26px; margin: -20px 0 0 -4px; border-radius: 4px; background: linear-gradient(90deg, #8d939a, #e7eaee 45%, #7a8087); transform-origin: 50% 100%; transform: rotate(28deg); transition: transform .15s; box-shadow: 0 2px 4px #000a; }
+.sw .bat::after { content: ""; position: absolute; left: -5px; bottom: -6px; width: 18px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #6c7278, #1d2024); }
+.guarded .cover { left: 12px; right: 12px; top: 6px; height: 34px; border-radius: 4px 4px 2px 2px; background: linear-gradient(#e2372bcc, #9f1f17cc); box-shadow: inset 0 0 0 1px #ff8a7a66; transform-origin: 50% 0; transition: transform .2s; }
+#pad[data-motor] .guarded .cover { transform: perspective(80px) rotateX(70deg); }
+#pad[data-motor] .guarded .bat { transform: rotate(-28deg); }
+.sw .led { right: 8px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: #3a2b1c; box-shadow: inset 0 0 0 1px #000; }
+.sw[data-on] .bat { transform: rotate(-28deg); }
+.sw[data-on] .led { background: #ffb340; box-shadow: 0 0 8px 2px #ff9b2a99; }
+/* palanca del tren: pomo en forma de rueda que sube y baja, con las tres luces de tren blocado */
+.gear .slot, .flaps .slot { left: 14px; top: 6px; bottom: 6px; width: 10px; border-radius: 5px; background: #050607; box-shadow: inset 0 0 0 1px #2c3036; }
+.gear .wheel { left: -9px; width: 28px; height: 28px; border-radius: 50%; bottom: 0; transition: bottom .4s;
+  background: radial-gradient(circle, #d9dde2 0 26%, #3d4247 28% 34%, #111 36% 58%, #2a2d31 60%); box-shadow: 0 2px 5px #000c; }
+#pad[data-gear="up"] .gear .wheel { bottom: calc(100% - 28px); }
+#pad[data-gear="transit"] .gear .wheel { bottom: calc(50% - 14px); }
+.gear .lights { right: 7px; top: 8px; width: 12px; display: grid; gap: 5px; position: absolute; }
+.gear .lights em { position: static; width: 12px; height: 12px; border-radius: 50%; background: #10200f; box-shadow: inset 0 0 0 1px #000; }
+#pad[data-gear="down"] .gear .lights em { background: #46e05a; box-shadow: 0 0 7px #46e05a99; }
+#pad[data-gear="transit"] .gear .lights em { background: #ff3b2f; box-shadow: 0 0 7px #ff3b2f99; }
+/* palanca de flaps: empuñadura con forma de perfil y sus tres retenes */
+.flaps .grip { left: -10px; width: 30px; height: 12px; border-radius: 6px 6px 3px 3px; top: 0; transition: top .25s; background: linear-gradient(#f1f3f5, #9aa0a6); box-shadow: 0 2px 4px #000c; }
+#pad[data-flap="1"] .flaps .grip { top: calc(50% - 6px); }
+#pad[data-flap="2"] .flaps .grip { top: calc(100% - 12px); }
+.flaps .marks { right: 6px; top: 4px; bottom: 4px; width: 22px; }
+.flaps .marks em { right: 0; font: 700 8px ui-monospace, Menlo, monospace; color: #cfd6dd; }
+.flaps .marks em:nth-child(1) { top: 0; }
+.flaps .marks em:nth-child(2) { top: calc(50% - 4px); }
+.flaps .marks em:nth-child(3) { bottom: 0; }
+/* freno: tirador en T con franjas amarillas y negras; se tira mientras se mantiene */
+.tee .handle { left: 50%; top: 10px; width: 44px; height: 12px; margin-left: -22px; border-radius: 4px; transition: transform .1s;
+  background: repeating-linear-gradient(-45deg, #f5c518 0 5px, #151515 5px 10px); box-shadow: 0 2px 4px #000c, inset 0 0 0 1px #0008; }
+.tee .handle::after { content: ""; position: absolute; left: 50%; top: 12px; width: 8px; height: 18px; margin-left: -4px; background: linear-gradient(90deg, #6e747a, #c9cdd2, #6e747a); }
+#pad[data-brake] .tee .handle { transform: translateY(8px); }
+/* selector giratorio de vista EXT/CAB */
+.rotary .dial { left: 50%; top: 50%; width: 32px; height: 32px; margin: -18px 0 0 -16px; border-radius: 50%; transition: transform .2s; transform: rotate(-40deg);
+  background: radial-gradient(circle at 40% 35%, #5c6168, #1b1d20 70%); box-shadow: 0 2px 5px #000c, inset 0 0 0 2px #0008; }
+.rotary .ptr { left: 50%; top: 2px; width: 3px; height: 12px; margin-left: -1.5px; border-radius: 2px; background: #fff; }
+#pad[data-cam="cockpit"] .rotary .dial { transform: rotate(40deg); }
+.rotary .pos { inset: 0; }
+.rotary .pos em { top: 4px; font: 700 7.5px ui-monospace, Menlo, monospace; color: #cfd6dd; }
+.rotary .pos em:first-child { left: 5px; }
+.rotary .pos em:last-child { right: 5px; }
+#pad:not([data-cam="cockpit"]) .rotary .pos em:first-child, #pad[data-cam="cockpit"] .rotary .pos em:last-child { color: var(--accent); }
+/* pulsador con capuchón */
+.push .cap { left: 50%; top: 50%; width: 30px; height: 30px; margin: -17px 0 0 -15px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ff6a5c, #b3261b 70%); box-shadow: 0 3px 0 #5a120d, 0 4px 8px #000c; }
+.push:active .cap { transform: translateY(2px); box-shadow: 0 1px 0 #5a120d, 0 2px 4px #000c; }
+/* asa de eyección para salir */
+.eject .loop { left: 50%; top: 9px; width: 40px; height: 30px; margin-left: -20px; border-radius: 14px 14px 6px 6px; border: 6px solid transparent;
+  background: repeating-linear-gradient(-45deg, #f5c518 0 5px, #151515 5px 10px) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); }
+.cmp:active { filter: brightness(1.15); }
 
 /* horizontal: la barra pasa a una columna a la derecha y la tarjeta a un panel lateral */
 body[data-orient="landscape"] #bar { left: auto; top: 0; bottom: 0; width: calc(84px + env(safe-area-inset-right)); grid-auto-flow: row; grid-template-columns: 1fr; grid-auto-rows: 1fr; padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) 8px; box-shadow: -1px 0 0 var(--line); }
@@ -67,7 +125,10 @@ body[data-orient="landscape"] #card { left: auto; right: calc(92px + env(safe-ar
 body[data-orient="landscape"] nav.sections { bottom: calc(10px + env(safe-area-inset-bottom)); right: calc(100px + env(safe-area-inset-right)); display: flex; justify-content: center; }
 body[data-orient="landscape"] nav.sections a { padding: 6px 10px; }
 body[data-orient="landscape"] #steps { bottom: calc(56px + env(safe-area-inset-bottom)); }
-body[data-orient="landscape"] .padkeys { grid-template-columns: repeat(4, 64px); top: auto; right: 50%; transform: translateX(50%); bottom: calc(14px + env(safe-area-inset-bottom)); }
+/* en horizontal cada consola va pegada por dentro a su palanca, abajo, como en la cabina */
+body[data-orient="landscape"] .console { top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); }
+body[data-orient="landscape"] #consoleL { left: calc(min(26vw, 150px) + 34px + env(safe-area-inset-left)); }
+body[data-orient="landscape"] #consoleR { right: calc(min(26vw, 150px) + 34px + env(safe-area-inset-right)); }
 body[data-orient="landscape"] .stick { width: min(26vw, 150px); }
 
 #mode { top: calc(56px + env(safe-area-inset-top)); font-size: 11px; padding: 6px 10px; }
