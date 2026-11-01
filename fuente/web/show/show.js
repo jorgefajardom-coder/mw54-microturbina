@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Sky } from "three/addons/objects/Sky.js";
-import { loadModel, guardContext } from "../look.js";
+import { loadModel, guardContext } from "../look.js?v=20261031-flame2";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });

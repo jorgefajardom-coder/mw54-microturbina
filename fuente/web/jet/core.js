@@ -3,12 +3,12 @@
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { setupEnvironment } from "../environment.js";
+import { setupEnvironment } from "../environment.js?v=20261031-flame2";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createFloor } from "../floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js";
-import { createFlame } from "../flame.js";
-import { createFlight } from "../flight.js";
+import { createFloor } from "../floor.js?v=20261031-flame2";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-flame2";
+import { createFlame } from "../flame.js?v=20261031-flame2";
+import { createFlight } from "../flight.js?v=20261031-flame2";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -375,7 +375,7 @@ export async function start(profile, cfg) {
     geometry.setAttribute("burn", new THREE.Float32BufferAttribute(new Float32Array(positions.length / 3), 1));
     geometry.setIndex(indices);
     const material = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, clipping: true,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.NormalBlending, clipping: true,
       uniforms: { time: { value: 0 }, heat: { value: 0 }, share: { value: 0 }, onlyFlame: { value: 0 } },
       vertexShader: `#include <clipping_planes_pars_vertex>
         attribute float burn; varying vec2 vUv; varying float vBurn;
@@ -395,7 +395,7 @@ export async function start(profile, cfg) {
           vec3 color=mix(vec3(.16,.38,1.),vec3(1.,.36,.055),smoothstep(.15,.8,vBurn));
           color=mix(color,vec3(1.,.85,.45),smoothstep(.75,1.2,vBurn)*.6);
           float alpha=fade*share*tongues*(.13*(1.-onlyFlame)*(1.-hot)+.5*hot);
-          gl_FragColor=vec4(color*(.6+hot),alpha);
+          gl_FragColor=vec4(color,alpha);
         }`,
     });
     const roots = parts.filter((e) => e.data.group === "engine" && e.data.part === cfg.engine);

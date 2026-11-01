@@ -3,13 +3,13 @@
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js";
+import { setupEnvironment } from "./environment.js?v=20261031-flame2";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js";
-import { createFlight } from "./flight.js";
-import { createFloor } from "./floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js";
-import { createFlame } from "./flame.js";
+import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-flame2";
+import { createFlight } from "./flight.js?v=20261031-flame2";
+import { createFloor } from "./floor.js?v=20261031-flame2";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-flame2";
+import { createFlame } from "./flame.js?v=20261031-flame2";
 
 const $ = (id) => document.getElementById(id);
 
@@ -299,7 +299,7 @@ const flameVol = (() => {
   geo.setAttribute("fuv", new THREE.Float32BufferAttribute(uv, 3));
   geo.setIndex(idx);
   const mat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, clipping: true,
+    transparent: true, depthWrite: false, blending: THREE.NormalBlending, side: THREE.DoubleSide, clipping: true,
     uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uFlow: { value: 0 } },
     vertexShader: `#include <clipping_planes_pars_vertex>
       attribute vec3 fuv; varying vec3 vUv;
@@ -316,20 +316,16 @@ const flameVol = (() => {
         #include <clipping_planes_fragment>
         float u = vUv.x, th = vUv.y, layer = vUv.z;
         float speed = .6 + 2.4 * uFlow;
-        // seis antorchas que se abren y se mezclan corriente abajo
-        float torch = pow(.5 + .5 * cos((th * 6. - .5) * 6.2832), mix(6., 1.2, u));
-        float tongues = fbm(vec2(th * 18., u * 5. - uTime * speed)) ;
-        float flick = fbm(vec2(th * 40. + layer * 3., u * 9. - uTime * speed * 1.7));
-        // Un cuerpo continuo con un extremo ondulante: sin puntos ni manchas aisladas.
-        float tip = .66 + .24 * tongues + .06 * sin(th * 37.7 - uTime * speed);
-        float body = smoothstep(.0, .06, u) * (1. - smoothstep(tip - .16, tip, u));
-        float a = body * (.5 + .5 * torch) * (.65 + .35 * flick);
-        a *= mix(1., .55, abs(layer - .5) * 2.);
-        vec3 blue = vec3(.25, .45, 1.), yel = vec3(1., .78, .35), org = vec3(1., .4, .1);
-        vec3 col = mix(blue, yel, smoothstep(.08, .35, u)); col = mix(col, org, smoothstep(.45, .85, u));
-        col += vec3(1., .9, .7) * pow(max(tongues + flick - .9, 0.), 2.) * 2.;
+        // Lámina de llama unida: variación suave y longitudinal, sin focos puntuales.
+        float wave = sin(th * 18.8496 - uTime * speed * 2.);
+        float tip = .84 + .07 * wave;
+        float body = smoothstep(.0, .045, u) * (1. - smoothstep(tip - .18, tip, u));
+        float a = body * (.68 + .12 * sin(th * 37.699 - u * 4. + uTime * speed));
+        a *= mix(.7, 1., 1. - abs(layer - .5) * 2.);
+        vec3 col = mix(vec3(.12, .32, 1.), vec3(1., .65, .12), smoothstep(.08, .45, u));
+        col = mix(col, vec3(1., .2, .025), smoothstep(.5, .92, u));
         a *= uHeat * (.5 + .5 * uFlow);
-        gl_FragColor = vec4(col * a * .85, a);
+        gl_FragColor = vec4(col, a * .65);
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
