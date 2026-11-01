@@ -19,7 +19,6 @@ export default async function mobile(profile, cfg) {
   document.body.insertAdjacentHTML(
     "beforeend",
     `<div class="ui" id="sheet">
-      <button id="assemble">Montaje</button>
       <button id="heat">Mapa de calor</button>
       <button id="surfaces">Mandos</button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="${Math.round((cfg.throttle ?? 0.85) * 100)}" aria-label="Palanca de gases"></label>
@@ -51,13 +50,14 @@ export default async function mobile(profile, cfg) {
   }
   const closeSheet = () => { sheet.removeAttribute("data-open"); $("more").removeAttribute("data-on"); };
   const tap = (id, fn, keep) => ($(id).onclick = () => { haptic(); fn(); if (!keep) closeSheet(); });
-  for (const id of ["run", "explode", "cut", "mission", "assemble", "heat"]) tap(id, A[id]);
+  for (const id of ["run", "explode", "cut", "mission", "heat"]) tap(id, A[id]);
   tap("surfaces", A.surfaces, true);
   tap("more", () => { const open = !sheet.hasAttribute("data-open"); sheet.toggleAttribute("data-open", open); $("more").toggleAttribute("data-on", open); }, true);
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   $("mach").oninput = (e) => A.mach(e.target.value / 10);
   api.onChange((st) => {
     for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces })) $(id).toggleAttribute("data-on", on);
+    $("explode").lastChild.textContent = st.exploded ? "Montar" : "Despiece";
     $("run").lastChild.textContent = st.running ? "Apagar" : "Motor";
   });
 

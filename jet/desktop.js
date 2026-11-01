@@ -9,7 +9,6 @@ export default async function desktop(profile, cfg) {
   document.body.insertAdjacentHTML(
     "beforeend",
     `<div class="ui" id="controls">
-      <button id="assemble">Montaje</button>
       <button id="explode">Despiece</button>
       <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="${Math.round((cfg.throttle ?? 0.85) * 100)}" aria-label="Palanca de gases"></label>
@@ -27,11 +26,12 @@ export default async function desktop(profile, cfg) {
   };
   const api = await start(profile, cfg);
   const A = api.actions;
-  for (const id of ["assemble", "explode", "run", "mission", "heat", "cut", "surfaces"]) $(id).onclick = A[id];
+  for (const id of ["explode", "run", "mission", "heat", "cut", "surfaces"]) $(id).onclick = A[id];
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   $("mach").oninput = (e) => A.mach(e.target.value / 10);
   api.onChange((st) => {
     for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces })) $(id).toggleAttribute("data-on", on);
+    $("explode").textContent = st.exploded ? "Montar" : "Despiece";
     $("run").lastChild.textContent = st.running ? "Apagar" : "Arrancar";
   });
   const tip = $("tip");

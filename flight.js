@@ -366,7 +366,9 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
       camPos.lerp(want, Math.min(1, dt * 3));
       camera.position.copy(s.p).add(camPos);
       camera.up.set(0, 1, 0);
-      camera.lookAt(s.p.clone().addScaledVector(fwd, 2));
+      // se mira un poco por debajo del avión: así queda en la mitad de arriba de la pantalla, por encima de los mandos
+      // (palancas y consolas en el celular, barra de botones en el escritorio)
+      camera.lookAt(s.p.clone().addScaledVector(fwd, 2).add(new THREE.Vector3(0, isTouch() ? -0.8 : -0.5, 0)));
     } else {
       // ojos del piloto delantero: sobre el asiento, a la altura del cabezal, mirando por encima del HUD
       camera.position.copy(s.p).addScaledVector(fwd, 0.486).addScaledVector(up, 0.09);

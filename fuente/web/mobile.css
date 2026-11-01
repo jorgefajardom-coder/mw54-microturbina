@@ -55,14 +55,14 @@ body[data-flying] #pad { display: block; }
 #stickL { left: calc(16px + env(safe-area-inset-left)); }
 #stickR { right: calc(16px + env(safe-area-inset-right)); }
 /* ── consolas de cabina junto a cada palanca: componentes con la forma de los de un reactor ── */
-.console { position: absolute; top: calc(64px + env(safe-area-inset-top)); display: grid; grid-template-columns: repeat(2, 66px); gap: 6px; padding: 7px; border-radius: 12px; pointer-events: auto;
+.console { position: absolute; top: calc(64px + env(safe-area-inset-top)); display: grid; grid-template-columns: repeat(2, 58px); gap: 5px; padding: 6px; border-radius: 12px; pointer-events: auto;
   background: linear-gradient(160deg, #3a3f46, #23272c 60%, #1b1e22); box-shadow: inset 0 1px 0 #ffffff22, inset 0 0 0 1px #00000080, 0 6px 18px #0009; }
 .console::before, .console::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #9aa1a8, #3d4248); top: 4px; }
 .console::before { left: 4px; }
 .console::after { right: 4px; }
 #consoleL { left: calc(12px + env(safe-area-inset-left)); }
 #consoleR { right: calc(12px + env(safe-area-inset-right)); }
-.cmp { width: 66px; height: 74px; padding: 0; border-radius: 8px; background: #15171a; box-shadow: inset 0 0 0 1px #000, inset 0 1px 0 #ffffff14; display: flex; flex-direction: column; align-items: center; justify-content: space-between; line-height: 1; }
+.cmp { width: 58px; height: 64px; padding: 0; border-radius: 8px; background: #15171a; box-shadow: inset 0 0 0 1px #000, inset 0 1px 0 #ffffff14; display: flex; flex-direction: column; align-items: center; justify-content: space-between; line-height: 1; }
 .cmp .plate { position: relative; flex: 1; width: 100%; display: block; }
 .cmp b { display: block; width: 100%; padding: 3px 0 4px; font: 700 8.5px ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; color: #e9ecef; background: #0006; border-radius: 0 0 8px 8px; }
 .cmp i, .cmp em { display: block; font-style: normal; position: absolute; }

@@ -22,7 +22,6 @@ export default async function mobile(profile) {
   document.body.insertAdjacentHTML(
     "beforeend",
     `<div class="ui" id="sheet">
-      <button id="assemble">Montaje</button>
       <button id="heat">Mapa de calor</button>
       <button id="gear">Tren</button>
       <button id="surfaces">Mandos</button>
@@ -72,7 +71,6 @@ export default async function mobile(profile) {
   tap("explode", A.explode);
   tap("cockpit", A.cockpit);
   tap("fly", () => { A.fly(); setFlying(api.state().flying); });
-  tap("assemble", A.assemble);
   tap("heat", A.heat);
   // la cámara de combustión va en la barra, a un toque (no se esconde en «Más»)
   tap("cam", A.pip);
@@ -84,6 +82,7 @@ export default async function mobile(profile) {
   api.onChange((st) => {
     for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, heat: st.heat, cam: st.pip, gear: st.gear, surfaces: st.surfaces, cockpit: st.cockpit, fly: st.flying })) $(id).toggleAttribute("data-on", on);
     $("run").lastChild.textContent = st.running ? "Apagar" : "Motor";
+    $("explode").lastChild.textContent = st.exploded ? "Montar" : "Despiece";
   });
 
   // la tarjeta lleva su botón de cerrar (el núcleo reescribe su contenido en cada actualización)
