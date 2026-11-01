@@ -1,16 +1,16 @@
-import { createCombustion, reactionAt } from "./combustion.js?v=20261031-motion7";
+import { createCombustion, reactionAt } from "./combustion.js?v=20261031-cut8";
 // Núcleo del visor del Hawk con su MW54, común a escritorio y celular: escena, modelo, montaje, motor, combustible,
 // cámara de combustión, mapa de calor, cabina y simulador. No escucha ratón, teclado ni toques: cada interfaz
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js?v=20261031-motion7";
+import { setupEnvironment } from "./environment.js?v=20261031-cut8";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-motion7";
-import { createFlight } from "./flight.js?v=20261031-motion7";
-import { createFloor } from "./floor.js?v=20261031-motion7";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-motion7";
-import { createFlame } from "./flame.js?v=20261031-motion7";
+import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-cut8";
+import { createFlight } from "./flight.js?v=20261031-cut8";
+import { createFloor } from "./floor.js?v=20261031-cut8";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-cut8";
+import { createFlame } from "./flame.js?v=20261031-cut8";
 
 const $ = (id) => document.getElementById(id);
 
@@ -334,6 +334,7 @@ const flameVol = (() => {
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.noAO = true;
   mesh.layers.set(1);
   mesh.frustumCulled = false;
   mesh.visible = false;
@@ -496,6 +497,8 @@ model.traverse((o) => o.isMesh && hawkMats.add(o.material));
 const hawkSides = new Map([...hawkMats].map((m) => [m, m.side]));
 function setCut(on) {
   cutOn = on;
+  if (on) camera.layers.enable(1);
+  else camera.layers.disable(1);
   for (const m of hawkMats) if (!m.transparent) m.side = on ? THREE.DoubleSide : hawkSides.get(m);
 }
 // misión: un vuelo de exhibición de la maqueta, sólo con la palanca de gas (rodaje, despegue, subida, crucero,

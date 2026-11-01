@@ -1,15 +1,15 @@
-import { createCombustion, reactionAt } from "../combustion.js?v=20261031-motion7";
+import { createCombustion, reactionAt } from "../combustion.js?v=20261031-cut8";
 // Núcleo común de los visores de aviones a escala real (SR-72, F-22, SR-71), igual en escritorio y en celular.
 // Todo lo propio de cada avión llega en su config.js: modelo, piezas, física, mecanismos que mueve el Mach, chorros,
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { setupEnvironment } from "../environment.js?v=20261031-motion7";
+import { setupEnvironment } from "../environment.js?v=20261031-cut8";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createFloor } from "../floor.js?v=20261031-motion7";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-motion7";
-import { createFlame } from "../flame.js?v=20261031-motion7";
-import { createFlight } from "../flight.js?v=20261031-motion7";
+import { createFloor } from "../floor.js?v=20261031-cut8";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-cut8";
+import { createFlame } from "../flame.js?v=20261031-cut8";
+import { createFlight } from "../flight.js?v=20261031-cut8";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -338,7 +338,7 @@ export async function start(profile, cfg) {
     renderer.setScissorTest(false);
     renderer.setViewport(0, 0, ...profile.size());
     flow.visible = flowWas;
-    for (const stream of streams) stream.material.uniforms.onlyFlame.value = 0;
+    for (const stream of streams) stream.material.uniforms.onlyFlame.value = cutOn ? 1 : 0;
     const burn = Number.isFinite(o.burner) ? o.burner - K : null;
     $("pipT").textContent = combustion.state.flame > .01 ? "en combustión" : motor.heat > .02 ? "caliente · sin combustión" : "fría";
     $("chem").innerHTML = `<b>${FUEL[1]}</b><br>Combustible ${FUEL[0]} · aire de la toma a <b>${fmt(o.T0 - K)}</b> °C` +
@@ -403,6 +403,7 @@ export async function start(profile, cfg) {
     const roots = parts.filter((e) => e.data.group === "engine" && e.data.part === cfg.engine);
     for (const root of roots) {
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.userData.noAO = true;
       mesh.matrixAutoUpdate = false;
       mesh.frustumCulled = false;
       mesh.userData.root = root.obj;
@@ -454,6 +455,11 @@ export async function start(profile, cfg) {
       m.needsUpdate = true;
     }
     flow.visible = on;
+    for (const stream of streams) {
+      stream.material.clippingPlanes = on ? [cutPlane] : null;
+      stream.material.uniforms.onlyFlame.value = on ? 1 : 0;
+      stream.material.needsUpdate = true;
+    }
   }
 
   // ── tarjeta de pieza ──
