@@ -6,13 +6,14 @@ export function createCombustion() {
   return {
     state,
     update(dt, motor, cycle = {}) {
-      const fuel = motor.on && motor.spin > .15;
+      const ramActive = (cycle.ram ?? 0) > .05;
+      const fuel = motor.on && (motor.spin > .15 || ramActive);
       const throttle = motor.thr ?? motor.f ?? 0;
       const target = fuel ? .55 + .45 * clamp(throttle) : 0;
       const follow = (key, value, tau) => { state[key] += (value-state[key])*(1-Math.exp(-Math.max(0,dt)/tau)); };
       follow('flame', target, fuel ? .18 : .08);
       // El metal conserva calor al cortar combustible, pero la llama se extingue.
-      state.startup = fuel ? (1-ramp(.2,.72,motor.spin)) : 0;
+      state.startup = fuel && !ramActive ? (1-ramp(.2,.72,motor.spin)) : 0;
       follow('afterburner', fuel ? clamp(cycle.ab ?? 0) : 0, fuel ? .25 : .08);
       follow('ram', fuel ? clamp(cycle.ram ?? 0) : 0, .2);
       state.flow = fuel ? .4 + 1.6 * clamp(throttle) : 0;

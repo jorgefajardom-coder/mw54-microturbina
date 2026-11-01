@@ -1,15 +1,15 @@
-import { createCombustion, reactionAt } from "../combustion.js?v=20261031-color9";
+import { createCombustion, reactionAt } from "../combustion.js?v=20261031-transition10";
 // Núcleo común de los visores de aviones a escala real (SR-72, F-22, SR-71), igual en escritorio y en celular.
 // Todo lo propio de cada avión llega en su config.js: modelo, piezas, física, mecanismos que mueve el Mach, chorros,
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { setupEnvironment } from "../environment.js?v=20261031-color9";
+import { setupEnvironment } from "../environment.js?v=20261031-transition10";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createFloor } from "../floor.js?v=20261031-color9";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-color9";
-import { createFlame } from "../flame.js?v=20261031-color9";
-import { createFlight } from "../flight.js?v=20261031-color9";
+import { createFloor } from "../floor.js?v=20261031-transition10";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-transition10";
+import { createFlame } from "../flame.js?v=20261031-transition10";
+import { createFlight } from "../flight.js?v=20261031-transition10";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -402,7 +402,7 @@ export async function start(profile, cfg) {
           gl_FragColor=vec4(color*(1.+.45*hot),min(.95,alpha));
         }`,
     });
-    const roots = parts.filter((e) => e.data.group === "engine" && e.data.part === cfg.engine);
+    const roots = parts.filter((e) => e.data.group === "engine" && (e.data.part === cfg.engine || e.data.part === cfg.engineAlt));
     for (const root of roots) {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.userData.noAO = true;
@@ -415,7 +415,12 @@ export async function start(profile, cfg) {
   });
   function stepFlow(dt) {
     if ((!flow.visible && !pipOn) || !engineRoot) return;
-    for (const mesh of flow.children) mesh.matrix.copy(mesh.userData.root.matrixWorld);
+    for (const mesh of flow.children) {
+      // Actualizar también sus ancestros después de mover el avión y sus mecanismos.
+      mesh.userData.root.updateWorldMatrix(true, false);
+      mesh.matrix.copy(mesh.userData.root.matrixWorld);
+      mesh.matrixWorldNeedsUpdate = true;
+    }
     const running = motor.on && motor.spin > 0.3;
     for (const { path, geometry, material } of streams) {
       material.uniforms.time.value += dt * (.5 + motor.thr);

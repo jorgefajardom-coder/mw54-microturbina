@@ -31,3 +31,17 @@ test('postquemador y ramjet sólo producen llama en sus estados activos',()=>{
  assert.equal(reactionAt('TBCC','ram',.15,c.state),0);
  assert.equal(reactionAt('F119','bypass',.35,c.state),0);
 });
+
+test('el ramjet mantiene la combustión con la turbina detenida y se apaga al cortar combustible',()=>{
+ const c=createCombustion();
+ c.update(5,{on:true,spin:1,thr:.85},{turbine:1,ram:0});
+ for(let i=0;i<=100;i++){
+  const t=i/100;
+  c.update(.1,{on:true,spin:1-t,thr:.85},{turbine:1-t,ram:t});
+  assert.ok(c.state.flame>.8, 'la llama no debe apagarse durante el relevo');
+ }
+ assert.ok(reactionAt('TBCC','ram',.6,c.state,{turbine:0,ram:1})>.8);
+ assert.equal(c.state.startup,0,'el ramjet no debe simular un nuevo arranque de turbina');
+ c.update(1,{on:false,spin:0,thr:.85},{turbine:0,ram:1});
+ assert.ok(c.state.flame<.001);
+});
