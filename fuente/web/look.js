@@ -50,7 +50,7 @@ export async function createComposer(renderer, scene, camera, profile, options =
   if (profile.kind === "celular" || profile.tier === "baja") {
     return { render: () => renderer.render(scene, camera), setSize() {}, bloom: null };
   }
-  const { createDesktopComposer } = await import("./postprocessing.js?v=20261031-flame4");
+  const { createDesktopComposer } = await import("./postprocessing.js?v=20261031-motion5");
   return createDesktopComposer(renderer, scene, camera, profile, options);
 }
 
@@ -147,10 +147,15 @@ export function sequenceSteps(order, target, { speed = 1, label }) {
   const list = target ? order : order.slice().reverse();
   const maxL = Math.max(...list.map((e) => e.offset.length()), 1e-6);
   let at = 0;
-  return list.map((e) => {
+  const steps = list.map((e) => {
     const dur = (0.75 + 0.55 * (e.offset.length() / maxL)) / speed;
     const step = { e, at, dur, from: target ? 0 : 1, to: target, say: `${target ? "Desarmando" : "Montando"} · ${label(e)}` };
     at += dur * 0.8;   // casi una detrás de otra: se ve qué entra y por dónde
     return step;
   });
+  // Tiempo total estable aunque el avión tenga muchas piezas.
+  const total = Math.max(...steps.map((step) => step.at + step.dur), .001);
+  const factor = (target ? 1.8 : 3.2) / Math.max(.01, speed) / total;
+  for (const step of steps) { step.at *= factor; step.dur *= factor; }
+  return steps;
 }

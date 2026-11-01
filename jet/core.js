@@ -1,15 +1,15 @@
-import { createCombustion, reactionAt } from "../combustion.js?v=20261031-flame4";
+import { createCombustion, reactionAt } from "../combustion.js?v=20261031-motion5";
 // Núcleo común de los visores de aviones a escala real (SR-72, F-22, SR-71), igual en escritorio y en celular.
 // Todo lo propio de cada avión llega en su config.js: modelo, piezas, física, mecanismos que mueve el Mach, chorros,
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { setupEnvironment } from "../environment.js?v=20261031-flame4";
+import { setupEnvironment } from "../environment.js?v=20261031-motion5";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createFloor } from "../floor.js?v=20261031-flame4";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-flame4";
-import { createFlame } from "../flame.js?v=20261031-flame4";
-import { createFlight } from "../flight.js?v=20261031-flame4";
+import { createFloor } from "../floor.js?v=20261031-motion5";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-motion5";
+import { createFlame } from "../flame.js?v=20261031-motion5";
+import { createFlight } from "../flight.js?v=20261031-motion5";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -655,17 +655,9 @@ export async function start(profile, cfg) {
     composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
   }
   setExploded(1);
-  // Introducción breve: piezas escalonadas que terminan de montar en unos 2,5 s.
+  // Breve pausa inicial para ver el despiece antes del montaje.
   assemble();
-  if (timeline) {
-    const lastAt = Math.max(...timeline.steps.map((step) => step.at), .001);
-    for (const step of timeline.steps) {
-      step.at = step.at / lastAt * 1.3;
-      step.dur = .75;
-    }
-    timeline.start += .4;
-    timeline.total = 2.1;
-  }
+  if (timeline) timeline.start += .4;
   frame();
   return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, maxMach: cfg.maxMach };
 }

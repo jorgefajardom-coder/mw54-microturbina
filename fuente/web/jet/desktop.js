@@ -1,8 +1,8 @@
 // Interfaz de escritorio de los visores de aviones: barra completa (montaje, despiece, motor, gas, Mach, misión,
 // calor, corte, mandos), tarjeta que sigue al cursor y clic para acercarse a la pieza.
-import { start, fmt } from "./core.js?v=20261031-flame4";
-import { debugPanel } from "../device.js?v=20261031-flame4";
-import { createPad } from "../controls.js?v=20261031-flame4";
+import { start, fmt } from "./core.js?v=20261031-motion5";
+import { debugPanel } from "../device.js?v=20261031-motion5";
+import { createPad } from "../controls.js?v=20261031-motion5";
 
 const $ = (id) => document.getElementById(id);
 

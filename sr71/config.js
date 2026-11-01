@@ -1,6 +1,6 @@
 // El SR-71 Blackbird para el visor común: modelo, piezas, física y mecanismos (cono de entrada, elevones, derivas).
-import * as sim from "./sim.js?v=20261031-flame4";
-import { fmt } from "../jet/core.js?v=20261031-flame4";
+import * as sim from "./sim.js?v=20261031-motion5";
+import { fmt } from "../jet/core.js?v=20261031-motion5";
 
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
