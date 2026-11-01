@@ -628,7 +628,7 @@ function resize() {
   if (!camTween && !flying && !inCockpit) flyCamera("home");
   composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
 }
-setExploded(0);
+setExploded(1);
 frame();
 return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, renderer };
 }
