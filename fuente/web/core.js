@@ -1,16 +1,16 @@
-import { createCombustion, reactionAt } from "./combustion.js?v=20261031-cut8";
+import { createCombustion, reactionAt } from "./combustion.js?v=20261031-color9";
 // Núcleo del visor del Hawk con su MW54, común a escritorio y celular: escena, modelo, montaje, motor, combustible,
 // cámara de combustión, mapa de calor, cabina y simulador. No escucha ratón, teclado ni toques: cada interfaz
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js?v=20261031-cut8";
+import { setupEnvironment } from "./environment.js?v=20261031-color9";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-cut8";
-import { createFlight } from "./flight.js?v=20261031-cut8";
-import { createFloor } from "./floor.js?v=20261031-cut8";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-cut8";
-import { createFlame } from "./flame.js?v=20261031-cut8";
+import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-color9";
+import { createFlight } from "./flight.js?v=20261031-color9";
+import { createFloor } from "./floor.js?v=20261031-color9";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-color9";
+import { createFlame } from "./flame.js?v=20261031-color9";
 
 const $ = (id) => document.getElementById(id);
 
@@ -302,14 +302,14 @@ const flameVol = (() => {
   geo.setIndex(idx);
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.NormalBlending, side: THREE.DoubleSide, clipping: true,
-    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uFlow: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uFlow: { value: 0 }, uRich: { value: 0 } },
     vertexShader: `#include <clipping_planes_pars_vertex>
       attribute vec3 fuv; varying vec3 vUv;
       void main(){ vUv = fuv; vec4 mvPosition = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mvPosition;
         #include <clipping_planes_vertex>
       }`,
     fragmentShader: `#include <clipping_planes_pars_fragment>
-      uniform float uTime; uniform float uHeat; uniform float uFlow; varying vec3 vUv;
+      uniform float uTime; uniform float uHeat; uniform float uFlow; uniform float uRich; varying vec3 vUv;
       float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
         return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
@@ -325,11 +325,12 @@ const flameVol = (() => {
         float injector = .65 + .35 * pow(.5 + .5 * cos(th * 37.699 - 3.12), 2.);
         float a = body * injector * (.85 + .1 * sin(th * 37.699 - u * 9. + uTime * speed));
         a *= mix(.7, 1., 1. - abs(layer - .5) * 2.);
-        vec3 col = mix(vec3(.12, .38, 1.), vec3(1., .85, .18), smoothstep(.04, .26, u));
-        col = mix(col, vec3(1., .2, .025), smoothstep(.5, .92, u));
+        // Emisión azul en la raíz; luminosidad cálida en zonas localmente ricas.
+        float warm = uRich * smoothstep(.08, .38, u);
+        vec3 clean = mix(vec3(.12, .27, 1.), vec3(.62, .76, 1.), smoothstep(.05, .32, u));
+        vec3 luminous = mix(vec3(1., .72, .24), vec3(1., .28, .045), smoothstep(.32, .72, u));
+        vec3 col = mix(clean, luminous, warm);
         a *= sqrt(uHeat) * (.85 + .15 * uFlow);
-        // Núcleo amarillo vivo y borde naranja legibles incluso al arrancar.
-        col += vec3(.35, .2, .035) * (1. - smoothstep(.35, .8, u));
         gl_FragColor = vec4(col * 1.35, min(.94, a * 1.75));
       }`,
   });
@@ -347,6 +348,7 @@ function stepFlames(dt) {
   flameVol.mat.uniforms.uTime.value += dt;
   flameVol.mat.uniforms.uHeat.value = combustion.state.flame;
   flameVol.mat.uniforms.uFlow.value = motor.f;
+  flameVol.mat.uniforms.uRich.value = Math.min(.85, .18 + .55 * combustion.state.startup + .15 * motor.f);
 }
 
 // ── mapa de calor: cada pieza con el color de su temperatura (escala turbo) ──

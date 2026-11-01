@@ -1,15 +1,15 @@
-import { createCombustion, reactionAt } from "../combustion.js?v=20261031-cut8";
+import { createCombustion, reactionAt } from "../combustion.js?v=20261031-color9";
 // Núcleo común de los visores de aviones a escala real (SR-72, F-22, SR-71), igual en escritorio y en celular.
 // Todo lo propio de cada avión llega en su config.js: modelo, piezas, física, mecanismos que mueve el Mach, chorros,
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { setupEnvironment } from "../environment.js?v=20261031-cut8";
+import { setupEnvironment } from "../environment.js?v=20261031-color9";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createFloor } from "../floor.js?v=20261031-cut8";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-cut8";
-import { createFlame } from "../flame.js?v=20261031-cut8";
-import { createFlight } from "../flight.js?v=20261031-cut8";
+import { createFloor } from "../floor.js?v=20261031-color9";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-color9";
+import { createFlame } from "../flame.js?v=20261031-color9";
+import { createFlight } from "../flight.js?v=20261031-color9";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -378,7 +378,7 @@ export async function start(profile, cfg) {
     geometry.setIndex(indices);
     const material = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.NormalBlending, clipping: true,
-      uniforms: { time: { value: 0 }, heat: { value: 0 }, share: { value: 0 }, onlyFlame: { value: 0 } },
+      uniforms: { time: { value: 0 }, heat: { value: 0 }, share: { value: 0 }, onlyFlame: { value: 0 }, rich: { value: 0 }, abStart: { value: cfg.engine === "J58" ? .47 : cfg.engine === "TBCC" ? .6 : .55 } },
       vertexShader: `#include <clipping_planes_pars_vertex>
         attribute float burn; varying vec2 vUv; varying float vBurn;
         void main(){ vUv=uv; vBurn=burn;
@@ -387,15 +387,17 @@ export async function start(profile, cfg) {
           #include <clipping_planes_vertex>
         }`,
       fragmentShader: `#include <clipping_planes_pars_fragment>
-        uniform float time, heat, share, onlyFlame; varying vec2 vUv; varying float vBurn;
+        uniform float time, heat, share, onlyFlame, rich, abStart; varying vec2 vUv; varying float vBurn;
         void main(){
           #include <clipping_planes_fragment>
           float hot=smoothstep(.03,.35,vBurn)*sqrt(heat);
           float tongues=.76+.14*sin(vUv.y*37.7-vUv.x*22.+time*4.)
             +.1*sin(vUv.y*69.1+vUv.x*31.-time*6.);
           float fade=smoothstep(0.,.035,vUv.x)*(1.-smoothstep(.9,1.,vUv.x));
-          vec3 color=mix(vec3(.16,.38,1.),vec3(1.,.62,.04),smoothstep(.15,.8,vBurn));
-          color=mix(color,vec3(1.,.95,.4),smoothstep(.75,1.2,vBurn)*.6);
+          vec3 clean=mix(vec3(.13,.28,1.),vec3(.68,.78,1.),smoothstep(.1,.85,vBurn));
+          vec3 luminous=mix(vec3(1.,.78,.32),vec3(1.,.34,.075),vUv.y*.25);
+          float warmth=rich*mix(.45,1.,smoothstep(abStart-.02,abStart+.04,vUv.x));
+          vec3 color=mix(clean,luminous,warmth);
           float alpha=fade*share*tongues*(.13*(1.-onlyFlame)*(1.-hot)+.95*hot);
           gl_FragColor=vec4(color*(1.+.45*hot),min(.95,alpha));
         }`,
@@ -418,6 +420,7 @@ export async function start(profile, cfg) {
     for (const { path, geometry, material } of streams) {
       material.uniforms.time.value += dt * (.5 + motor.thr);
       material.uniforms.heat.value = combustion.state.flame;
+      material.uniforms.rich.value = Math.min(.85, .18 + .45 * combustion.state.startup + .4 * combustion.state.afterburner);
       material.uniforms.share.value = Math.max(0, cfg.flow.share(path, o));
       const burn = geometry.attributes.burn;
       for (let i = 0; i <= segments; i++) {
