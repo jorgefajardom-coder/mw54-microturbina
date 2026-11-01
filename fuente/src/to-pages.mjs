@@ -12,7 +12,7 @@ const OUT = resolve(process.argv[2] ?? join(ROOT, ".."));
 mkdirSync(join(OUT, "anatomia"), { recursive: true });
 for (const d of ["sr72", "f22", "f14", "sr71", "jet"]) mkdirSync(join(OUT, d), { recursive: true });
 copyFileSync(join(ROOT, "src", "model.mjs"), join(ROOT, "web", "model.js"));
-for (const f of ["app.js", "core.js", "desktop.js", "mobile.js", "device.js", "flight.js", "controls.js", "floor.js", "look.js", "flame.js", "base.css", "desktop.css", "mobile.css", "model.js", "mw54.glb", "hangar.hdr"]) copyFileSync(join(ROOT, "web", f), join(OUT, f));
+for (const f of ["app.js", "core.js", "desktop.js", "mobile.js", "device.js", "flight.js", "controls.js", "floor.js", "look.js", "environment.js", "postprocessing.js", "flame.js", "base.css", "desktop.css", "mobile.css", "model.js", "mw54.glb", "hangar.hdr"]) copyFileSync(join(ROOT, "web", f), join(OUT, f));
 mkdirSync(join(OUT, "draco"), { recursive: true });
 for (const f of ["draco_decoder.wasm", "draco_wasm_wrapper.js"]) copyFileSync(join(ROOT, "web", "draco", f), join(OUT, "draco", f));
 const head = seoHead({

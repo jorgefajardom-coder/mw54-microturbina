@@ -38,7 +38,7 @@ function tierOf(gpu) {
   return "media";
 }
 
-const size = () => [Math.round(innerWidth), Math.round(innerHeight)];
+const size = () => [Math.max(1, Math.round(innerWidth)), Math.max(1, Math.round(innerHeight))];
 
 export async function profileFor(kind) {
   const dpr = devicePixelRatio || 1;
@@ -46,15 +46,22 @@ export async function profileFor(kind) {
     return { kind, tier: "alta", gpu: gpuName(), size, antialias: true, pixelRatio: Math.min(dpr, 2), minPixelRatio: 1, adaptive: true, shadowSize: 2048, textureSize: 2048, fit: (a) => Math.min(2.6, Math.max(1, 1.25 / a)) };
   }
   const gpu = gpuName();
-  const tier = tierOf(gpu);
-  const Q = { alta: [2, 2048, 2048, true], media: [1.6, 1536, 1024, true], baja: [1.25, 1024, 1024, false] }[tier];
+  const limited = navigator.connection?.saveData || /^(slow-)?2g$/.test(navigator.connection?.effectiveType || "");
+  const tier = limited ? "baja" : tierOf(gpu);
+  const Q = { alta: [1.5, 1024, 512, 1250000], media: [1.25, 512, 256, 900000], baja: [1, 256, 256, 500000] }[tier];
+  const [w, h] = size();
+  const pixelRatio = Math.min(dpr, Q[0], Math.sqrt(Q[3] / (w * h)));
   let model = "";
-  try { model = (await navigator.userAgentData?.getHighEntropyValues?.(["model"]))?.model ?? ""; } catch {}
+  if (params.get("debug") === "1") {
+    try { model = (await navigator.userAgentData?.getHighEntropyValues?.(["model"]))?.model ?? ""; } catch {}
+  }
   return {
     kind, tier, gpu, model, size,
-    antialias: Q[3],
-    pixelRatio: Math.min(dpr, Q[0]),
-    minPixelRatio: Math.min(dpr, 0.8),
+    antialias: false,
+    pixelRatio,
+    minPixelRatio: Math.min(pixelRatio, 0.65),
+    dracoWorkers: 1,
+    microdetail: false,
     adaptive: true,
     shadowSize: Q[1],
     textureSize: Q[2],

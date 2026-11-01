@@ -3,9 +3,8 @@
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
+import { setupEnvironment } from "./environment.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { op, metal, PARTS, SPEC } from "./model.js";
 import { createFlight } from "./flight.js";
 import { createFloor } from "./floor.js";
@@ -15,9 +14,8 @@ import { createFlame } from "./flame.js";
 const $ = (id) => document.getElementById(id);
 
 export async function start(profile) {
-const modelLoad = loadModel("./mw54.glb", "./draco/");
+const modelLoad = loadModel("./mw54.glb", "./draco/", { workerLimit: profile.dracoWorkers ?? 2 });
 const fmt = (n) => Math.round(n).toLocaleString("es-ES");
-const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Blender (Z arriba, mm) → glTF (Y arriba): (x, y, z) → (x, z, −y)
 const fromBlender = ([x, y, z]) => new THREE.Vector3(x, z, -y);
 
@@ -35,16 +33,7 @@ $("view").appendChild(renderer.domElement);
 guardContext(renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.9;
-// reflejos de una nave industrial real (Poly Haven, CC0): la pintura y el metal reflejan luces, vigas y puertas, no una caja
-new HDRLoader().load("./hangar.hdr", (hdr) => {
-  hdr.mapping = THREE.EquirectangularReflectionMapping;
-  scene.environment = pmrem.fromEquirectangular(hdr).texture;
-  scene.environmentIntensity = 0.75;
-  hdr.dispose();
-});
+await setupEnvironment(renderer, scene, profile, "./hangar.hdr");
 const camera = new THREE.PerspectiveCamera(32, profile.size()[0] / profile.size()[1], 0.01, 50);
 // el perfil decide cuánto alejar la cámara para que quepa la envergadura en esa pantalla
 function homeView() {
@@ -66,7 +55,7 @@ Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.
 sun.shadow.bias = -0.0004;
 scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.4));
 studioLights(scene, 1.6);
-const composer = createComposer(renderer, scene, camera, profile, { aoRadius: 0.05 });
+const composer = await createComposer(renderer, scene, camera, profile, { aoRadius: 0.05 });
 // ── piso del taller (módulo compartido con la página del SR-72) ──
 const ground = createFloor(renderer, {
   res: profile.textureSize,
@@ -96,7 +85,7 @@ model.traverse((o) => {
   }
   const d = o.userData;
   if (d && d.part) {
-    const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), t: 1, materials: [] };
+    const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), t: 0, materials: [] };
     o.traverse((m) => m.isMesh && entry.materials.push(m));
     if (d.group === "engine" && d.part === "MW54") engineRoot = entry;
     else if (d.group === "MW54") engineParts[d.part] = entry;
@@ -109,7 +98,7 @@ for (const e of parts) {
   for (const m of e.materials) {
     if (e.data.group === "MW54") m.material = m.material.clone();
     else if (m.material.metalness > 0.5) m.material = clones.get(m.material) ?? clones.set(m.material, m.material.clone()).get(m.material);
-    if (m.material.metalness > 0.5) enrichMetal(m.material);
+    if (m.material.metalness > 0.5 && profile.microdetail !== false) enrichMetal(m.material);
   }
 }
 for (const e of parts) for (const m of e.materials) m.userData.realMaterial = m.material;
@@ -191,7 +180,9 @@ const disassembly = disassemblyOrder(parts, {
 });
 const labelOf = (e) => (e === engineRoot ? "la MW54 sale por la escotilla" : infoOf(e)?.name ?? e.data.label);
 function sequence(target, speed = 1) {
-  const steps = sequenceSteps(disassembly, target, { speed, label: labelOf });
+  const active = disassembly.filter((e) => Math.abs(e.t - target) > 1e-6);
+  if (!active.length) { timeline = null; setExploded(target); $("steps").style.display = "none"; return; }
+  const steps = sequenceSteps(active, target, { speed, label: labelOf });
   for (const st of steps) st.from = st.e.t;
   timeline = { steps, start: performance.now() / 1000, total: Math.max(...steps.map((x) => x.at + x.dur)) + 0.1 };
   exploded = !!target;
@@ -199,7 +190,6 @@ function sequence(target, speed = 1) {
 }
 function assemble(speed = 1) {
   stop();
-  setExploded(1);
   for (const e of parts) if (e.offset.length() < 1e-6) e.t = 0;
   sequence(0, speed);
   queueMicrotask(() => notify());
@@ -438,7 +428,7 @@ const actions = {
   fly() {
     flying = !flying;
     document.body.toggleAttribute("data-flying", flying);
-    if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; flight.enter(); }
+    if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; ensureFlight().enter(); }
     else { flight.exit(); controls.enabled = true; ground.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; flyCamera(inCockpit ? "cockpit" : "home"); }
     notify();
   },
@@ -447,7 +437,10 @@ const actions = {
 let demoSurfaces = false;
 let flying = false;
 const pad = profile.pad;
-const flight = createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
+let flight = null;
+function ensureFlight() {
+  return flight ??= createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
+}
 
 // ── vista de cabina: la cámara entra por encima del puesto trasero y mira el tablero; los mandos se mueven solos ──
 const VIEWS = {
@@ -466,7 +459,7 @@ function stepCamera(now) {
   controls.target.lerpVectors(camTween.fromT, camTween.to.target, k);
   if (k >= 1) camTween = null;
 }
-window.__sim = { flight, motor, gearState, camera, controls, model };
+window.__sim = { get flight() { return flight; }, motor, gearState, camera, controls, model };
 // ── bucle ──
 const clock = new THREE.Clock();
 let heatTick = 0;
@@ -564,7 +557,6 @@ function resize() {
   composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
 }
 setExploded(0);
-if (!still) setTimeout(() => assemble(2.4), 600);
 frame();
 return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, renderer };
 }

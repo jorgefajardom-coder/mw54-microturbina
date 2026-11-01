@@ -4,6 +4,7 @@
 # postquemador, compresor de 9 etapas, turbina de 2, seis tubos que llevan aire del 4.º escalón al postquemador por
 # encima de Mach 2 y eyector con aletas libres al final de la góndola. 1 unidad = 1 mm, +X morro, +Y izquierda.
 import math
+from attachments import hinge_pins, surface_link
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, tube_path, boolean_cut, halves)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
@@ -203,6 +204,9 @@ def build_sr71(M, root, meta, log=lambda msg: None):
             p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, NAC_Z))
             ob["hinge"] = list((p1 - p0).normalized() * side)
             set_pivot(ob, p0)
+            fixed_key = "ala" if k == 0 else "ala.ext"
+            fixed = next(p for p in parts if p.name == f"{fixed_key}.{tagname}")
+            hinge_pins(ob, fixed, p0, p1, 55, 100, M["steel"])
 
     # ── góndolas: piel exterior desde el labio de la toma hasta el eyector ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
@@ -241,23 +245,29 @@ def build_sr71(M, root, meta, log=lambda msg: None):
                   "airframe", 6, (0, side * 1200, 2600), f"Deriva enteriza {tagname}", control="rudder", range=[-20, 20], path="v")
         ob["hinge"] = [0.0, 0.0, 1.0]   # eje vertical: la raíz gira en su plano, sin hundirse en la góndola
         set_pivot(ob, (-11200, side * NAC_Y, base))
+        host = next(p for p in parts if p.name == f"gondola.{tagname}")
+        surface_link(ob, host, (-11200, side * NAC_Y, base + 90), (0, 0, -1), 500, 65, M["steel"])
 
     # ── tren: tres ruedas en cada pata principal, dos en el morro ──
     def wheel(name, c, r, w):
         Fw = frame(Vector(c) - Vector((0, w / 2, 0)), (0, 1, 0))
         return [lathe(f"{name}_t", Fw, [(0, r * 0.6), (0, r * 0.9), (w * 0.15, r), (w * 0.85, r), (w, r * 0.9), (w, r * 0.6)], M["rubber"], steps=40),
                 lathe(f"{name}_h", Fw, [(w * 0.1, 0), (w * 0.1, r * 0.6), (w * 0.9, r * 0.6), (w * 0.9, 0)], M["alu"], steps=32)]
-    nose = [cylinder_between("ns", (7600, 0, -485), (7600, 0, GROUND + 330), 90, M["steel"], steps=20)]
+    nose = [cylinder_between("ns", (7600, 0, -440), (7600, 0, GROUND + 330), 90, M["steel"], steps=20)]
     for y in (-200, 200):
         nose += wheel(f"nw{y}", (7600, y, GROUND + 330), 330, 220)
     part("tren.morro", nose, "airframe", 8, (0, 2600, 0), "Tren de morro")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         y = side * 1900
-        g = [cylinder_between(f"ms{side}", (-3200, y, -480), (-3200, y, GROUND + 450), 130, M["steel"], steps=20)]
+        g = [cylinder_between(f"ms{side}", (-3200, y, -450), (-3200, y, GROUND + 450), 130, M["steel"], steps=20)]
         for dy in (-330, 0, 330):
             g += wheel(f"mw{side}{dy}", (-3200, y + dy, GROUND + 450), 450, 260)
         part(f"tren.{tagname}", g, "airframe", 9, (5500, 0, 0), f"Tren principal {tagname}")
 
+    for side, tagname in ((1, "izquierda"), (-1, "derecha")):
+        host = next(p for p in parts if p.name == f"gondola.{tagname}")
+        for x in (-4000, -5400):
+            surface_link(host, host, (x, side * NAC_Y, NAC_Z + 689), (0, 0, 1), 600, 55, M["steel"])
     eng = {}
     for side, prefix, detailed in ((-1, "J58", True), (1, "J58.L", False)):
         er, ep = build_j58(prefix, M, root, (FACE_X, side * NAC_Y, NAC_Z), meta, detailed)

@@ -4,7 +4,8 @@
 // coeficiente de sustentación que pide el vuelo nivelado, la resistencia (de forma, de onda e inducida) y la finura.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { setupEnvironment } from "../environment.js";
+import { detect, profileFor } from "../device.js";
 import { loadModel, guardContext, studioLights } from "../look.js";
 import * as sr71 from "../sr71/sim.js";
 import * as f22 from "../f22/sim.js";
@@ -76,15 +77,16 @@ function regime(M) {
 }
 
 // ── escena ──
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const profile = await profileFor(detect());
+const renderer = new THREE.WebGLRenderer({ antialias: profile.antialias, powerPreference: "high-performance" });
+renderer.setPixelRatio(profile.pixelRatio);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NeutralToneMapping;
 $("view").appendChild(renderer.domElement);
 guardContext(renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
-scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+await setupEnvironment(renderer, scene, profile);
 scene.environmentIntensity = 0.7;
 const sun = new THREE.DirectionalLight(0xffffff, 2.2);
 sun.position.set(30, 50, 20);
@@ -107,7 +109,7 @@ coneHolder.add(cone);
 scene.add(coneHolder);
 
 // partículas del aire: cada una sigue una línea de corriente de la que se ve un trazo corto
-const small = matchMedia("(max-width: 760px)").matches;
+const small = profile.kind === "celular";
 const COUNT = small ? 900 : 2200;
 const TRAIL = 6;
 const flowGeo = new THREE.BufferGeometry();
@@ -134,7 +136,7 @@ async function show(id) {
   if (current) scene.remove(models[current]);
   $("loading").hidden = false;
   if (!models[id]) {
-    const gltf = await loadModel(c.glb, "../draco/");
+    const gltf = await loadModel(c.glb, "../draco/", { workerLimit: profile.dracoWorkers ?? 2 });
     models[id] = gltf.scene;
   }
   $("loading").hidden = true;

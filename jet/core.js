@@ -3,9 +3,8 @@
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
+import { setupEnvironment } from "../environment.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { createFloor } from "../floor.js";
 import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js";
 import { createFlame } from "../flame.js";
@@ -25,8 +24,7 @@ export const turbo = (t) => {
 };
 
 export async function start(profile, cfg) {
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const modelLoad = loadModel(cfg.glb, "../draco/");
+  const modelLoad = loadModel(cfg.glb, "../draco/", { workerLimit: profile.dracoWorkers ?? 2 });
   const PARTS = await (await fetch(cfg.parts)).json();
   const { op, metalOf, modeOf, gasAlong, K } = cfg.sim;
 
@@ -43,14 +41,7 @@ export async function start(profile, cfg) {
   guardContext(renderer);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d0f12);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  new HDRLoader().load("../hangar.hdr", (hdr) => {
-    hdr.mapping = THREE.EquirectangularReflectionMapping;
-    scene.environment = pmrem.fromEquirectangular(hdr).texture;
-    scene.environmentIntensity = 0.8;
-    hdr.dispose();
-  });
+  await setupEnvironment(renderer, scene, profile, "../hangar.hdr");
   const [W0, H0] = profile.size();
   const camera = new THREE.PerspectiveCamera(32, W0 / H0, 0.1, 600);
   const homeView = () => new THREE.Vector3(...cfg.view.home).multiplyScalar(profile.fit(camera.aspect));
@@ -71,7 +62,7 @@ export async function start(profile, cfg) {
   sun.shadow.normalBias = 0.02;
   scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.4));
   studioLights(scene, cfg.view.max / 4);
-  const composer = createComposer(renderer, scene, camera, profile, { aoRadius: cfg.view.max / 140 });
+  const composer = await createComposer(renderer, scene, camera, profile, { aoRadius: cfg.view.max / 140 });
   scene.add(createFloor(renderer, { ...cfg.floor, res: profile.textureSize }));
 
   // ── modelo ──
@@ -90,7 +81,7 @@ export async function start(profile, cfg) {
     }
     const d = o.userData;
     if (d && d.part) {
-      const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), via: d.via ? fromBlender(d.via) : null, t: 1, materials: [], T: 15 };
+      const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), via: d.via ? fromBlender(d.via) : null, t: 0, materials: [], T: 15 };
       o.traverse((m) => m.isMesh && entry.materials.push(m));
       if (d.group === "engine" && d.part === cfg.engine) engineRoot = entry;
       if (d.group === cfg.engine) engineParts.push(entry);
@@ -104,7 +95,7 @@ export async function start(profile, cfg) {
     for (const m of e.materials) {
       if (isEngineGroup(e.data)) m.material = m.material.clone();
       else if (m.material.metalness > 0.5) m.material = clones.get(m.material) ?? clones.set(m.material, m.material.clone()).get(m.material);
-      if (m.material.metalness > 0.5) enrichMetal(m.material);
+      if (m.material.metalness > 0.5 && profile.microdetail !== false) enrichMetal(m.material);
       allMaterials.add(m.material);
     }
   }
@@ -159,14 +150,15 @@ export async function start(profile, cfg) {
   });
   const labelOf = (e) => infoOf(e)?.name ?? e.data.label;
   function sequence(target, speed = 1) {
-    const steps = sequenceSteps(order, target, { speed, label: labelOf });
+    const active = order.filter((e) => Math.abs(e.t - target) > 1e-6);
+    if (!active.length) { timeline = null; setExploded(target); $("steps").style.display = "none"; return; }
+    const steps = sequenceSteps(active, target, { speed, label: labelOf });
     for (const st of steps) st.from = st.e.t;
     timeline = { steps, start: performance.now() / 1000, total: Math.max(...steps.map((x) => x.at + x.dur)) + 0.1 };
     exploded = !!target;
     $("steps").style.display = "block";
   }
   function assemble(speed = 1) {
-    setExploded(1);
     exploded = false;
     for (const e of parts) if (e.offset.length() < 1e-6) e.t = 0;
     sequence(0, speed);
@@ -450,7 +442,6 @@ export async function start(profile, cfg) {
     composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
   }
   setExploded(0);
-  if (!still) setTimeout(() => { assemble(2.2); notify(); }, 600);
   frame();
   return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, maxMach: cfg.maxMach };
 }

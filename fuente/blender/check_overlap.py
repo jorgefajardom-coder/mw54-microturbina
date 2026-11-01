@@ -15,8 +15,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import lib  # noqa: E402
 
-name = next((a for a in sys.argv[1:] if a in ("sr72", "f22", "sr71", "f14", "hawk")), "sr72")
-LIMIT = next((float(a) for a in sys.argv[1:] if re.fullmatch(r"[\d.]+", a)), 2.0 if name == "hawk" else 8.0)
+# Blender conserva sus opciones en sys.argv (p. ej. --python-exit-code 1).
+# Sólo los argumentos posteriores a -- pertenecen a esta comprobación.
+args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
+name = next((a for a in args if a in ("sr72", "f22", "sr71", "f14", "hawk")), "sr72")
+LIMIT = next((float(a) for a in args if re.fullmatch(r"[\d.]+", a)), 2.0 if name == "hawk" else 8.0)
 ROOT = os.path.dirname(HERE)
 sc = bpy.data.scenes.new(name.upper())
 for other in list(bpy.data.scenes):
