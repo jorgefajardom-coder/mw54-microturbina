@@ -1,16 +1,16 @@
-import { createCombustion, reactionAt } from "./combustion.js?v=20261031-intro6";
+import { createCombustion, reactionAt } from "./combustion.js?v=20261031-motion7";
 // Núcleo del visor del Hawk con su MW54, común a escritorio y celular: escena, modelo, montaje, motor, combustible,
 // cámara de combustión, mapa de calor, cabina y simulador. No escucha ratón, teclado ni toques: cada interfaz
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js?v=20261031-intro6";
+import { setupEnvironment } from "./environment.js?v=20261031-motion7";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-intro6";
-import { createFlight } from "./flight.js?v=20261031-intro6";
-import { createFloor } from "./floor.js?v=20261031-intro6";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-intro6";
-import { createFlame } from "./flame.js?v=20261031-intro6";
+import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-motion7";
+import { createFlight } from "./flight.js?v=20261031-motion7";
+import { createFloor } from "./floor.js?v=20261031-motion7";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-motion7";
+import { createFlame } from "./flame.js?v=20261031-motion7";
 
 const $ = (id) => document.getElementById(id);
 

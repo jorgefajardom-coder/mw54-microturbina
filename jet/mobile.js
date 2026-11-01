@@ -1,9 +1,9 @@
 // Interfaz de celular de los visores de aviones: barra inferior (motor, despiece, corte, misión, más) y hoja con el
 // resto y las palancas de gas y Mach; un toque elige una pieza, dos toques acercan la cámara. La vista se recoloca con
 // cada giro y con la barra de direcciones; la calidad la fija el perfil del teléfono.
-import { start, fmt } from "./core.js?v=20261031-intro6";
-import { debugPanel } from "../device.js?v=20261031-intro6";
-import { createPad } from "../controls.js?v=20261031-intro6";
+import { start, fmt } from "./core.js?v=20261031-motion7";
+import { debugPanel } from "../device.js?v=20261031-motion7";
+import { createPad } from "../controls.js?v=20261031-motion7";
 
 const $ = (id) => document.getElementById(id);
 const icon = (d) => `<i aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg></i>`;

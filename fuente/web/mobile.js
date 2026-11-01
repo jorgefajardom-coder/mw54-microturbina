@@ -2,9 +2,9 @@
 // resto; un toque elige una pieza y abre su tarjeta, dos toques acercan la cámara. Al volar pasa a pantalla completa
 // en horizontal, mantiene la pantalla encendida y muestra las palancas táctiles. La vista se recoloca con cada giro y
 // con la barra de direcciones del navegador; la calidad la fija el perfil del teléfono (device.js).
-import { start } from "./core.js?v=20261031-intro6";
-import { createPad } from "./controls.js?v=20261031-intro6";
-import { debugPanel } from "./device.js?v=20261031-intro6";
+import { start } from "./core.js?v=20261031-motion7";
+import { createPad } from "./controls.js?v=20261031-motion7";
+import { debugPanel } from "./device.js?v=20261031-motion7";
 
 const $ = (id) => document.getElementById(id);
 const icon = (d) => `<i aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg></i>`;
