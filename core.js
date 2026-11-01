@@ -341,13 +341,14 @@ const flameVol = (() => {
         float tongues = fbm(vec2(th * 18., u * 5. - uTime * speed));
         float flick = fbm(vec2(th * 40. + layer * 3., u * 9. - uTime * speed * 1.7));
         float body = smoothstep(.0, .08, u) * (1. - smoothstep(.55, 1., u));
-        float a = body * (.35 + .65 * torch) * smoothstep(.25 + .35 * u, .95, tongues + .35 * flick + .2 * (1. - u));
-        a *= mix(1., .55, abs(layer - .5) * 2.);
+        // cuerpo lleno de llama con lenguas encima: se ve la combustión aunque el motor vaya en ralentí
+        float a = body * (.45 + .55 * torch) * (.55 + .45 * smoothstep(.15 + .3 * u, .9, tongues + .35 * flick + .2 * (1. - u)));
+        a *= mix(1., .7, abs(layer - .5) * 2.);
         vec3 blue = vec3(.25, .45, 1.), yel = vec3(1., .78, .35), org = vec3(1., .4, .1);
         vec3 col = mix(blue, yel, smoothstep(.08, .35, u)); col = mix(col, org, smoothstep(.45, .85, u));
         col += vec3(1., .9, .7) * pow(max(tongues + flick - .9, 0.), 2.) * 2.;
-        a *= uHeat * (.5 + .5 * uFlow);
-        gl_FragColor = vec4(col * a * .85, a);
+        a *= uHeat * (.7 + .3 * uFlow);
+        gl_FragColor = vec4(col * a * 2.2, min(1., a * 1.4));
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -469,7 +470,15 @@ const actions = {
   surfaces() { demoSurfaces = !demoSurfaces; if (!demoSurfaces) setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); notify(); },
   cockpit() {
     inCockpit = !inCockpit;
-    controls.minDistance = inCockpit ? 0.06 : 0.25;
+    // en el asiento: la órbita queda en una esfera de 3 cm alrededor de los ojos (mirar alrededor) y el campo de visión es
+    // el de una persona, no el de un teleobjetivo
+    controls.minDistance = inCockpit ? 0.03 : 0.25;
+    controls.maxDistance = inCockpit ? 0.03 : cockpitBack.maxDistance;
+    controls.enablePan = !inCockpit;
+    controls.rotateSpeed = inCockpit ? 0.35 : cockpitBack.rotateSpeed;
+    controls.maxPolarAngle = inCockpit ? Math.PI : cockpitBack.maxPolar;
+    camera.fov = inCockpit ? 72 : cockpitBack.fov;
+    camera.updateProjectionMatrix();
     if (inCockpit) settle();
     if (inCockpit !== demoSurfaces) { demoSurfaces = inCockpit; if (!demoSurfaces) setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); }
     flyCamera(inCockpit ? "cockpit" : "home");
@@ -492,10 +501,13 @@ const flight = createFlight({ scene, renderer, camera, model, op, motor, lite: p
 // ── vista de cabina: la cámara entra por encima del puesto trasero y mira el tablero; los mandos se mueven solos ──
 const VIEWS = {
   home: { pos: homeView(), target: new THREE.Vector3(0, -0.05, 0) },
-  cockpit: { pos: new THREE.Vector3(0.405, 0.16, 0.07), target: new THREE.Vector3(0.53, 0.055, 0) },
+  // primera persona: los ojos del piloto delantero (como la vista de cabina en vuelo), mirando al frente por encima del
+  // tablero; el blanco queda a 3 cm, así arrastrar gira la cabeza sin salir del asiento
+  cockpit: { pos: new THREE.Vector3(0.486, 0.09, 0), target: new THREE.Vector3(0.516, 0.086, 0) },
 };
 let camTween = null;
 let inCockpit = false;
+const cockpitBack = { maxDistance: controls.maxDistance, maxPolar: controls.maxPolarAngle, fov: camera.fov, rotateSpeed: controls.rotateSpeed };
 function flyCamera(view) {
   camTween = { from: camera.position.clone(), fromT: controls.target.clone(), to: VIEWS[view], start: performance.now() / 1000, dur: 1.4 };
 }

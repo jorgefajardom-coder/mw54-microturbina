@@ -8,10 +8,9 @@ button, .chip { height: 40px; line-height: 40px; touch-action: manipulation; }
 button:active { transform: scale(.97); }
 #readout { left: calc(14px + env(safe-area-inset-left)); top: calc(36px + env(safe-area-inset-top)); font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
 #readout b { color: var(--text); font-weight: 600; }
-nav.sections { left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); top: auto; transform: none; bottom: calc(80px + env(safe-area-inset-bottom)); overflow-x: auto; scrollbar-width: none; }
-nav.sections::-webkit-scrollbar { display: none; }
-nav.sections a { flex: none; }
-nav.sections a { padding: 7px 11px; font-size: 10.5px; }
+/* los siete destinos a la vista, sin fila que se corte en el borde: en vertical dos filas (4 + 3) */
+nav.sections { left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); top: auto; transform: none; bottom: calc(80px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+nav.sections a { padding: 7px 2px; font-size: 10px; letter-spacing: .04em; text-align: center; white-space: nowrap; }
 
 #bar { left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); background: #0d0f12f2; box-shadow: 0 -1px 0 var(--line); backdrop-filter: blur(10px); }
 #bar button { height: 56px; padding: 0 2px; border-radius: 14px; line-height: 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 9.5px; letter-spacing: .06em; }
@@ -22,6 +21,9 @@ nav.sections a { padding: 7px 11px; font-size: 10.5px; }
 #sheet { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); bottom: calc(80px + env(safe-area-inset-bottom)); padding: 12px; border-radius: 16px; background: #15181df5; box-shadow: inset 0 0 0 1px var(--line), 0 -10px 40px #0009; display: none; grid-template-columns: 1fr 1fr; gap: 8px; }
 #sheet[data-open] { display: grid; }
 #sheet button { height: 46px; border-radius: 12px; }
+#sheet a.go { display: flex; align-items: center; justify-content: center; height: 46px; border-radius: 12px; background: var(--panel); color: var(--text); text-decoration: none; font: 600 11px ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; box-shadow: inset 0 0 0 1px var(--accent); }
+/* con «Más» la fila de arriba es sólo de aviones: cinco en una fila */
+body:has(#sheet) nav.sections { grid-template-columns: repeat(5, 1fr); }
 #sheet label.chip { grid-column: 1 / -1; height: 46px; border-radius: 12px; justify-content: space-between; }
 #sheet input[type=range] { flex: 1; }
 body:has(#sheet[data-open]) nav.sections { display: none; }
@@ -60,7 +62,8 @@ body[data-orient="landscape"] #bar { left: auto; top: 0; bottom: 0; width: calc(
 body[data-orient="landscape"] #bar button { height: auto; }
 body[data-orient="landscape"] #sheet { left: auto; right: calc(92px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom)); width: 340px; }
 body[data-orient="landscape"] #card { left: auto; right: calc(92px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); bottom: auto; width: 320px; max-height: calc(100% - 16px); }
-body[data-orient="landscape"] nav.sections { bottom: calc(10px + env(safe-area-inset-bottom)); }
+body[data-orient="landscape"] nav.sections { bottom: calc(10px + env(safe-area-inset-bottom)); right: calc(100px + env(safe-area-inset-right)); display: flex; justify-content: center; }
+body[data-orient="landscape"] nav.sections a { padding: 6px 10px; }
 body[data-orient="landscape"] #steps { bottom: calc(56px + env(safe-area-inset-bottom)); }
 body[data-orient="landscape"] .padkeys { grid-template-columns: repeat(4, 64px); top: auto; right: 50%; transform: translateX(50%); bottom: calc(14px + env(safe-area-inset-bottom)); }
 body[data-orient="landscape"] .stick { width: min(26vw, 150px); }

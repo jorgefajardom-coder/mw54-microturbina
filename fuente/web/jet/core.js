@@ -279,6 +279,92 @@ export async function start(profile, cfg) {
     flowGeo.attributes.color.needsUpdate = true;
   }
 
+  // ── combustión: volumen de llama alrededor de cada conducto del motor, sólo donde el gas arde (más de ~700 °C según
+  // gasAlong: cámara, postquemador, ramjet), con el color de su temperatura y lenguas que avanzan con el flujo. Tres
+  // capas concéntricas por conducto; el plano del corte lo abre como al motor. ──
+  const BURN_N = 64;
+  const burnTemp = new Float32Array(BURN_N * names.length);
+  const burnTex = new THREE.DataTexture(burnTemp, BURN_N, names.length, THREE.RedFormat, THREE.FloatType);
+  burnTex.magFilter = burnTex.minFilter = THREE.LinearFilter;
+  const burnMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, clipping: true,
+    uniforms: { uTemp: { value: burnTex }, uTime: { value: 0 }, uHeat: { value: 0 }, uFlow: { value: 0 }, uRows: { value: names.length } },
+    vertexShader: `#include <clipping_planes_pars_vertex>
+      attribute vec3 buv; varying vec3 vB;
+      void main(){ vB = buv; vec4 mvPosition = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mvPosition;
+        #include <clipping_planes_vertex>
+      }`,
+    fragmentShader: `#include <clipping_planes_pars_fragment>
+      uniform sampler2D uTemp; uniform float uTime, uHeat, uFlow, uRows; varying vec3 vB;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+        return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ float a = .5, s = 0.; for (int i = 0; i < 4; i++) { s += a * n2(p); p *= 2.03; a *= .5; } return s; }
+      // color de la llama por temperatura (°C): rojo oscuro, naranja, amarillo y casi blanco en el postquemador
+      vec3 flame(float T){
+        vec3 c = mix(vec3(.55, .06, .02), vec3(1., .35, .06), smoothstep(700., 1150., T));
+        c = mix(c, vec3(1., .78, .3), smoothstep(1150., 1600., T));
+        return mix(c, vec3(1., .95, .85), smoothstep(1600., 2300., T));
+      }
+      void main(){
+        #include <clipping_planes_fragment>
+        float u = vB.x, th = vB.y, layer = vB.z;
+        float T = texture2D(uTemp, vec2(u, (vB.z * 0. + floor(th) + .5) / uRows)).r;
+        float burn = smoothstep(650., 1050., T);
+        if (burn <= .01) discard;
+        float ang = fract(th);
+        float speed = .8 + 3. * uFlow;
+        float tongues = fbm(vec2(ang * 22., u * 14. - uTime * speed));
+        float flick = fbm(vec2(ang * 47. + layer * 5., u * 26. - uTime * speed * 1.8));
+        float a = burn * (.55 + .45 * smoothstep(.2, .85, tongues + .3 * flick)) * mix(1., .65, abs(layer - .5) * 2.);
+        vec3 col = flame(T) * (1. + .6 * pow(max(tongues + flick - .85, 0.), 2.) * 3.);
+        a *= uHeat;
+        gl_FragColor = vec4(col * a * 1.25, min(1., a * 1.1));
+      }`,
+  });
+  const burnMeshes = names.map((n, row) => {
+    const pts = cfg.flow.paths[n];
+    const curve = curves[n];
+    const S = 96, A = 48;
+    const pos = [], buv = [], idx = [];
+    for (const [k, f] of [[0, 0.6], [1, 0.8], [2, 1]].map(([k, f]) => [k / 2, f])) {
+      const base = pos.length / 3;
+      for (let i = 0; i <= S; i++) for (let j = 0; j <= A; j++) {
+        const u = i / S;
+        const p = curve.getPointAt(u);
+        const r = Math.max(40, p.z) * f;
+        const a = (j / A) * Math.PI * 2;
+        // en ejes del motor (Blender, mm): el conducto da vueltas alrededor del eje x a la altura de su línea de corriente
+        pos.push(...fromBlender([p.x, r * Math.sin(a), r * Math.cos(a)]).toArray());
+        buv.push(u, row + j / (A + 1), k);
+      }
+      for (let i = 0; i < S; i++) for (let j = 0; j < A; j++) {
+        const a = base + i * (A + 1) + j, b = a + A + 1;
+        idx.push(a, b, a + 1, b, b + 1, a + 1);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("buv", new THREE.Float32BufferAttribute(buv, 3));
+    geo.setIndex(idx);
+    const mesh = new THREE.Mesh(geo, burnMat);
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    engineRoot?.obj.add(mesh);
+    return mesh;
+  });
+  function stepBurn(dt, assembled) {
+    const running = motor.on && motor.spin > 0.3;
+    const show = motor.heat > 0.02 && assembled && !!engineRoot;
+    for (const m of burnMeshes) m.visible = show;
+    if (!show) return;
+    names.forEach((n, row) => { for (let i = 0; i < BURN_N; i++) burnTemp[row * BURN_N + i] = gasAlong(n, i / (BURN_N - 1), o, running); });
+    burnTex.needsUpdate = true;
+    burnMat.uniforms.uTime.value += dt;
+    burnMat.uniforms.uHeat.value = motor.heat;
+    burnMat.uniforms.uFlow.value = motor.thr;
+  }
+
   // ── mapa de calor ──
   let heatOn = false;
   const heatMats = new Map();
@@ -447,6 +533,7 @@ export async function start(profile, cfg) {
     const assembled = parts.every((e) => e.t < 0.02);
     flame.update({ ...cfg.flame.state(o, motor), time: now, visible: motor.heat > 0.02 && assembled });
     stepFlow(dt);
+    stepBurn(dt, assembled);
     // el metal que pasa de ~520 °C empieza a brillar con su color de cuerpo negro
     if (!heatOn) for (const e of engineParts) { if (e === hovered) continue; const g = blackbody(e.T); for (const m of e.materials) m.material.emissive?.copy(g); }
     if (heatOn && (heatTick += dt) > 0.2) { heatTick = 0; paintHeat(); }

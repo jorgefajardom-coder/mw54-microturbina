@@ -47,6 +47,14 @@ export default async function mobile(profile) {
   const api = await start(profile);
   const A = api.actions;
   const sheet = $("sheet");
+  // Aero y Anatomía van en «Más»: arriba quedan sólo los cinco aviones, en una fila que cabe entera
+  for (const a of document.querySelectorAll("nav.sections a")) {
+    if (!/aero|anatomia/.test(a.getAttribute("href"))) continue;
+    const link = Object.assign(a.cloneNode(true), { className: "go" });
+    link.textContent = /aero/.test(a.getAttribute("href")) ? "Aerodinámica" : "Anatomía técnica";
+    sheet.appendChild(link);
+    a.remove();
+  }
   const closeSheet = () => { sheet.removeAttribute("data-open"); $("more").removeAttribute("data-on"); };
   const tap = (id, fn, keep) => ($(id).onclick = () => { haptic(); fn(); if (!keep) closeSheet(); });
   tap("run", A.run);
