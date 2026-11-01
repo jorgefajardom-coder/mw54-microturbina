@@ -145,7 +145,12 @@ function sectionsOf(model, box) {
       hz[b] = Math.max(hz[b], Math.abs(v.z - cz));
     }
   });
-  return { hy, hz, cy, cz };
+  // se suaviza a lo largo de x (envolvente de las vecinas y media) para que las líneas no zigzagueen entre franjas
+  const soften = (arr) => {
+    const env = arr.map((_, i) => Math.max(...arr.slice(Math.max(0, i - 2), i + 3)));
+    return env.map((_, i) => { const w = env.slice(Math.max(0, i - 4), i + 5); return w.reduce((a, b) => a + b, 0) / w.length; });
+  };
+  return { hy: soften(hy), hz: soften(hz), cy, cz };
 }
 let M = 0;
 const models = {};
