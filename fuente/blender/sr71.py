@@ -4,9 +4,6 @@
 # postquemador, compresor de 9 etapas, turbina de 2, seis tubos que llevan aire del 4.º escalón al postquemador por
 # encima de Mach 2 y eyector con aletas libres al final de la góndola. 1 unidad = 1 mm, +X morro, +Y izquierda.
 import math
-
-import bpy
-from attachments import hinge_pins, surface_link
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, tube_path, boolean_cut, halves)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
@@ -232,9 +229,6 @@ def build_sr71(M, root, meta, log=lambda msg: None):
             p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, NAC_Z))
             ob["hinge"] = list((p1 - p0).normalized() * side)
             set_pivot(ob, p0)
-            fixed_key = "ala" if k == 0 else "ala.ext"
-            fixed = next(p for p in parts if p.name == f"{fixed_key}.{tagname}")
-            hinge_pins(ob, fixed, p0, p1, 55, 100, M["steel"])
 
     # ── góndolas: piel exterior desde el labio de la toma hasta el eyector ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
@@ -273,8 +267,6 @@ def build_sr71(M, root, meta, log=lambda msg: None):
                   "airframe", 6, (0, side * 1200, 2600), f"Deriva enteriza {tagname}", control="rudder", range=[-20, 20], path="v")
         ob["hinge"] = [0.0, 0.0, 1.0]   # eje vertical: la raíz gira en su plano, sin hundirse en la góndola
         set_pivot(ob, (-11200, side * NAC_Y, base))
-        host = next(p for p in parts if p.name == f"gondola.{tagname}")
-        surface_link(ob, host, (-11200, side * NAC_Y, base + 90), (0, 0, -1), 500, 65, M["steel"])
 
     # ── tren: tres ruedas en cada pata principal, dos en el morro ──
     def wheel(name, c, r, w):
@@ -284,34 +276,21 @@ def build_sr71(M, root, meta, log=lambda msg: None):
     # tren en su sitio del plano de tres vistas: el de morro a 10,9 m de la punta, los principales bajo las góndolas
     NOSE_GX, MAIN_GX = 5100, -7100
     belly = catmull(ST, NOSE_GX)
-    # el puntal entra 3 mm en la panza: sin junta abierta (check_connections --strict)
-    nose = [cylinder_between("ns", (NOSE_GX, 0, belly[4] - belly[3] + 3), (NOSE_GX, 0, GROUND + 330), 90, M["steel"], steps=20)]
+    nose = [cylinder_between("ns", (NOSE_GX, 0, belly[4] - belly[3] - 4), (NOSE_GX, 0, GROUND + 330), 90, M["steel"], steps=20)]
     for y in (-200, 200):
         nose += wheel(f"nw{y}", (NOSE_GX, y, GROUND + 330), 330, 220)
     part("tren.morro", nose, "airframe", 8, (0, 2600, 0), "Tren de morro")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         y = side * 1900
-        # en la estación del plano el intradós está 76 mm más arriba que en la anterior: el puntal sube hasta él
-        g = [cylinder_between(f"ms{side}", (MAIN_GX, y, -390), (MAIN_GX, y, GROUND + 450), 130, M["steel"], steps=20)]
+        g = [cylinder_between(f"ms{side}", (MAIN_GX, y, -480), (MAIN_GX, y, GROUND + 450), 130, M["steel"], steps=20)]
         for dy in (-330, 0, 330):
             g += wheel(f"mw{side}{dy}", (MAIN_GX, y + dy, GROUND + 450), 450, 260)
         part(f"tren.{tagname}", g, "airframe", 9, (5500, 0, 0), f"Tren principal {tagname}")
 
-    for side, tagname in ((1, "izquierda"), (-1, "derecha")):
-        host = next(p for p in parts if p.name == f"gondola.{tagname}")
-        for x in (-4000, -5400):
-            surface_link(host, host, (x, side * NAC_Y, NAC_Z + 689), (0, 0, 1), 600, 55, M["steel"])
     eng = {}
     for side, prefix, detailed in ((-1, "J58", True), (1, "J58.L", False)):
         er, ep = build_j58(prefix, M, root, (FACE_X - ENGINE_AFT, side * NAC_Y, NAC_Z), meta, detailed)
         tag(er, part=prefix, group="engine", order=40, explode=[-16000, 0, -1300], label="J58 derecho" if detailed else "J58 izquierdo", system="engines")
         eng[prefix] = (er, ep)
-        # el J58 a escala deja 70 mm de holgura con la góndola: va colgado de ella por soportes arriba y abajo, como el real
-        host = next(p for p in parts if p.name == ("gondola.derecha" if side < 0 else "gondola.izquierda"))
-        bpy.context.view_layer.update()
-        case_key = max(ep, key=lambda k: ep[k].dimensions.y * ep[k].dimensions.z)
-        for x in (FACE_X - ENGINE_AFT - 800, FACE_X - ENGINE_AFT - 3600):
-            for dz in (1, -1):
-                ep[case_key] = surface_link(ep[case_key], host, (x, side * NAC_Y, NAC_Z), (0, 0, dz), 1400, 45, M["steel"])
         log(f"Motor {prefix}")
     return parts, eng

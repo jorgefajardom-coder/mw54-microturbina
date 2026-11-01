@@ -4,13 +4,12 @@
 // coeficiente de sustentación que pide el vuelo nivelado, la resistencia (de forma, de onda e inducida) y la finura.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { setupEnvironment } from "../environment.js?v=20261031-transition10";
-import { detect, profileFor } from "../device.js?v=20261031-transition10";
-import { loadModel, guardContext, studioLights } from "../look.js?v=20261031-transition10";
-import * as sr71 from "../sr71/sim.js?v=20261031-transition10";
-import * as f22 from "../f22/sim.js?v=20261031-transition10";
-import * as f14 from "../f14/sim.js?v=20261031-transition10";
-import * as sr72 from "../sr72/sim.js?v=20261031-transition10";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { loadModel, guardContext, studioLights } from "../look.js";
+import * as sr71 from "../sr71/sim.js";
+import * as f22 from "../f22/sim.js";
+import * as f14 from "../f14/sim.js";
+import * as sr72 from "../sr72/sim.js";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -77,16 +76,15 @@ function regime(M) {
 }
 
 // ── escena ──
-const device = await profileFor(detect());
-const renderer = new THREE.WebGLRenderer({ antialias: device.antialias, powerPreference: "high-performance" });
-renderer.setPixelRatio(device.pixelRatio);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NeutralToneMapping;
 $("view").appendChild(renderer.domElement);
 guardContext(renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
-await setupEnvironment(renderer, scene, device);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.7;
 const sun = new THREE.DirectionalLight(0xffffff, 2.2);
 sun.position.set(30, 50, 20);
@@ -109,7 +107,7 @@ coneHolder.add(cone);
 scene.add(coneHolder);
 
 // partículas del aire: cada una sigue una línea de corriente de la que se ve un trazo corto
-const small = device.kind === "celular";
+const small = matchMedia("(max-width: 760px)").matches;
 const COUNT = small ? 900 : 2200;
 const TRAIL = 6;
 const flowGeo = new THREE.BufferGeometry();
@@ -166,7 +164,7 @@ async function show(id) {
   if (current) scene.remove(models[current]);
   $("loading").hidden = false;
   if (!models[id]) {
-    const gltf = await loadModel(c.glb, "../draco/", { workerLimit: device.dracoWorkers ?? 2 });
+    const gltf = await loadModel(c.glb, "../draco/");
     models[id] = gltf.scene;
   }
   $("loading").hidden = true;

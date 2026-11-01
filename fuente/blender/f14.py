@@ -6,8 +6,6 @@
 # baja de 2, postquemador, tobera convergente-divergente de pétalos; ≈ 120 kN con postquemador).
 # 1 unidad = 1 mm, +X morro, +Y izquierda, +Z arriba.
 import math
-from dimensions import F14_LENGTH, fit_forebody_length
-from attachments import add_to, hinge_pins, surface_link
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, boolean_cut, halves)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
@@ -186,9 +184,6 @@ def build_f14(M, root, meta, log=lambda msg: None):
                                     (2300, side * NAC_Y - 420, AX_Z + 560), (2300, side * NAC_Y + 420, AX_Z + 560), (700, side * NAC_Y - 350, AX_Z + 525), (700, side * NAC_Y + 350, AX_Z + 525)], M["skin"])
         ob = part(f"rampa.{tagname}", [ramp], "airframe", 8, (2600, 0, 1900), f"Rampas de la toma {tagname}", control="ramp", hinge=[0.0, 1.0, 0.0], range=[0, 18])
         set_pivot(ob, (2300, side * NAC_Y, AX_Z + 540))
-        host = next(p for p in parts if p.name == f"gondola.{tagname}")
-        hinge_pins(ob, host, (2300, side * NAC_Y - 400, AX_Z + 540),
-                   (2300, side * NAC_Y + 400, AX_Z + 540), 65, 80, M["steel"])
 
     # ── guantes fijos (flecha de ~67°) y alas de geometría variable sobre su pivote ──
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
@@ -221,9 +216,6 @@ def build_f14(M, root, meta, log=lambda msg: None):
                   f"Estabilizador enterizo {tagname}", control="stabilator", range=[-25, 25], sign=side)
         ob["hinge"] = [0.0, 1.0, 0.0]
         set_pivot(ob, (-7600, side * 2110, AX_Z + 60))
-        add_to(ob, [cylinder_between(f"stab_bulon{side}",
-                   (-7600, side * (NAC_Y + 540), AX_Z + 60),
-                   (-7600, side * 2160, AX_Z + 60), 60, M["steel"], steps=24)])
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         cant = math.tan(math.radians(5)) * side
         base = AX_Z + 600
@@ -240,8 +232,6 @@ def build_f14(M, root, meta, log=lambda msg: None):
         b = Vector((FIN[1][1] - 0.72 * FIN[1][2], side * NAC_Y + cant * 2350, base + 2350))
         rud["hinge"] = list((b - a).normalized())
         set_pivot(rud, a)
-        fixed = next(p for p in parts if p.name == f"deriva.{tagname}")
-        hinge_pins(rud, fixed, a, b, 30, 100, M["steel"])
 
     # ── tren: rueda doble en el morro con barra de catapulta, principales bajo los guantes ──
     def wheel(name, c, r, w):
@@ -254,21 +244,10 @@ def build_f14(M, root, meta, log=lambda msg: None):
     part("tren.morro", nose, "airframe", 11, (0, 2200, 0), "Tren de morro con barra de lanzamiento")
     for side, tagname in ((1, "izquierdo"), (-1, "derecho")):
         y = side * 2350   # bajo el guante, por dentro de la raíz del ala
-        part(f"tren.{tagname}", [cylinder_between(f"ms{side}", (-1300, y, WING_Z), (-1300, y, GROUND + 450), 110, M["steel"], steps=20)] + wheel(f"mw{side}", (-1300, y + side * 200, GROUND + 450), 450, 300),
+        part(f"tren.{tagname}", [cylinder_between(f"ms{side}", (-1300, y, 425), (-1300, y, GROUND + 450), 110, M["steel"], steps=20)] + wheel(f"mw{side}", (-1300, y + side * 200, GROUND + 450), 450, 300),
              "airframe", 11, (2500, side * 1800, 0), f"Tren principal {tagname}", via=[2500, 0, 0])
     part("gancho", [cylinder_between("hook", (-6200, 0, -150), (-8800, 0, -450), 60, M["steel"], steps=16)], "airframe", 12, (-2000, 0, -800), "Gancho de apontaje")
 
-    # Ajuste de longitud general NATOPS, antes de añadir los F110: sus
-    # dimensiones físicas y sus posiciones de instalación se conservan.
-    fit_forebody_length(parts, F14_LENGTH, seam=CAN[0])
-    for side, tagname in ((1, "izquierda"), (-1, "derecha")):
-        host = next(p for p in parts if p.name == f"gondola.{tagname}")
-        glove_name = "guante.izquierdo" if side > 0 else "guante.derecho"
-        glove = next(p for p in parts if p.name == glove_name)
-        for x in (-1000, -2500):
-            surface_link(glove, host, (x, side * 2050, WING_Z), (0, 0, -1), 1600, 70, M["steel"])
-        for x in (-3600, -5200):
-            surface_link(host, host, (x, side * NAC_Y, AX_Z + 584), (0, 0, 1), 600, 45, M["steel"])
     eng = {}
     for side, prefix, detailed in ((-1, "F110", True), (1, "F110.L", False)):
         er, ep = build_f110(prefix, M, root, (FAN_X, side * NAC_Y, AX_Z), meta, detailed)

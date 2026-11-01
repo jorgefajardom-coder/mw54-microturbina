@@ -1,22 +1,23 @@
-import { createCombustion, reactionAt } from "./combustion.js?v=20261031-transition10";
 // Núcleo del visor del Hawk con su MW54, común a escritorio y celular: escena, modelo, montaje, motor, combustible,
 // cámara de combustión, mapa de calor, cabina y simulador. No escucha ratón, teclado ni toques: cada interfaz
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js?v=20261031-transition10";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-transition10";
-import { createFlight } from "./flight.js?v=20261031-transition10";
-import { createFloor } from "./floor.js?v=20261031-transition10";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-transition10";
-import { createFlame } from "./flame.js?v=20261031-transition10";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
+import { op, metal, PARTS, SPEC } from "./model.js";
+import { createFlight } from "./flight.js";
+import { createFloor } from "./floor.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js";
+import { createFlame } from "./flame.js";
 
 const $ = (id) => document.getElementById(id);
 
 export async function start(profile) {
-const modelLoad = loadModel("./mw54.glb", "./draco/", { workerLimit: profile.dracoWorkers ?? 2 });
+const modelLoad = loadModel("./mw54.glb", "./draco/");
 const fmt = (n) => Math.round(n).toLocaleString("es-ES");
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Blender (Z arriba, mm) → glTF (Y arriba): (x, y, z) → (x, z, −y)
 const fromBlender = ([x, y, z]) => new THREE.Vector3(x, z, -y);
 
@@ -34,7 +35,16 @@ $("view").appendChild(renderer.domElement);
 guardContext(renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
-await setupEnvironment(renderer, scene, profile, "./hangar.hdr");
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.9;
+// reflejos de una nave industrial real (Poly Haven, CC0): la pintura y el metal reflejan luces, vigas y puertas, no una caja
+new HDRLoader().load("./hangar.hdr", (hdr) => {
+  hdr.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = pmrem.fromEquirectangular(hdr).texture;
+  scene.environmentIntensity = 0.75;
+  hdr.dispose();
+});
 const camera = new THREE.PerspectiveCamera(32, profile.size()[0] / profile.size()[1], 0.01, 50);
 // el perfil decide cuánto alejar la cámara para que quepa la envergadura en esa pantalla
 function homeView() {
@@ -57,7 +67,7 @@ Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.
 sun.shadow.bias = -0.0004;
 scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.4));
 studioLights(scene, 1.6);
-const composer = await createComposer(renderer, scene, camera, profile, { aoRadius: 0.05 });
+const composer = createComposer(renderer, scene, camera, profile, { aoRadius: 0.05 });
 // ── piso del taller (módulo compartido con la página del SR-72) ──
 const ground = createFloor(renderer, {
   res: profile.textureSize,
@@ -87,7 +97,7 @@ model.traverse((o) => {
   }
   const d = o.userData;
   if (d && d.part) {
-    const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), t: 0, materials: [] };
+    const entry = { obj: o, data: d, home: o.position.clone(), quat: o.quaternion.clone(), offset: fromBlender(d.explode || [0, 0, 0]), t: 1, materials: [] };
     o.traverse((m) => m.isMesh && entry.materials.push(m));
     if (d.group === "engine" && d.part === "MW54") engineRoot = entry;
     else if (d.group === "MW54") engineParts[d.part] = entry;
@@ -100,7 +110,7 @@ for (const e of parts) {
   for (const m of e.materials) {
     if (e.data.group === "MW54") m.material = m.material.clone();
     else if (m.material.metalness > 0.5) m.material = clones.get(m.material) ?? clones.set(m.material, m.material.clone()).get(m.material);
-    if (m.material.metalness > 0.5 && profile.microdetail !== false) enrichMetal(m.material);
+    if (m.material.metalness > 0.5) enrichMetal(m.material);
   }
 }
 for (const e of parts) for (const m of e.materials) m.userData.realMaterial = m.material;
@@ -139,7 +149,6 @@ for (const e of parts) for (const m of e.materials) { m.userData.entry = e; mesh
 
 // ── estado del motor ──
 const motor = { on: false, f: 0, target: 0.6, spin: 0, heat: 0, angle: 0, t: 0 };
-const combustion = createCombustion();
 const ambient = 15;
 function tempOf(entry) {
   const o = op(motor.f);
@@ -183,9 +192,7 @@ const disassembly = disassemblyOrder(parts, {
 });
 const labelOf = (e) => (e === engineRoot ? "la MW54 sale por la escotilla" : infoOf(e)?.name ?? e.data.label);
 function sequence(target, speed = 1) {
-  const active = disassembly.filter((e) => Math.abs(e.t - target) > 1e-6);
-  if (!active.length) { timeline = null; setExploded(target); $("steps").style.display = "none"; return; }
-  const steps = sequenceSteps(active, target, { speed, label: labelOf });
+  const steps = sequenceSteps(disassembly, target, { speed, label: labelOf });
   for (const st of steps) st.from = st.e.t;
   timeline = { steps, start: performance.now() / 1000, total: Math.max(...steps.map((x) => x.at + x.dur)) + 0.1 };
   exploded = !!target;
@@ -193,6 +200,7 @@ function sequence(target, speed = 1) {
 }
 function assemble(speed = 1) {
   stop();
+  setExploded(1);
   for (const e of parts) if (e.offset.length() < 1e-6) e.t = 0;
   sequence(0, speed);
   queueMicrotask(() => notify());
@@ -274,81 +282,49 @@ flame.add(plumeHolder, EXIT, { length: 0.55, r: 0.03 });   // boca de la tobera 
 // ── cámara de combustión: un segundo punto de vista con el motor cortado por la mitad y la llama dentro ──
 const pipCam = new THREE.PerspectiveCamera(38, 340 / 220, 0.005, 5);
 const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+const FLAMES = 900;
+const flameGeo = new THREE.BufferGeometry();
+const fpos = new Float32Array(FLAMES * 3);
+const fseed = new Float32Array(FLAMES);
+for (let i = 0; i < FLAMES; i++) fseed[i] = Math.random();
+flameGeo.setAttribute("position", new THREE.BufferAttribute(fpos, 3));
+flameGeo.setAttribute("seed", new THREE.BufferAttribute(fseed, 1));
+const flameMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uSize: { value: 26 } },
+  vertexShader: `attribute float seed; varying float vLife; uniform float uSize;
+    void main(){ vLife = fract(seed); vec4 mv = modelViewMatrix * vec4(position,1.); gl_PointSize = uSize * (1.-vLife*.6) / -mv.z * 0.1; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `varying float vLife;
+    void main(){ vec2 c = gl_PointCoord - .5; float d = length(c); float a = smoothstep(.5, .0, d);
+      vec3 col = mix(vec3(.55,.75,1.), vec3(1.,.7,.25), smoothstep(.0,.25,vLife)); col = mix(col, vec3(1.,.35,.1), smoothstep(.4,.9,vLife));
+      gl_FragColor = vec4(col * a * (1.-vLife) * 1.4, a * (1.-vLife)); }`,
+});
+const flames = new THREE.Points(flameGeo, flameMat);
+flames.layers.set(1);
+flames.frustumCulled = false;
+scene.add(flames);
 pipCam.layers.enable(1);
-// la llama como volumen, no sólo chispas: una corona entre los dos tubos del anular (r 22–33 mm, de la cabeza de los
-// vaporizadores a la entrada del estátor), con seis antorchas, azul en la zona primaria y amarilla a naranja hacia la
-// turbina, con lenguas que avanzan con el gasto. Va en la capa 1 (sólo la ve la cámara de combustión) y la corta el mismo
-// plano que al motor.
-const flameVol = (() => {
-  const S = 48, A = 96, Rr = [22, 27.5, 33];
-  const pos = [], uv = [], idx = [];
-  for (let k = 0; k < Rr.length; k++) {
-    const base = pos.length / 3;
-    for (let i = 0; i <= S; i++) for (let j = 0; j <= A; j++) {
-      const u = i / S, th = (j / A) * Math.PI * 2;
-      const s = 54 + u * 52;
-      const r = Rr[k] + Math.sin(th * 6 + 0.52 * 6) * 1.2 * u;
-      pos.push(...fromBlender([-s, r * Math.cos(th), r * Math.sin(th)]).toArray());
-      uv.push(u, th / (Math.PI * 2), k / (Rr.length - 1));
-    }
-    for (let i = 0; i < S; i++) for (let j = 0; j < A; j++) {
-      const a = base + i * (A + 1) + j, b = a + A + 1;
-      idx.push(a, b, a + 1, b, b + 1, a + 1);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute("fuv", new THREE.Float32BufferAttribute(uv, 3));
-  geo.setIndex(idx);
-  const mat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.NormalBlending, side: THREE.DoubleSide, clipping: true,
-    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uFlow: { value: 0 }, uRich: { value: 0 } },
-    vertexShader: `#include <clipping_planes_pars_vertex>
-      attribute vec3 fuv; varying vec3 vUv;
-      void main(){ vUv = fuv; vec4 mvPosition = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mvPosition;
-        #include <clipping_planes_vertex>
-      }`,
-    fragmentShader: `#include <clipping_planes_pars_fragment>
-      uniform float uTime; uniform float uHeat; uniform float uFlow; uniform float uRich; varying vec3 vUv;
-      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
-        return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
-      float fbm(vec2 p){ float a = .5, s = 0.; for (int i = 0; i < 4; i++) { s += a * n2(p); p *= 2.03; a *= .5; } return s; }
-      void main(){
-        #include <clipping_planes_fragment>
-        float u = vUv.x, th = vUv.y, layer = vUv.z;
-        float speed = .6 + 2.4 * uFlow;
-        // Lámina de llama unida: variación suave y longitudinal, sin focos puntuales.
-        float wave = sin(th * 18.8496 - uTime * speed * 2.);
-        float tip = .48 + .16 * uFlow + .035 * wave;
-        float body = smoothstep(.0, .045, u) * (1. - smoothstep(tip - .18, tip, u));
-        float injector = .65 + .35 * pow(.5 + .5 * cos(th * 37.699 - 3.12), 2.);
-        float a = body * injector * (.85 + .1 * sin(th * 37.699 - u * 9. + uTime * speed));
-        a *= mix(.7, 1., 1. - abs(layer - .5) * 2.);
-        // Emisión azul en la raíz; luminosidad cálida en zonas localmente ricas.
-        float warm = uRich * smoothstep(.08, .38, u);
-        vec3 clean = mix(vec3(.12, .27, 1.), vec3(.62, .76, 1.), smoothstep(.05, .32, u));
-        vec3 luminous = mix(vec3(1., .72, .24), vec3(1., .28, .045), smoothstep(.32, .72, u));
-        vec3 col = mix(clean, luminous, warm);
-        a *= sqrt(uHeat) * (.85 + .15 * uFlow);
-        gl_FragColor = vec4(col * 1.35, min(.94, a * 1.75));
-      }`,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.userData.noAO = true;
-  mesh.layers.set(1);
-  mesh.frustumCulled = false;
-  mesh.visible = false;
-  engineRoot?.obj.add(mesh);
-  return { mesh, mat };
-})();
 function stepFlames(dt) {
   if (!engineRoot) return;
-  flameVol.mesh.visible = combustion.state.flame > .01;
-  flameVol.mat.uniforms.uTime.value += dt;
-  flameVol.mat.uniforms.uHeat.value = combustion.state.flame;
-  flameVol.mat.uniforms.uFlow.value = motor.f;
-  flameVol.mat.uniforms.uRich.value = Math.min(.85, .18 + .55 * combustion.state.startup + .15 * motor.f);
+  const burning = motor.heat;
+  flames.visible = burning > 0.02;
+  if (!flames.visible) return;
+  const M = engineRoot.obj.matrixWorld;
+  const speed = 0.4 + 1.6 * motor.f;
+  for (let i = 0; i < FLAMES; i++) {
+    fseed[i] = (fseed[i] + dt * speed * (0.6 + 0.8 * ((i * 0.618) % 1))) % 1;
+    const life = fseed[i];
+    const jet = i % 6;
+    const th = (jet / 6) * Math.PI * 2 + 0.52 + (((i * 0.37) % 1) - 0.5) * 0.9 * life;
+    const s = 56 + life * 46;
+    const r = 27 + Math.sin(i * 1.7) * (4 + 6 * life);
+    // marco del motor en Blender: punto(s, r, θ) = (−s, r cos θ, r sin θ)
+    const p = fromBlender([-s, r * Math.cos(th), r * Math.sin(th)]);
+    p.applyMatrix4(M);
+    fpos.set([p.x, p.y, p.z], i * 3);
+  }
+  flameGeo.attributes.position.needsUpdate = true;
+  flameGeo.attributes.seed.needsUpdate = true;
 }
 
 // ── mapa de calor: cada pieza con el color de su temperatura (escala turbo) ──
@@ -464,7 +440,7 @@ const actions = {
     flying = !flying;
     if (flying) { setCut(false); mission = null; }
     document.body.toggleAttribute("data-flying", flying);
-    if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; gearState.target = 0; gearState.t = 0; ensureFlight().enter(); }
+    if (flying) { timeline = null; setExploded(0); controls.enabled = false; ground.visible = false; gearState.target = 0; gearState.t = 0; flight.enter(); }
     else { flight.exit(); controls.enabled = true; ground.visible = true; setSurfaces({ roll: 0, pitch: 0, yaw: 0, flap: 0 }); gearState.target = 0; flyCamera(inCockpit ? "cockpit" : "home"); }
     notify();
   },
@@ -475,10 +451,7 @@ const actions = {
 let demoSurfaces = false;
 let flying = false;
 const pad = profile.pad;
-let flight = null;
-function ensureFlight() {
-  return flight ??= createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
-}
+const flight = createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
 
 // ── vista de cabina: la cámara entra por encima del puesto trasero y mira el tablero; los mandos se mueven solos ──
 const VIEWS = {
@@ -499,8 +472,6 @@ model.traverse((o) => o.isMesh && hawkMats.add(o.material));
 const hawkSides = new Map([...hawkMats].map((m) => [m, m.side]));
 function setCut(on) {
   cutOn = on;
-  if (on) camera.layers.enable(1);
-  else camera.layers.disable(1);
   for (const m of hawkMats) if (!m.transparent) m.side = on ? THREE.DoubleSide : hawkSides.get(m);
 }
 // misión: un vuelo de exhibición de la maqueta, sólo con la palanca de gas (rodaje, despegue, subida, crucero,
@@ -527,7 +498,7 @@ function stepCamera(now) {
   controls.target.lerpVectors(camTween.fromT, camTween.to.target, k);
   if (k >= 1) camTween = null;
 }
-window.__sim = { get flight() { return flight; }, motor, gearState, camera, controls, model };
+window.__sim = { flight, motor, gearState, camera, controls, model };
 // ── bucle ──
 const clock = new THREE.Clock();
 let heatTick = 0;
@@ -554,9 +525,8 @@ function frame() {
   for (const e of spinners) e.obj.rotation.x = motor.angle;
   const o = op(motor.f);
   // al arrancar, mientras el motor aún no llega a ralentí, sale llama naranja; luego el chorro es casi transparente
-  const burning = combustion.update(dt, motor);
-  const startFlame = burning.startup;
-  flame.update({ w: { run: 1 - startFlame, start: startFlame }, level: burning.flame * (startFlame * .8 + .025 * motor.f), optimal: 0, reach: .06 + .65 * startFlame, time: now, visible: burning.flame > .01 && parts.every((e) => e.t < 0.02) });
+  const startFlame = motor.on ? Math.max(0, 1 - motor.heat / 0.45) : 0;
+  flame.update({ w: { run: 1 - startFlame, start: startFlame }, level: Math.max(startFlame, motor.heat * (0.35 + 0.65 * motor.f)), optimal: 0, reach: 0.6 + 0.4 * motor.f, time: now, visible: motor.heat > 0.02 && parts.every((e) => e.t < 0.02) });
   stepFuel(dt);
   stepFlames(dt);
   if (!flying) stepFocus(dt);
@@ -577,7 +547,7 @@ function frame() {
   const air = o.flow * motor.spin;
   const fuelKg = (o.thrust * 0.15) / 3600;
   $("chem").innerHTML = `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`;
-  $("pipT").textContent = combustion.state.flame > .01 ? "en combustión" : motor.heat > .02 ? "caliente · sin combustión" : "fría";
+  $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
   if (!flying) { stepCamera(now); controls.update(); }
   adapt(dt);   // antes de dibujar: si el cambio de resolución va después, ese cuadro se ve negro
   renderer.setScissorTest(false);
@@ -635,10 +605,8 @@ function resize() {
   if (!camTween && !flying && !inCockpit) flyCamera("home");
   composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
 }
-setExploded(1);
-  // Introducción pausada: 0,8 s de despiece y 6,4 s de montaje.
-  assemble(.5);
-  if (timeline) timeline.start += .8;
+setExploded(0);
+if (!still) setTimeout(() => assemble(2.4), 600);
 frame();
 return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, renderer };
 }

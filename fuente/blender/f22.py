@@ -5,8 +5,6 @@
 # F119: fan de 3 etapas, compresor de alta de 6, turbinas de alta y de baja de una etapa cada una y contrarrotativas,
 # relación de derivación 0,3, ≈ 156 kN con postquemador. 1 unidad = 1 mm, +X morro, +Y izquierda, +Z arriba.
 import math
-from dimensions import F22_LENGTH, fit_forebody_length
-from attachments import add_to, hinge_pins, surface_link
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, boolean_cut, halves)
 from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
@@ -252,8 +250,6 @@ def build_f22(M, root, meta, log=lambda msg: None):
             p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, DZ(b)))
             ob["hinge"] = list((p1 - p0).normalized() * side)
             set_pivot(ob, p0)
-            fixed = next(p for p in parts if p.name == f"ala.{tagname}")
-            hinge_pins(ob, fixed, p0, p1, 40, 100, M["steel"])
 
     # ── estabilizadores enterizos ──
     # estabilizadores como en el plano de tres vistas: grandes, con la punta a 4,5 m del eje y por detrás de los flaperones
@@ -265,8 +261,6 @@ def build_f22(M, root, meta, log=lambda msg: None):
                   "airframe", 6, (-2500, side * 2200, 1500), f"Estabilizador enterizo {tagname}", control="stabilator", range=[-25, 25], sign=side, path="v")
         ob["hinge"] = [0.0, 1.0, 0.0]
         set_pivot(ob, (-7400, side * 2150, -150))
-        add_to(ob, [cylinder_between(f"stab_bulon{side}", (-7400, side * 2090, -150),
-                   (-7400, side * 2190, -150), 45, M["steel"], steps=24)])
 
     # ── derivas gemelas inclinadas 28° hacia fuera, con timón ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
@@ -286,8 +280,6 @@ def build_f22(M, root, meta, log=lambda msg: None):
         b = Vector((FIN[1][1] - 0.7 * FIN[1][2], side * 1900 + cant * 2400, base + 2400))
         rud["hinge"] = list((b - a).normalized())
         set_pivot(rud, a)
-        fixed = next(p for p in parts if p.name == f"deriva.{tagname}")
-        hinge_pins(rud, fixed, a, b, 30, 100, M["steel"])
 
     # ── tren ──
     def wheel(name, c, r, w):
@@ -301,16 +293,6 @@ def build_f22(M, root, meta, log=lambda msg: None):
         part(f"tren.{tagname}", [cylinder_between(f"ms{side}", (-1800, y, belly(-1800, y) + 10), (-1800, y, GROUND + 420), 100, M["steel"], steps=20)] + wheel(f"mw{side}", (-1800, y + side * 160, GROUND + 420), 420, 280),
              "airframe", 9, (0, side * 2400, 0), f"Tren principal {tagname}")
 
-    # Restricción de longitud USAF. Los motores se construyen después para
-    # no deformar sus piezas ni la tobera vectorial.
-    fit_forebody_length(parts, F22_LENGTH, seam=CAN[0])
-    host = next(p for p in parts if p.name == "fuselaje.delantero")
-    cockpit = next(p for p in parts if p.name == "cabina.interior")
-    for y in (-180, 180):
-        surface_link(cockpit, host, (4200, y, 250), (0, 0, -1), 1600, 25, M["steel"])
-    host = next(p for p in parts if p.name == "fuselaje.central")
-    for side in (1, -1):
-        surface_link(host, host, (-4200, side * ENG_Y, AX_Z + 584), (0, 0, 1), 500, 35, M["steel"])
     eng = {}
     for side, prefix, detailed in ((-1, "F119", True), (1, "F119.L", False)):
         er, ep = build_f119(prefix, M, root, (FAN_X, side * ENG_Y, AX_Z), meta, side, detailed)

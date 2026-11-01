@@ -7,7 +7,6 @@
 # combinado (TBCC) en disposición "over-under": turbofán arriba y estatorreactor de modo dual abajo, con la entrada y la
 # tobera compartidas, como en el esquema de modos del Darkstar. 1 unidad = 1 mm, +X morro, +Y izquierda, +Z arriba.
 import math
-from attachments import hinge_pins, surface_link
 import bmesh
 import bpy
 from mathutils import Vector
@@ -369,8 +368,6 @@ def build_sr72(M, root, meta, log=lambda msg: None):
                       f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
             ob["hinge"] = list((p1 - p0).normalized() * side)
             set_pivot(ob, p0)
-            fixed = next(p for p in parts if p.name == "fuselaje.trasero")
-            hinge_pins(ob, fixed, p0, p1, 60, 110, M["steel"])
 
     # ── derivas enterizas sobre las jorobas, inclinadas 12° hacia fuera ──
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
@@ -387,9 +384,6 @@ def build_sr72(M, root, meta, log=lambda msg: None):
                   "airframe", 6, (0, side * 1800, 2400), f"Deriva enteriza {tagname}", control="rudder", range=[-20, 20])
         ob["hinge"] = list(Vector((0, cant, 1)).normalized())
         set_pivot(ob, (-7800, side * 1700, base))
-        host = next(p for p in parts if p.name == "fuselaje.trasero")
-        axis = Vector(ob["hinge"])
-        surface_link(ob, host, ob.location + axis * 100, -axis, 600, 60, M["steel"])
 
     # ── góndolas bajo el ala: la boca rectangular de la toma y la piel que cubre cada TBCC ──
     S = ENGINE_SCALE

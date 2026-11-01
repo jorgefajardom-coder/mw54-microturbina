@@ -8,9 +8,8 @@ import math
 import os
 import bmesh
 import bpy
-from attachments import add_to, surface_link
 from mathutils import Vector, Matrix
-from lib import (material, lathe, cylinder_between, box, tube_path, join, tag, frame, point, TAU, to_object)
+from lib import (material, lathe, cylinder_between, box, tube_path, join, tag, frame, TAU, to_object)
 
 SPAN = 9390 / 7.0
 GROUND = -180.0
@@ -382,8 +381,6 @@ def build_cockpit(M, part):
         return obs
     front_panel = panel("fp", 533, 56, 76, 60, [M["pfd"], M["mfd"]], hud=True)
     rear_panel = panel("rp", 472, 68, 86, 46, [M["pfd"], M["mfd"]])
-    rear_panel += [box(f"rp_soporte{s}", (472, s * 18, (FLOOR + 68) / 2),
-                      (3, 3, 68 - FLOOR), M["anod"]) for s in (-1, 1)]
 
     # asientos eyectables: cubo, cojín, respaldo, cabezal con el paracaídas y el asa amarilla entre las piernas
     def seat(name, x):
@@ -428,8 +425,6 @@ def build_cockpit(M, part):
                        "airframe", 57, (0, 350, 200), f"Pedal de timón ({tagname})", "airframe", path="v", control="pedal", range=[-12, 12], sign=sgn)
             ped["hinge"] = [0.0, 1.0, 0.0]
             set_pivot(ped, (px, sgn * 8, FLOOR + 22))
-            add_to(tub, [cylinder_between(f"pedal_soporte{x}{sgn}",
-                   (px, sgn * 8, FLOOR), (px, sgn * 8, FLOOR + 22), 1.5, M["alu"], steps=12)])
 
 
 # despiece de la MW54 en el Hawk: (desplazamiento en x, turno). Por delante salen la tuerca, la toma, la tapa, la
@@ -682,9 +677,6 @@ def build_hawk(M, root, log=lambda msg: None):
         ob["hinge"] = list(axis)
         set_pivot(ob, edge)
     part("pozo.morro", [nose_well], "airframe", 43, (0, -350, 200), "Pozo del tren de morro", "gear", path="v")
-    for side in (1, -1):
-        surface_link(bpy.data.objects["tren.morro"], bpy.data.objects["pozo.morro"],
-                     npivot, (0, side, 0), 80, 3, M["steel"])
 
     # ── instalación del motor: carriles, montura de dos piezas, tubo de empuje hasta la tobera ──
     EF = frame(ENGINE_TIP, (-1, 0, 0))
@@ -713,14 +705,7 @@ def build_hawk(M, root, log=lambda msg: None):
     end = Vector((-786, 0, tail[3]))
     TF = frame(start, end - start)
     L_TT = (end - start).length
-    thrust_tube = part("tubo_empuje", [lathe("thrusttube", TF, [(0, 38), (12, 32), (L_TT, 17.6), (L_TT, 17.0), (12, 31.4), (0, 37.4)], M["thrust"], steps=64)], "systems", 21, (0, 0, 160), "Tubo de empuje (pared simple)", "engines")
-    s = L_TT * 0.6
-    r = 32 + (17.6 - 32) * (s - 12) / (L_TT - 12)
-    center = point(TF, s, 0, 0)
-    for theta in (0, TAU / 3, 2 * TAU / 3):
-        at = point(TF, s, r - 0.1, theta)
-        surface_link(thrust_tube, bpy.data.objects["fuselaje.trasero"], at,
-                     at - center, 80, 1.5, M["steel"])
+    part("tubo_empuje", [lathe("thrusttube", TF, [(0, 38), (12, 32), (L_TT, 17.6), (L_TT, 17.0), (12, 31.4), (0, 37.4)], M["thrust"], steps=64)], "systems", 21, (0, 0, 160), "Tubo de empuje (pared simple)", "engines")
     return parts, EF
 
 
@@ -757,16 +742,6 @@ def install_systems(M, root, fittings, log=lambda msg: None):
     # bandejas sobre las que pasan
     part("lineas.motor", lines[3:4] + lines[5:6], "systems", 54.5, (0, -350, 200), "Líneas al motor: Festo de combustible y gas", "fuel", path="v")
     part("lineas", lines[:3] + lines[4:5], "systems", 45.5, (0, -350, 200), "Líneas entre equipos: Tygon al hopper y la bomba, Festo y gas", "fuel", path="v")
-    # Escuadras de las bandejas y los carriles al costado del fuselaje.
-    # Sin ellas los equipos se tocaban entre sí, pero flotaba el conjunto.
-    for side in (-1, 1):
-        surface_link(bpy.data.objects["bandeja"], bpy.data.objects["fuselaje.central"],
-                     (260, side * 39, TZ - 2), (0, side, 0), 100, 1.5, M["alu"])
-        front_half = "fuselaje.delantero" if side > 0 else "fuselaje.delantero.b"
-        surface_link(bpy.data.objects["bandeja.morro"], bpy.data.objects[front_half],
-                     (575, side * 25, -2), (0, side, 0), 100, 1.5, M["alu"])
-        surface_link(bpy.data.objects["motor.montura"], bpy.data.objects["fuselaje.central"],
-                     (70, side * 43, ENGINE_TIP[2] - 53), (0, side, 0), 100, 2, M["alu"])
     # la cabina se aparta hacia la izquierda y los equipos hacia la derecha, cada pieza a su propio hueco: la primera en
     # salir va más lejos, así ninguna barre a las que ya están fuera
     for side in (1, -1):

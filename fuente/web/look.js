@@ -2,20 +2,20 @@
 // ambiental (GTAO) y resplandor (bloom) según la gama del dispositivo, microdetalle procedural para los metales (que no
 // tienen coordenadas de textura) y el brillo de cuerpo negro del metal caliente.
 import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
 // Carga del modelo con el decodificador Draco servido por el propio sitio (sin esperar a otro dominio). Se llama al
 // empezar, antes de montar la escena, para que la descarga corra en paralelo con todo lo demás.
-export async function loadModel(url, decoder, { workerLimit = 2 } = {}) {
+export function loadModel(url, decoder) {
   const draco = new DRACOLoader().setDecoderPath(decoder).setDecoderConfig({ type: "wasm" });
-  draco.setWorkerLimit(workerLimit);
   draco.preload();
-  try {
-    return await new GLTFLoader().setDRACOLoader(draco).loadAsync(url);
-  } finally {
-    draco.dispose();
-  }
+  return new GLTFLoader().setDRACOLoader(draco).loadAsync(url);
 }
 
 // Si el teléfono se queda sin memoria de vídeo, el navegador quita el contexto WebGL y el lienzo queda negro: se avisa
@@ -44,14 +44,44 @@ export function studioLights(scene, size) {
   return { fill, rim };
 }
 
-// Escritorio conserva el posproceso; celular dibuja directo sin descargar los pases.
+// Posproceso: alta gama con oclusión ambiental y resplandor, media sólo con resplandor, baja sin posproceso.
 // `aoRadius` en unidades de escena; devuelve { render(), setSize(w, h), bloom }.
-export async function createComposer(renderer, scene, camera, profile, options = {}) {
-  if (profile.kind === "celular" || profile.tier === "baja") {
-    return { render: () => renderer.render(scene, camera), setSize() {}, bloom: null };
+export function createComposer(renderer, scene, camera, profile, { aoRadius = 0.5 } = {}) {
+  const tier = profile.kind === "escritorio" ? "alta" : profile.tier;
+  if (tier === "baja") return { render: () => renderer.render(scene, camera), setSize() {}, bloom: null };
+  const [w, h] = profile.size();
+  // búfer de color con decimales sólo donde la GPU sabe dibujar en él (si no, el lienzo sale negro) y suavizado de bordes
+  // con las muestras que admita
+  const ext = renderer.extensions;
+  const half = ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float");
+  const samples = profile.antialias ? Math.min(4, renderer.capabilities.maxSamples || 0) : 0;
+  const target = new THREE.WebGLRenderTarget(w, h, { type: half ? THREE.HalfFloatType : THREE.UnsignedByteType, samples });
+  const composer = new EffectComposer(renderer, target);
+  composer.addPass(new RenderPass(scene, camera));
+  let gtao = null;
+  if (tier === "alta") {
+    gtao = new GTAOPass(scene, camera, w, h);
+    gtao.updateGtaoMaterial({ radius: aoRadius, distanceExponent: 1.4, thickness: aoRadius * 2, scale: 1.1, samples: 12, screenSpaceRadius: false });
+    gtao.blendIntensity = 0.85;
+    // la oclusión no debe ver los volúmenes de llama ni los vidrios: se esconden mientras dibuja sus normales
+    const hide = gtao._overrideVisibility.bind(gtao);
+    gtao._overrideVisibility = () => {
+      hide();
+      scene.traverse((o) => {
+        if (o.isMesh && o.visible && (o.userData.noAO || (o.material?.transparent && o.material.opacity < 0.95))) { o.visible = false; gtao._visibilityCache.push(o); }
+      });
+    };
+    composer.addPass(gtao);
   }
-  const { createDesktopComposer } = await import("./postprocessing.js?v=20261031-transition10");
-  return createDesktopComposer(renderer, scene, camera, profile, options);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.3, 0.45, 1.0);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+  return {
+    render: () => composer.render(),
+    setSize(width, height) { composer.setSize(width, height); gtao?.setSize(width, height); },
+    setPixelRatio(r) { composer.setPixelRatio(r); },
+    bloom,
+  };
 }
 
 // Microdetalle para metales sin UV: ruido en coordenadas del objeto (en mm del modelo) que varía la rugosidad, deja
@@ -109,15 +139,19 @@ export function blackbody(T) {
 }
 
 // ── despiece pieza por pieza: cada pieza sale por un camino libre (primero en horizontal y luego en vertical, o al
-//    revés si su dato `path` es "v", o pasando por el punto `via`). Los extremos
-//    quedan fijos: sin flotación aleatoria ni rebotes fuera del encaje. ──
+//    revés si su dato `path` es "v", o pasando por el punto `via`), sólo gira cuando ya está fuera, se asienta con un leve rebote al volver y, ya
+//    separada, flota despacio ──
 const eio = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+// al llegar a su sitio la pieza frena sin pasarse: un rebote la metería un instante dentro de la vecina
+const back = (t) => 1 - Math.pow(1 - t, 3);
+const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const H = new THREE.Vector3();
 const V = new THREE.Vector3();
-export function organicPose(e, time, { up }) {
+export function organicPose(e, time, { up, float = 1, dir = 1 }) {
   const t = Math.min(1, Math.max(0, e.t));
-  const k = eio(t);
+  const k = dir < 0 ? 1 - back(1 - t) : eio(t);
   const L = e.offset.length();
+  e.seed ??= { phase: Math.random() * 6.28, axis: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(), spin: (Math.random() - 0.5) * 0.8 };
   V.copy(up).multiplyScalar(e.offset.dot(up));
   H.copy(e.offset).sub(V);
   const [first, second] = e.data.path === "v" ? [V, H] : [H, V];
@@ -126,7 +160,11 @@ export function organicPose(e, time, { up }) {
   if (e.via) e.obj.position.addScaledVector(e.via, Math.min(1, k * 2)).addScaledVector(H.copy(e.offset).sub(e.via), Math.max(0, (k - 0.5) * 2));
   else if (first.length() < 0.05 * L || second.length() < 0.05 * L) e.obj.position.addScaledVector(e.offset, k);
   else e.obj.position.addScaledVector(first, k < 0.5 ? k * 2 : 1).addScaledVector(second, k > 0.5 ? (k - 0.5) * 2 : 0);
-  e.obj.quaternion.copy(e.quat);
+  const bob = float * Math.pow(t, 6) * L * 0.012 * Math.sin(time * 0.9 + e.seed.phase);
+  e.obj.position.addScaledVector(up, bob);
+  // sólo gira cuando ya está bien lejos de su sitio, nunca mientras entra o sale
+  const tumble = (e.seed.spin * Math.sin(Math.PI * t) * sm(0.75, 0.95, t) + Math.pow(t, 6) * 0.02 * Math.sin(time * 0.7 + e.seed.phase)) * (dir < 0 ? sm(0.8, 1, t) : 1);
+  e.obj.quaternion.copy(e.quat).multiply(new THREE.Quaternion().setFromAxisAngle(e.seed.axis, tumble));
 }
 
 // Orden de desarme: tren, cubiertas (góndolas, cabina, escotillas), el motor entero, el motor pieza a pieza según su
@@ -147,15 +185,10 @@ export function sequenceSteps(order, target, { speed = 1, label }) {
   const list = target ? order : order.slice().reverse();
   const maxL = Math.max(...list.map((e) => e.offset.length()), 1e-6);
   let at = 0;
-  const steps = list.map((e) => {
+  return list.map((e) => {
     const dur = (0.75 + 0.55 * (e.offset.length() / maxL)) / speed;
     const step = { e, at, dur, from: target ? 0 : 1, to: target, say: `${target ? "Desarmando" : "Montando"} · ${label(e)}` };
     at += dur * 0.8;   // casi una detrás de otra: se ve qué entra y por dónde
     return step;
   });
-  // Tiempo total estable aunque el avión tenga muchas piezas.
-  const total = Math.max(...steps.map((step) => step.at + step.dur), .001);
-  const factor = (target ? 4 : 3.2) / Math.max(.01, speed) / total;
-  for (const step of steps) { step.at *= factor; step.dur *= factor; }
-  return steps;
 }

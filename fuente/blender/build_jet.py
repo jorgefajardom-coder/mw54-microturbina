@@ -29,8 +29,7 @@ with bpy.context.temp_override(scene=sc):
     for o in sc.objects:
         o.select_set(o in obs)
     with bpy.context.temp_override(scene=sc, selected_objects=obs, selected_editable_objects=obs, active_object=root):
-        bpy.ops.export_scene.gltf(filepath=out + ".tmp.glb", export_format="GLB", use_selection=True, export_extras=True, export_apply=True, export_yup=True,
+        bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", use_selection=True, export_extras=True, export_apply=True, export_yup=True,
                                   export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6,
                                   export_image_format="WEBP", export_image_quality=90, export_cameras=False, export_lights=False)
-os.replace(out + ".tmp.glb", out)
 print(f"{name}: {len(parts)} piezas de célula, {sum(len(p) for _, p in eng.values())} de motor → {out} ({os.path.getsize(out)} bytes)")
