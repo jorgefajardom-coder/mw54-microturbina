@@ -396,9 +396,13 @@ def build_sr72(M, root, meta, log=lambda msg: None):
             top = z_bottom(x, yc) + 80
             # el fondo cubre el labio, la cámara del estatorreactor y el faldón de la tobera, que sube al final
             bot = ENGINE_Z + (COWL_Z - 170 + 440 * smooth(-4600, -6580, x)) * S
-            rows.append([(x, yc + w / 2 * math.copysign(abs(math.cos(t)) ** (2 / 8), math.cos(t)),
-                          (top + bot) / 2 + (top - bot) / 2 * math.copysign(abs(math.sin(t)) ** (2 / 8), math.sin(t)))
-                         for t in [TAU * j / 40 for j in range(40)]])
+            # la boca va inclinada como las tomas de rampa: el labio de abajo adelantado, el techo bajo el vientre atrás
+            rake = (lambda z: -520 * (z - bot) / (top - bot)) if k == 0 else (lambda z: 0.0)
+            ring = []
+            for t in [TAU * j / 40 for j in range(40)]:
+                z = (top + bot) / 2 + (top - bot) / 2 * math.copysign(abs(math.sin(t)) ** (2 / 8), math.sin(t))
+                ring.append((x + rake(z), yc + w / 2 * math.copysign(abs(math.cos(t)) ** (2 / 8), math.cos(t)), z))
+            rows.append(ring)
         part(f"gondola.{tagname}", [loft(f"nac{side}", rows, M["nacelle"], uvscale=4000)], "airframe", 7, (0, side * 1800, -900), f"Toma y góndola {tagname}", path="v")
 
     # ── tren fijo: el de morro adelante, los principales bajo las tomas ──

@@ -442,6 +442,11 @@ def engine_meta(model):
     return meta
 
 
+def smooth_step(a, b, x):
+    t = min(1.0, max(0.0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+
+
 def build_hawk(M, root, log=lambda msg: None):
     parts = []
 
@@ -490,7 +495,8 @@ def build_hawk(M, root, log=lambda msg: None):
     canopy_rows = []
     for x in [x for x in xs if CAN[0] >= x >= CAN[1]]:
         s = superellipse(*section_at(x))
-        bulge = 26 * math.sin(math.pi * (CAN[0] - x) / (CAN[0] - CAN[1])) ** 0.7
+        # cúpula alta como la del Hawk, con el puesto de atrás más elevado que el de delante
+        bulge = (34 + 8 * smooth_step(CAN[0] - 60, CAN[1] + 60, x)) * math.sin(math.pi * (CAN[0] - x) / (CAN[0] - CAN[1])) ** 0.7
         row = []
         for k in range(min(TOP), max(TOP) + 2):
             t = (k - min(TOP)) / (max(TOP) + 1 - min(TOP))

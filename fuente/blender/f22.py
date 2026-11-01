@@ -33,7 +33,8 @@ def section(x):
         t = TAU * k / N
         c, s = math.cos(t), math.sin(t)
         # el lomo se va haciendo más cuadrado hacia atrás, donde los dos motores van uno al lado del otro
-        p = (1.6 + 2.4 * smooth(1500, -2500, x)) if s >= 0 else (2.3 + 1.7 * smooth(1500, -2500, x))
+        # y hacia el morro se afila en diamante: la arista lateral del F-22 va de la punta a las tomas
+        p = (1.6 + 2.4 * smooth(1500, -2500, x) - 0.4 * smooth(6000, 8200, x)) if s >= 0 else (2.3 + 1.7 * smooth(1500, -2500, x) - 0.75 * smooth(6000, 8200, x))
         pts.append((x, w / 2 * math.copysign(abs(c) ** (2 / p), c), zc + (ht if s >= 0 else hb) * math.copysign(abs(s) ** (2 / p), s)))
     return pts
 
@@ -41,7 +42,7 @@ def section(x):
 def belly(x, y):
     """Altura de la panza del fuselaje en (x, y)."""
     _, w, ht, hb, zc = catmull(ST, x)
-    p = 2.3 + 1.7 * smooth(1500, -2500, x)
+    p = 2.3 + 1.7 * smooth(1500, -2500, x) - 0.75 * smooth(6000, 8200, x)
     return zc - hb * max(0.0, 1 - (2 * abs(y) / w) ** p) ** (1 / p)
 
 
@@ -196,8 +197,20 @@ def build_f22(M, root, meta, log=lambda msg: None):
     ducts = []
     for side, tagname in ((1, "izquierda"), (-1, "derecha")):
         y0, y1 = side * 1150, side * 2050
-        lip = rect_duct(f"inlet{side}", 3700, 1500, min(y0, y1), max(y0, y1), -620, 120, 45, M["skin"],
-                        y0b=min(side * 1150, side * 1800), y1b=max(side * 1150, side * 1800), z0b=-560, z1b=60)
+        # toma caret: boca trapezoidal con los labios en flecha en planta y de perfil (el labio de abajo y el de
+        # dentro van por delante), pared exterior inclinada como el costado del fuselaje
+        def ring(x, wy, zb, zt, rake=False, inset=0.0):
+            pts = [(1150 + inset, zt - inset), (wy[0] - inset, zt - inset), (wy[1] - inset, zb + inset), (1150 + inset, zb + inset)]
+            out = []
+            for y, z in pts:
+                dx = -(420 * (z - zb) / (zt - zb) + 260 * (y - 1150) / (wy[1] - 1150)) if rake else 0.0
+                out.append((x + dx, side * y, z))
+            return out
+        STA = ((3700, (1950, 2060), -620, 120, True), (3100, (1930, 2030), -610, 110, False), (2300, (1880, 1950), -590, 90, False), (1500, (1780, 1820), -560, 60, False))
+        outer = loft(f"inlet{side}", [ring(*st) for st in STA], M["skin"], uvscale=4000)
+        inner = loft(f"inletin{side}", [ring(*st, inset=45) for st in STA], M["dark"], uvscale=4000)
+        mouth = loft(f"inletlip{side}", [ring(*STA[0]), ring(*STA[0], inset=45)], M["skin"], uvscale=4000)
+        lip = [outer, inner, mouth]
         srows = []
         for k in range(10):
             f = k / 9
