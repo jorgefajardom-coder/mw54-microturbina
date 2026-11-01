@@ -3,6 +3,7 @@
 // z ala derecha. Coeficientes aerodinámicos típicos de un entrenador de ala en flecha, ajustados a esta escala.
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
+import { createTerrain } from "./terrain.js";
 
 const RHO = 1.225;
 const G0 = 9.81;
@@ -17,17 +18,17 @@ const WHEELS = [
   { p: new THREE.Vector3(-0.04, -0.18, 0.238) },
   { p: new THREE.Vector3(-0.04, -0.18, -0.238) },
 ];
+// puntos que no deben tocar nada: morro, cola, deriva y puntas de ala (las ruedas y la panza son los que apoyan)
+const SKIN = [[0.78, 0, 0], [-0.8, 0.05, 0], [-0.68, 0.32, 0], [-0.12, 0.02, 0.67], [-0.12, 0.02, -0.67], [0.2, 0.1, 0]].map((p) => new THREE.Vector3(...p));
 const BELLY = [[0.5, -0.06, 0], [-0.3, -0.06, 0], [-0.04, -0.07, 0.24], [-0.04, -0.07, -0.24]].map((p) => ({ p: new THREE.Vector3(...p) }));
 
-export function createFlight({ scene, camera, model, op, motor, setGear, setSurfaces, gearState, pad }) {
+export function createFlight({ scene, renderer, camera, model, op, motor, lite, setGear, setSurfaces, gearState, pad }) {
   const world = new THREE.Group();
   world.visible = false;
   scene.add(world);
   // ── terreno, pista y cielo ──
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x3d5a2c, roughness: 0.95 }));
-  grass.rotation.x = -Math.PI / 2;
-  grass.receiveShadow = true;
-  world.add(grass);
+  const terrain = createTerrain({ lite });
+  world.add(terrain.group);
   const cv = document.createElement("canvas");
   cv.width = 256;
   cv.height = 4096;
@@ -42,29 +43,112 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   for (let k = 0; k < 8; k++) { g.fillRect(24 + k * 26, 60, 14, 160); g.fillRect(24 + k * 26, 3876, 14, 160); }
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.anisotropy = lite ? 2 : 8;
   const runway = new THREE.Mesh(new THREE.PlaneGeometry(14, 320), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
   runway.rotation.x = -Math.PI / 2;
   runway.rotation.z = Math.PI / 2;
-  runway.position.set(120, 0.005, 0);
+  runway.position.set(120, 0.03, 0);
   runway.receiveShadow = true;
   world.add(runway);
-  for (let i = 0; i < 40; i++) {
-    const tree = new THREE.Mesh(new THREE.ConeGeometry(2 + Math.random() * 2, 7 + Math.random() * 6, 7), new THREE.MeshStandardMaterial({ color: 0x24401f, roughness: 1 }));
-    const a = Math.random() * Math.PI * 2;
-    const r = 60 + Math.random() * 400;
-    tree.position.set(120 + Math.cos(a) * r * 1.5, 4, Math.sin(a) * r);
-    if (Math.abs(tree.position.z) < 25) tree.position.z += 60;
-    tree.castShadow = true;
-    world.add(tree);
-  }
   const sky = new Sky();
   sky.scale.setScalar(10000);
   const sun = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(60), THREE.MathUtils.degToRad(160));
   Object.assign(sky.material.uniforms.sunPosition.value, sun);
   sky.material.uniforms.turbidity.value = 4;
   sky.material.uniforms.rayleigh.value = 1.4;
-  world.add(sky);
+  // el cielo no cambia (sol fijo): se hornea una vez en un cubo y se usa de fondo, en vez de calcular la dispersión
+  // atmosférica en cada píxel de cada cuadro
+  const skyScene = new THREE.Scene();
+  skyScene.add(sky);
+  let skyCube = null;
+  function bakeSky() {
+    const rt = new THREE.WebGLCubeRenderTarget(lite ? 256 : 512, { type: THREE.HalfFloatType });
+    new THREE.CubeCamera(1, 20000, rt).update(renderer, skyScene);
+    return rt.texture;
+  }
+  let bgBefore = null;
+
+  // ── viento visible: torbellinos de punta de ala (se ven cuando el ala carga) y vetas de aire que pasan junto al avión
+  // a la velocidad relativa, más largas y opacas cuanto más rápido vuela ──
+  const fx = new THREE.Group();
+  world.add(fx);
+  const TRAIL = 70;
+  const TIPS = [new THREE.Vector3(-0.12, 0.02, 0.67), new THREE.Vector3(-0.12, 0.02, -0.67)];
+  const trails = TIPS.map(() => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(TRAIL * 3), 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(TRAIL * 4), 4));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false }));
+    line.frustumCulled = false;
+    fx.add(line);
+    return { geo, n: 0 };
+  });
+  const STREAKS = lite ? 70 : 160;
+  const streakGeo = new THREE.BufferGeometry();
+  const sPos = new Float32Array(STREAKS * 6);
+  const sCol = new Float32Array(STREAKS * 8);
+  streakGeo.setAttribute("position", new THREE.BufferAttribute(sPos, 3));
+  streakGeo.setAttribute("color", new THREE.BufferAttribute(sCol, 4));
+  const streaks = new THREE.LineSegments(streakGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false }));
+  streaks.frustumCulled = false;
+  fx.add(streaks);
+  const air = Array.from({ length: STREAKS }, () => ({ p: new THREE.Vector3(), seed: Math.random() }));
+  // cada veta es un punto quieto en el aire (se mueve sólo con el viento) que se recoloca delante del avión al quedar atrás
+  function seedAir(a, ahead) {
+    const fwd = s.v.lengthSq() > 1 ? s.v.clone().normalize() : new THREE.Vector3(1, 0, 0).applyQuaternion(s.q);
+    const side = new THREE.Vector3(0, 1, 0).cross(fwd).normalize();
+    const up = fwd.clone().cross(side).normalize();
+    const r = 0.5 + Math.random() * 2.2;
+    const th = Math.random() * Math.PI * 2;
+    a.p.copy(s.p).addScaledVector(fwd, ahead ? 6 + Math.random() * 10 : (Math.random() - 0.3) * 16).addScaledVector(side, Math.cos(th) * r).addScaledVector(up, Math.sin(th) * r * 0.7);
+  }
+  function paintWind(dt, info) {
+    const Vk = THREE.MathUtils.smoothstep(info.V, 6, 30);
+    // torbellinos: con más ángulo de ataque (más carga) se condensan; en tierra no hay
+    const load = info.onGround ? 0 : Vk * THREE.MathUtils.clamp(0.25 + info.alpha * 5, 0, 1);
+    TIPS.forEach((tip, k) => {
+      const t = trails[k];
+      const pos = t.geo.attributes.position.array;
+      const col = t.geo.attributes.color.array;
+      pos.copyWithin(3, 0, (TRAIL - 1) * 3);
+      col.copyWithin(4, 0, (TRAIL - 1) * 4);
+      const w = tip.clone().applyQuaternion(s.q).add(s.p);
+      pos.set([w.x, w.y, w.z], 0);
+      col.set([1, 1, 1, load * 0.75], 0);
+      t.n = Math.min(TRAIL, t.n + 1);
+      for (let i = 0; i < TRAIL; i++) col[i * 4 + 3] *= i === 0 ? 1 : 0.985;
+      for (let i = 0; i < TRAIL; i++) { const j = i * 3; pos[j] += wind.x * dt; pos[j + 1] += (wind.y - 0.15) * dt; pos[j + 2] += wind.z * dt; }
+      if (t.n < TRAIL) for (let i = t.n; i < TRAIL; i++) { pos.copyWithin(i * 3, (t.n - 1) * 3, t.n * 3); col[i * 4 + 3] = 0; }
+      t.geo.attributes.position.needsUpdate = t.geo.attributes.color.needsUpdate = true;
+    });
+    // vetas: largo = el camino que recorre el aire respecto al avión en ~1/20 s
+    const rel = wind.clone().sub(s.v);
+    const fwd = s.v.lengthSq() > 1 ? s.v.clone().normalize() : new THREE.Vector3(1, 0, 0);
+    for (let i = 0; i < STREAKS; i++) {
+      const a = air[i];
+      a.p.addScaledVector(wind, dt);
+      const d = a.p.clone().sub(s.p);
+      if (d.dot(fwd) < -10 || d.length() > 20) seedAir(a, true);
+      const near = 1 - THREE.MathUtils.smoothstep(a.p.distanceTo(s.p), 1.5, 9);
+      const al = Vk * near * (0.25 + 0.35 * a.seed);
+      const tail = a.p.clone().addScaledVector(rel, -0.05);
+      sPos.set([a.p.x, a.p.y, a.p.z, tail.x, tail.y, tail.z], i * 6);
+      sCol.set([0.9, 0.95, 1, al, 0.9, 0.95, 1, 0], i * 8);
+    }
+    streakGeo.attributes.position.needsUpdate = streakGeo.attributes.color.needsUpdate = true;
+  }
+
+  // ── viento real: brisa constante con ráfagas y turbulencia que crece al despegarse del suelo ──
+  const wind = new THREE.Vector3();
+  const BREEZE = new THREE.Vector3(-2.2, 0, 0.9);
+  function stepWind(t, alt) {
+    const gust = 0.6 + 0.4 * Math.sin(t * 0.37) * Math.sin(t * 0.11 + 1.3);
+    const turb = THREE.MathUtils.clamp(alt / 20, 0.15, 1) * 0.9;
+    wind.copy(BREEZE).multiplyScalar(gust);
+    wind.x += turb * (Math.sin(t * 1.7) + 0.5 * Math.sin(t * 4.3 + 2));
+    wind.y += turb * 0.6 * (Math.sin(t * 2.1 + 0.7) + 0.5 * Math.sin(t * 5.9));
+    wind.z += turb * (Math.sin(t * 1.3 + 4) + 0.5 * Math.sin(t * 3.7 + 1));
+  }
 
   // ── estado ──
   const s = { p: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), w: new THREE.Vector3(), throttle: 0, roll: 0, pitch: 0, yaw: 0, flap: 0.5, brake: 0, gearUp: false, crashed: false, cam: "chase", t: 0, assist: true };
@@ -78,18 +162,31 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     s.throttle = 0;
     s.flap = 0.5;
     s.gearUp = false;
+    s.onGround = true;
+    s.hold = 0;
     s.crashed = false;
+    s.crashWhy = "";
     gearState.target = 0;
+    for (const t of trails) t.n = 0;
+    for (const a of air) seedAir(a, false);
   }
+  const act = {
+    gear() { if (s.p.y > 1.5) { s.gearUp = !s.gearUp; gearState.target = s.gearUp ? 1 : 0; } },
+    flap() { s.flap = s.flap > 0.6 ? 0 : s.flap + 0.5; },
+    cam() { s.cam = s.cam === "chase" ? "cockpit" : "chase"; },
+    reset,
+    engine() { motor.on = !motor.on; },
+    assist() { s.assist = !s.assist; },
+  };
   const onKey = (down) => (e) => {
     const k = e.key.toLowerCase();
-    if (down) {
-      if (k === "g" && s.p.y > 1.5) { s.gearUp = !s.gearUp; gearState.target = s.gearUp ? 1 : 0; }
-      if (k === "f") s.flap = s.flap > 0.6 ? 0 : s.flap + 0.5;
-      if (k === "c") s.cam = s.cam === "chase" ? "cockpit" : "chase";
-      if (k === "r") reset();
-      if (k === "e") motor.on = !motor.on;
-      if (k === "t") s.assist = !s.assist;
+    if (down && !e.repeat) {
+      if (k === "g") act.gear();
+      if (k === "f") act.flap();
+      if (k === "c") act.cam();
+      if (k === "r") act.reset();
+      if (k === "e") act.engine();
+      if (k === "t") act.assist();
     }
     if (["w", "s", "a", "d", "q", "e", "shift", "control", "b", "arrowup", "arrowdown", " "].includes(k)) e.preventDefault();
     down ? keys.add(k) : keys.delete(k);
@@ -97,17 +194,34 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   const kd = onKey(true);
   const ku = onKey(false);
 
+  // teclado, palancas táctiles y mando de juego llegan sumados por la capa de mandos común (controls.js)
+  let analog = null;
+  const isTouch = () => !!pad?.touch;
+
   const tmp = new THREE.Vector3();
+  function crash(why) {
+    if (s.crashed) return;
+    s.crashed = true;
+    s.crashWhy = why;
+    s.v.set(0, 0, 0);
+    s.w.set(0, 0, 0);
+  }
   const vb = new THREE.Vector3();
   function step(dt) {
     // mandos con su recorrido real y algo de inercia
-    // teclado, palancas táctiles y mando de juego se suman (cada uno limitado a su recorrido)
     const want = (a, b) => (keys.has(a) ? 1 : 0) - (keys.has(b) ? 1 : 0);
     const clamp1 = (v) => Math.max(-1, Math.min(1, v));
     const ax = analog;
     s.pitch += (clamp1(want("s", "w") + (ax?.pitch ?? 0)) - s.pitch) * Math.min(1, dt * 6);
     s.roll += (clamp1(want("d", "a") + (ax?.roll ?? 0)) - s.roll) * Math.min(1, dt * 7);
-    s.yaw += (clamp1(want("z", "x") + (ax?.yaw ?? 0)) - s.yaw) * Math.min(1, dt * 5);
+    // en tierra el giróscopo también va en la rueda de morro y el timón (como en los reactores de radiocontrol): con el
+    // pedal suelto sostiene el rumbo que llevaba, así el viento cruzado no lo saca de la pista
+    let yawIn = clamp1(want("z", "x") + (ax?.yaw ?? 0));
+    const fwdNow = new THREE.Vector3(1, 0, 0).applyQuaternion(s.q);
+    const psi = Math.atan2(fwdNow.z, fwdNow.x);
+    if (!s.onGround || Math.abs(yawIn) > 0.02 || s.v.length() < 1) s.hold = psi;
+    else if (s.assist) yawIn = THREE.MathUtils.clamp(Math.atan2(Math.sin(psi - s.hold), Math.cos(psi - s.hold)) * 6 + s.w.y * 0.4, -1, 1);
+    s.yaw += (yawIn - s.yaw) * Math.min(1, dt * 5);
     if (keys.has("shift") || keys.has("arrowup")) s.throttle = Math.min(1, s.throttle + dt * 0.5);
     if (keys.has("control") || keys.has("arrowdown")) s.throttle = Math.max(0, s.throttle - dt * 0.5);
     if (ax?.throttle != null) s.throttle = ax.throttle;
@@ -119,7 +233,9 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
 
     const R = new THREE.Matrix4().makeRotationFromQuaternion(s.q);
     const Rt = R.clone().transpose();
-    vb.copy(s.v).applyMatrix4(Rt);
+    s.t += dt;
+    stepWind(s.t, s.p.y);
+    vb.copy(s.v).sub(wind).applyMatrix4(Rt);
     const V = Math.max(0.01, vb.length());
     const alpha = Math.atan2(-vb.y, vb.x);
     const beta = Math.asin(THREE.MathUtils.clamp(vb.z / V, -1, 1));
@@ -170,8 +286,10 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     for (const c of contacts) {
       const rp = c.p.clone().applyQuaternion(s.q);
       const pw = rp.clone().add(s.p);
-      const pen = -pw.y;
+      const pen = terrain.heightAt(pw.x, pw.z) - pw.y;
       if (pen <= 0) continue;
+      // meterse 30 cm en el suelo sólo pasa chocando contra una ladera o un árbol de frente
+      if (pen > 0.3) crash("contra el terreno");
       onGround = true;
       const vel = s.v.clone().add(new THREE.Vector3().copy(s.w).applyQuaternion(s.q).cross(rp));
       const n = Math.max(0, 9000 * pen - 260 * vel.y);
@@ -185,11 +303,18 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
       fc.addScaledVector(side, -THREE.MathUtils.clamp(steerV * 60, -0.9 * n, 0.9 * n));
       Fw.add(fc);
       Mw.add(rp.clone().cross(fc));
-      if (contacts === BELLY && -vel.y > 2.5) s.crashed = true;
-      if (contacts === WHEELS && -vel.y > 4) s.crashed = true;
+      if (contacts === BELLY && -vel.y > 2.5) crash("aterrizaje de panza demasiado fuerte");
+      if (contacts === WHEELS && -vel.y > 4) crash("aterrizaje demasiado fuerte, se rompió el tren");
     }
     s.v.addScaledVector(Fw, dt / AC.m);
     s.p.addScaledVector(s.v, dt);
+    // colisiones: cada punto del fuselaje y las alas contra el terreno y contra árboles, hangares y el mástil
+    for (const c of SKIN) {
+      const pw = tmp.copy(c).applyQuaternion(s.q).add(s.p);
+      const what = terrain.hit(pw);
+      if (what) { crash(`choque contra ${what}`); break; }
+      if (terrain.heightAt(pw.x, pw.z) - pw.y > 0.03) { crash(c.z ? "una punta de ala tocó el suelo" : c.x > 0 ? "el morro contra el suelo" : "la cola contra el suelo"); break; }
+    }
     // dinámica angular en ejes del cuerpo
     const Mb = M.add(Mw.applyMatrix4(Rt));
     const Iw = new THREE.Vector3(AC.I.x * s.w.x, AC.I.y * s.w.y, AC.I.z * s.w.z);
@@ -202,26 +327,28 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     s.q.x += dq.x; s.q.y += dq.y; s.q.z += dq.z; s.q.w += dq.w;
     s.q.normalize();
     setSurfaces({ roll: s.roll, pitch: s.pitch, yaw: s.yaw, flap: s.flap });
+    s.onGround = onGround;
     return { V, alpha, onGround, thrust };
   }
 
   let info = { V: 0, alpha: 0, onGround: true, thrust: 0 };
-  let analog = null;
-  const camPos = new THREE.Vector3(-4, 1.5, 0);
+  const camPos = new THREE.Vector3(-3.4, 0.9, 0);
   function update(dt) {
-    if (s.crashed) { $hud(`<b>Accidente</b> · ${pad?.touch ? "Reinicio" : "R"} para volver a la pista`); return; }
+    if (s.crashed) { $hud(`<b>Accidente</b> · ${s.crashWhy}<br>${isTouch() ? "Reinicio" : "R"} para volver a la pista`); return; }
     analog = pad?.read() ?? null;
     for (let i = 0; i < 8; i++) info = step(dt / 8);
+    paintWind(dt, info);
+    terrain.setWind(wind, dt);
     model.position.copy(s.p);
     model.quaternion.copy(s.q);
     const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(s.q);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.q);
-    const fov = s.cam === "chase" ? 32 : 70;
-    if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     if (s.cam === "chase") {
-      const want = s.p.clone().addScaledVector(fwd, -3.6).add(new THREE.Vector3(0, 1.0, 0));
+      const back = camera.aspect < 1 ? 2.6 : 3.4;
+      // el retardo se aplica a la posición relativa al avión, no a la absoluta: a 150 km/h la cámara no se queda atrás
+      const want = fwd.clone().multiplyScalar(-back).add(new THREE.Vector3(0, back * 0.27, 0));
       camPos.lerp(want, Math.min(1, dt * 3));
-      camera.position.copy(camPos);
+      camera.position.copy(s.p).add(camPos);
       camera.up.set(0, 1, 0);
       camera.lookAt(s.p.clone().addScaledVector(fwd, 2));
     } else {
@@ -230,45 +357,76 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
       camera.up.copy(up);
       camera.lookAt(camera.position.clone().addScaledVector(fwd, 10).addScaledVector(up, -1.7));
     }
+    const fovWant = s.cam === "chase" ? null : 70;
+    if (fovWant && camera.fov !== fovWant) { camera.fov = fovWant; camera.updateProjectionMatrix(); }
+    if (!fovWant && s.cam !== update.cam) fit();
+    update.cam = s.cam;
     const o = op(motor.f);
-    const alt = Math.max(0, s.p.y);
+    const alt = Math.max(0, s.p.y - terrain.heightAt(s.p.x, s.p.z));
     const kmh = info.V * 3.6;
     const vs = s.v.y;
+    const stall = info.alpha > CL.stall;
+    // pantalla estrecha: tres líneas cortas con lo que se mira volando; los estados de tren, flaps y giro ya los
+    // muestran encendidos sus botones
+    if (innerWidth < 560) {
+      $hud(
+        `<b>${kmh.toFixed(0)}</b> km/h · <b>${alt.toFixed(0)}</b> m · ${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s<br>` +
+        (motor.on ? `<b>${Math.round((o.n * motor.spin) / 1000)}k</b> rpm · ${info.thrust.toFixed(0)} N · gas ${(s.throttle * 100).toFixed(0)} %` : "MW54 apagada · Motor para arrancar") +
+        (stall ? "<br><b>PÉRDIDA</b> · baja el morro" : s.brake ? "<br>frenos" : ""),
+      );
+      return;
+    }
     $hud(
       `<b>${kmh.toFixed(0)}</b> km/h · <b>${alt.toFixed(1)}</b> m · ${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s · α ${THREE.MathUtils.radToDeg(info.alpha).toFixed(0)}°<br>` +
-      `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : `apagada (${pad?.touch ? "Motor" : "E"} para arrancar)`} · gas ${(s.throttle * 100).toFixed(0)} %<br>` +
-      `Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * 40).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${info.alpha > CL.stall ? " · <b>PÉRDIDA</b>" : ""}`,
+      `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : `apagada (${isTouch() ? "Motor" : "E"} para arrancar)`} · gas ${(s.throttle * 100).toFixed(0)} %<br>` +
+      `Viento ${wind.length().toFixed(1)} m/s · Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * 40).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${stall ? " · <b>PÉRDIDA</b>" : ""}`,
     );
   }
-  function $hud(html) { document.getElementById("hud").innerHTML = html; }
+  let lastHud = "";
+  function $hud(html) { if (html !== lastHud) { lastHud = html; document.getElementById("hud").innerHTML = html; } }
+  // campo de visión horizontal fijo (~56°): en un teléfono vertical el avión no se sale por los lados
+  function fit() {
+    camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(28)) / camera.aspect)), 40, 66);
+    camera.updateProjectionMatrix();
+  }
+
+  // el aeródromo con su cielo, compartido con la exhibición; fx son los efectos de viento del avión pilotado
+  function showWorld(on, withFx = on) {
+    if (on && !world.visible) { skyCube ??= bakeSky(); bgBefore = scene.background; scene.background = skyCube; }
+    if (!on && world.visible) scene.background = bgBefore;
+    world.visible = on;
+    fx.visible = withFx;
+    scene.fog = on ? new THREE.Fog(0xa9bfd4, 900, lite ? 4500 : 6500) : null;
+    camera.up.set(0, 1, 0);
+    camera.near = on ? 0.004 : 0.01;
+    camera.far = on ? 12000 : 50;
+    if (on) fit();
+    else { camera.fov = 32; camera.updateProjectionMatrix(); }
+  }
 
   return {
     enter() {
-      world.visible = true;
-      scene.fog = new THREE.Fog(0xb8c8d8, 200, 2500);
+      showWorld(true);
       reset();
+      pad?.reset(0);
       addEventListener("keydown", kd);
       addEventListener("keyup", ku);
-      camPos.set(-4, 1.5, 0);
-      pad?.reset(0);
-      camera.near = 0.004;
-      camera.far = 12000;
-      camera.updateProjectionMatrix();
+      camPos.set(-3.4, 0.9, 0);
     },
     exit() {
-      world.visible = false;
-      scene.fog = null;
+      showWorld(false);
       removeEventListener("keydown", kd);
       removeEventListener("keyup", ku);
+      keys.clear();
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       model.position.copy(home.pos);
       model.quaternion.copy(home.quat);
-      camera.up.set(0, 1, 0);
-      camera.fov = 32;
-      camera.near = 0.01;
-      camera.far = 50;
-      camera.updateProjectionMatrix();
     },
     update,
+    fit,
+    showWorld,
+    home,
+    terrain,
     state: s,
   };
 }

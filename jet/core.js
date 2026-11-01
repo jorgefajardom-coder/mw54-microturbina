@@ -438,7 +438,9 @@ export async function start(profile, cfg) {
     const md = modeOf(motor.M);
     if (md.key !== lastMode) { lastMode = md.key; $("mode").innerHTML = `<b>${md.name}</b> · ${md.say}`; }
     $("mode").style.display = motor.on && !timeline ? "block" : "none";
-    $("readout").innerHTML = motor.on || motor.M > 0.05 ? cfg.readout(o, motor, md, K) : `En tierra · ${parts.length} piezas · ${cfg.say.engines}`;
+    // sólo si cambió: reescribir el mismo texto cada cuadro recalcula estilos y diseño
+    const ro = motor.on || motor.M > 0.05 ? cfg.readout(o, motor, md, K) : `En tierra · ${parts.length} piezas · ${cfg.say.engines}`;
+    if (ro !== frame.ro) { frame.ro = ro; $("readout").innerHTML = ro; }
     profile.onFrame?.(motor);
     stepCamera(now);
     controls.update();

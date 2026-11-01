@@ -13,6 +13,9 @@ import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disa
 import { createFlame } from "./flame.js";
 
 const $ = (id) => document.getElementById(id);
+// escribe en la página sólo si el texto cambió: reescribir lo mismo cada cuadro recalcula estilos y diseño
+const shown = new Map();
+const put = (id, html, prop = "innerHTML") => { if (shown.get(id) !== html) { shown.set(id, html); $(id)[prop] = html; } };
 
 export async function start(profile) {
 const modelLoad = loadModel("./mw54.glb", "./draco/");
@@ -90,6 +93,13 @@ model.traverse((o) => {
     o.castShadow = o.receiveShadow = true;
     // la cubeta de la cabina es una lámina abierta: se ve por las dos caras
     o.material.side = o.material.name.startsWith("Gris de cabina") ? THREE.DoubleSide : THREE.FrontSide;
+    // en el teléfono la transmisión obliga a pintar la escena dos veces por cuadro (de 28 a 46 fps al quitarla en un
+    // Adreno 610, medido en mw54-anatomy): el mismo tinte con transparencia se ve igual a esta escala
+    if (profile.kind === "celular" && o.material.transmission > 0) {
+      o.material.opacity = Math.min(o.material.opacity, 1 - 0.55 * o.material.transmission);
+      o.material.transmission = 0;
+      o.material.depthWrite = false;
+    }
     if (o.material.transmission > 0 || o.material.opacity < 1) { o.material.transparent = true; o.castShadow = false; }
     // el combinador del HUD es una lámina casi invisible con un tinte verde, no un bloque refractivo
     if (o.material.name.startsWith("Combinador")) Object.assign(o.material, { transmission: 0, opacity: 0.16, transparent: true, depthWrite: false });
@@ -473,7 +483,7 @@ const actions = {
 let demoSurfaces = false;
 let flying = false;
 const pad = profile.pad;
-const flight = createFlight({ scene, camera, model, op, motor, setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
+const flight = createFlight({ scene, renderer, camera, model, op, motor, lite: profile.kind === "celular", setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
 
 // ── vista de cabina: la cámara entra por encima del puesto trasero y mira el tablero; los mandos se mueven solos ──
 const VIEWS = {
@@ -526,13 +536,13 @@ function frame() {
   if (hovered && (heatTick % 0.2) < dt) showCard(hovered);
   const rpm = o.n * motor.spin;
   const fuel = ((o.thrust * 0.15) / 3600 / 0.8) * 1e6 * 60 / 1000;
-  $("readout").innerHTML = motor.heat > 0.02
+  put("readout", motor.heat > 0.02
     ? `<b>${fmt(rpm)}</b> rpm · <b>${o.thrust.toFixed(1)}</b> N · EGT <b>${fmt(15 + (o.egt - 15) * motor.heat)}</b> °C · <b>${fmt(fuel)}</b> ml/min`
-    : `Parada · ${SPEC.mass} g · ${parts.length} piezas`;
+    : `Parada · ${SPEC.mass} g · ${parts.length} piezas`);
   const air = o.flow * motor.spin;
   const fuelKg = (o.thrust * 0.15) / 3600;
-  $("chem").innerHTML = `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`;
-  $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
+  put("chem", `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`);
+  put("pipT", motor.heat > 0.02 ? "en combustión" : "fría", "textContent");
   if (!flying) { stepCamera(now); controls.update(); }
   adapt(dt);   // antes de dibujar: si el cambio de resolución va después, ese cuadro se ve negro
   renderer.setScissorTest(false);
