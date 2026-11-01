@@ -59,8 +59,7 @@ controls.maxPolarAngle = Math.PI * 0.49;
 controls.minDistance = 0.25;
 controls.maxDistance = 6 * profile.fit(camera.aspect);
 const sun = new THREE.DirectionalLight(0xffffff, 2.2);
-const SUN_OFFSET = new THREE.Vector3(2.5, 4, 1.5), ORIGIN = new THREE.Vector3();
-sun.position.copy(SUN_OFFSET);
+sun.position.set(2.5, 4, 1.5);
 sun.castShadow = true;
 sun.shadow.mapSize.set(profile.shadowSize, profile.shadowSize);
 Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.4, near: 0.5, far: 10 });
@@ -481,10 +480,6 @@ function frame() {
   poseControls();
   applyPose(now);
   if (flying) flight.update(dt);
-  // la sombra acompaña al avión en vuelo; en el taller vuelve a su sitio
-  sun.target.position.copy(flying ? model.position : ORIGIN);
-  sun.position.copy(sun.target.position).add(SUN_OFFSET);
-  sun.target.updateMatrixWorld();
   // motor: arranque con la bujía, ralentí, y la palanca; el calor llega y se va con inercia térmica
   const fT = motor.on ? motor.target : 0;
   motor.f += (fT - motor.f) * (1 - Math.exp(-dt / (fT > motor.f ? 1.6 : 1.1)));

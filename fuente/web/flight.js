@@ -43,7 +43,7 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
-  const runway = new THREE.Mesh(new THREE.PlaneGeometry(14, 320), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+  const runway = new THREE.Mesh(new THREE.PlaneGeometry(14, 320), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
   runway.rotation.x = -Math.PI / 2;
   runway.rotation.z = Math.PI / 2;
   runway.position.set(120, 0.005, 0);
@@ -217,9 +217,7 @@ export function createFlight({ scene, camera, model, op, motor, setGear, setSurf
     const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(s.q);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(s.q);
     const fov = s.cam === "chase" ? 32 : 70;
-    // plano cercano según la cámara: en la de persecución no hace falta acercarlo tanto, y así la pista no parpadea sobre el pasto
-    const near = s.cam === "chase" ? 0.05 : 0.004;
-    if (camera.fov !== fov || camera.near !== near) { camera.fov = fov; camera.near = near; camera.updateProjectionMatrix(); }
+    if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     if (s.cam === "chase") {
       const want = s.p.clone().addScaledVector(fwd, -3.6).add(new THREE.Vector3(0, 1.0, 0));
       camPos.lerp(want, Math.min(1, dt * 3));
