@@ -13,8 +13,10 @@ nav.sections::-webkit-scrollbar { display: none; }
 nav.sections a { flex: none; }
 nav.sections a { padding: 7px 11px; font-size: 10.5px; }
 
-#bar { left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); background: #0d0f12f2; box-shadow: 0 -1px 0 var(--line); backdrop-filter: blur(10px); }
+#bar { left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); background: #0d0f12f2; box-shadow: 0 -1px 0 var(--line); backdrop-filter: blur(10px); }
 #bar button { height: 56px; padding: 0 2px; border-radius: 14px; line-height: 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 9.5px; letter-spacing: .06em; }
+#bar button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bar #cam span { font-size: 8.5px; letter-spacing: .02em; }
 #bar button i { font-style: normal; font-size: 17px; letter-spacing: 0; line-height: 1; color: var(--muted); }
 #bar button[data-on] i { color: var(--accent); }
 #sheet { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); bottom: calc(80px + env(safe-area-inset-bottom)); padding: 12px; border-radius: 16px; background: #15181df5; box-shadow: inset 0 0 0 1px var(--line), 0 -10px 40px #0009; display: none; grid-template-columns: 1fr 1fr; gap: 8px; }

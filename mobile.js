@@ -11,6 +11,7 @@ const icon = (d) => `<i aria-hidden="true"><svg width="20" height="20" viewBox="
 const ICONS = {
   run: icon('<circle cx="12" cy="12" r="8"/><path d="M12 7v5"/>'),
   explode: icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+  cam: icon('<path d="M12 3c1 3 4 5 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-8z"/><path d="M12 21a2 2 0 0 0 2-2c0-1.5-2-3-2-3s-2 1.5-2 3a2 2 0 0 0 2 2z"/>'),
   cockpit: icon('<path d="M4 15c2-5 5-8 8-8s6 3 8 8"/><path d="M8 15h8"/><path d="M12 15v4"/>'),
   fly: icon('<path d="M2 13l8-2 4-7 2 1-2 6 6 1v2l-6 1 2 6-2 1-4-7-8-2z"/>'),
   more: icon('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'),
@@ -23,7 +24,6 @@ export default async function mobile(profile) {
     `<div class="ui" id="sheet">
       <button id="assemble">Montaje</button>
       <button id="heat">Mapa de calor</button>
-      <button id="cam">Combustión</button>
       <button id="gear">Tren</button>
       <button id="surfaces">Mandos</button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="60" aria-label="Palanca de gas"></label>
@@ -31,6 +31,7 @@ export default async function mobile(profile) {
     <nav class="ui" id="bar">
       <button id="run">${ICONS.run}<span>Motor</span></button>
       <button id="explode">${ICONS.explode}<span>Despiece</span></button>
+      <button id="cam">${ICONS.cam}<span>Combustión</span></button>
       <button id="cockpit">${ICONS.cockpit}<span>Cabina</span></button>
       <button id="fly">${ICONS.fly}<span>Volar</span></button>
       <button id="more">${ICONS.more}<span>Más</span></button>
@@ -54,6 +55,7 @@ export default async function mobile(profile) {
   tap("fly", () => { A.fly(); setFlying(api.state().flying); });
   tap("assemble", A.assemble);
   tap("heat", A.heat);
+  // la cámara de combustión va en la barra, a un toque (no se esconde en «Más»)
   tap("cam", A.pip);
   tap("gear", A.gear, true);
   tap("surfaces", A.surfaces, true);
