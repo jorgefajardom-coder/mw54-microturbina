@@ -1,15 +1,16 @@
+import { createCombustion, reactionAt } from "./combustion.js?v=20261031-flame4";
 // Núcleo del visor del Hawk con su MW54, común a escritorio y celular: escena, modelo, montaje, motor, combustible,
 // cámara de combustión, mapa de calor, cabina y simulador. No escucha ratón, teclado ni toques: cada interfaz
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js?v=20261031-flame3";
+import { setupEnvironment } from "./environment.js?v=20261031-flame4";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-flame3";
-import { createFlight } from "./flight.js?v=20261031-flame3";
-import { createFloor } from "./floor.js?v=20261031-flame3";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-flame3";
-import { createFlame } from "./flame.js?v=20261031-flame3";
+import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-flame4";
+import { createFlight } from "./flight.js?v=20261031-flame4";
+import { createFloor } from "./floor.js?v=20261031-flame4";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-flame4";
+import { createFlame } from "./flame.js?v=20261031-flame4";
 
 const $ = (id) => document.getElementById(id);
 
@@ -138,6 +139,7 @@ for (const e of parts) for (const m of e.materials) { m.userData.entry = e; mesh
 
 // ── estado del motor ──
 const motor = { on: false, f: 0, target: 0.6, spin: 0, heat: 0, angle: 0, t: 0 };
+const combustion = createCombustion();
 const ambient = 15;
 function tempOf(entry) {
   const o = op(motor.f);
@@ -318,9 +320,10 @@ const flameVol = (() => {
         float speed = .6 + 2.4 * uFlow;
         // Lámina de llama unida: variación suave y longitudinal, sin focos puntuales.
         float wave = sin(th * 18.8496 - uTime * speed * 2.);
-        float tip = .84 + .07 * wave;
+        float tip = .48 + .16 * uFlow + .035 * wave;
         float body = smoothstep(.0, .045, u) * (1. - smoothstep(tip - .18, tip, u));
-        float a = body * (.68 + .12 * sin(th * 37.699 - u * 4. + uTime * speed));
+        float injector = .65 + .35 * pow(.5 + .5 * cos(th * 37.699 - 3.12), 2.);
+        float a = body * injector * (.85 + .1 * sin(th * 37.699 - u * 9. + uTime * speed));
         a *= mix(.7, 1., 1. - abs(layer - .5) * 2.);
         vec3 col = mix(vec3(.12, .38, 1.), vec3(1., .85, .18), smoothstep(.04, .26, u));
         col = mix(col, vec3(1., .2, .025), smoothstep(.5, .92, u));
@@ -339,9 +342,9 @@ const flameVol = (() => {
 })();
 function stepFlames(dt) {
   if (!engineRoot) return;
-  flameVol.mesh.visible = motor.heat > 0.02;
+  flameVol.mesh.visible = combustion.state.flame > .01;
   flameVol.mat.uniforms.uTime.value += dt;
-  flameVol.mat.uniforms.uHeat.value = motor.heat;
+  flameVol.mat.uniforms.uHeat.value = combustion.state.flame;
   flameVol.mat.uniforms.uFlow.value = motor.f;
 }
 
@@ -546,8 +549,9 @@ function frame() {
   for (const e of spinners) e.obj.rotation.x = motor.angle;
   const o = op(motor.f);
   // al arrancar, mientras el motor aún no llega a ralentí, sale llama naranja; luego el chorro es casi transparente
-  const startFlame = motor.on ? Math.max(0, 1 - motor.heat / 0.45) : 0;
-  flame.update({ w: { run: 1 - startFlame, start: startFlame }, level: Math.max(startFlame, motor.heat * (0.35 + 0.65 * motor.f)), optimal: 0, reach: 0.6 + 0.4 * motor.f, time: now, visible: motor.heat > 0.02 && parts.every((e) => e.t < 0.02) });
+  const burning = combustion.update(dt, motor);
+  const startFlame = burning.startup;
+  flame.update({ w: { run: 1 - startFlame, start: startFlame }, level: burning.flame * (startFlame * .8 + .025 * motor.f), optimal: 0, reach: .06 + .65 * startFlame, time: now, visible: burning.flame > .01 && parts.every((e) => e.t < 0.02) });
   stepFuel(dt);
   stepFlames(dt);
   if (!flying) stepFocus(dt);
@@ -568,7 +572,7 @@ function frame() {
   const air = o.flow * motor.spin;
   const fuelKg = (o.thrust * 0.15) / 3600;
   $("chem").innerHTML = `<b>C₁₂H₂₃ + 17,75 O₂ → 12 CO₂ + 11,5 H₂O</b><br>Queroseno + 5 % de aceite · AFR global ≈ <b>${air > 0.001 ? Math.round(air / fuelKg) : "—"}</b>:1 · zona primaria ≈ 15:1<br>Llama ≈ <b>${fmt(15 + (o.primary - 15) * motor.heat)}</b> °C · entrada a turbina <b>${fmt(15 + (o.tit - 15) * motor.heat)}</b> °C`;
-  $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
+  $("pipT").textContent = combustion.state.flame > .01 ? "en combustión" : motor.heat > .02 ? "caliente · sin combustión" : "fría";
   if (!flying) { stepCamera(now); controls.update(); }
   adapt(dt);   // antes de dibujar: si el cambio de resolución va después, ese cuadro se ve negro
   renderer.setScissorTest(false);

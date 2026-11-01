@@ -1,14 +1,15 @@
+import { createCombustion, reactionAt } from "../combustion.js?v=20261031-flame4";
 // Núcleo común de los visores de aviones a escala real (SR-72, F-22, SR-71), igual en escritorio y en celular.
 // Todo lo propio de cada avión llega en su config.js: modelo, piezas, física, mecanismos que mueve el Mach, chorros,
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { setupEnvironment } from "../environment.js?v=20261031-flame3";
+import { setupEnvironment } from "../environment.js?v=20261031-flame4";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createFloor } from "../floor.js?v=20261031-flame3";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-flame3";
-import { createFlame } from "../flame.js?v=20261031-flame3";
-import { createFlight } from "../flight.js?v=20261031-flame3";
+import { createFloor } from "../floor.js?v=20261031-flame4";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-flame4";
+import { createFlame } from "../flame.js?v=20261031-flame4";
+import { createFlight } from "../flight.js?v=20261031-flame4";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -121,6 +122,7 @@ export async function start(profile, cfg) {
 
   // ── estado: el motor, los gases y el Mach, que llega con inercia ──
   const motor = { on: false, spin: 0, heat: 0, angle: 0, thr: 0, target: cfg.throttle ?? 0.85, M: 0, Mtarget: 0, mission: null };
+  const combustion = createCombustion();
   let o = op(0, 0);
   const isEngine = (e) => e.data.group === cfg.engine || (cfg.engineAlt && e.data.group === cfg.engineAlt);
   function tempTarget(e) {
@@ -338,7 +340,7 @@ export async function start(profile, cfg) {
     flow.visible = flowWas;
     for (const stream of streams) stream.material.uniforms.onlyFlame.value = 0;
     const burn = Number.isFinite(o.burner) ? o.burner - K : null;
-    $("pipT").textContent = motor.heat > 0.02 ? "en combustión" : "fría";
+    $("pipT").textContent = combustion.state.flame > .01 ? "en combustión" : motor.heat > .02 ? "caliente · sin combustión" : "fría";
     $("chem").innerHTML = `<b>${FUEL[1]}</b><br>Combustible ${FUEL[0]} · aire de la toma a <b>${fmt(o.T0 - K)}</b> °C` +
       (Number.isFinite(o.T3) ? ` · salida del compresor <b>${fmt(o.T3 - K)}</b> °C` : "") +
       (burn !== null ? `<br>Llama en la cámara ≈ <b>${fmt(motor.on ? burn * motor.heat + (o.T0 - K) * (1 - motor.heat) : o.T0 - K)}</b> °C` : "");
@@ -414,13 +416,13 @@ export async function start(profile, cfg) {
     const running = motor.on && motor.spin > 0.3;
     for (const { path, geometry, material } of streams) {
       material.uniforms.time.value += dt * (.5 + motor.thr);
-      material.uniforms.heat.value = motor.heat;
+      material.uniforms.heat.value = combustion.state.flame;
       material.uniforms.share.value = Math.max(0, cfg.flow.share(path, o));
       const burn = geometry.attributes.burn;
       for (let i = 0; i <= segments; i++) {
         const u = i / segments;
         // La llama aparece donde la combustión añade calor, también en postquemador y ramjet.
-        const added = Math.max(0, gasAlong(path, u, o, running) - gasAlong(path, u, o, false)) / 1200;
+        const added = reactionAt(cfg.engine, path, u, combustion.state, o);
         for (let j = 0; j <= sides; j++) burn.setX(i * (sides + 1) + j, added);
       }
       burn.needsUpdate = true;
@@ -616,7 +618,13 @@ export async function start(profile, cfg) {
     motor.angle += dt * motor.spin * (8 + 30 * motor.thr) * (o.turbine ?? 1);
     for (const e of spinners) e.obj.rotation.x = motor.angle * (e.data.spin ?? 1);
     const assembled = parts.every((e) => e.t < 0.02);
-    flame.update({ ...cfg.flame.state(o, motor), time: now, visible: motor.heat > 0.02 && assembled });
+    const burning = combustion.update(dt, motor, o);
+    const plumeState = cfg.flame.state(o, motor);
+    const augmented = Math.max(burning.afterburner, burning.ram);
+    // En seco sólo un resplandor corto; el chorro largo requiere combustión aumentada.
+    plumeState.level *= burning.flame * (.035 + .965 * augmented);
+    plumeState.reach = .06 + .94 * augmented;
+    flame.update({ ...plumeState, time: now, visible: burning.flame > .01 && assembled });
     stepFlow(dt);
     // el metal que pasa de ~520 °C empieza a brillar con su color de cuerpo negro
     if (!heatOn) for (const e of engineParts) { if (e === hovered) continue; const g = blackbody(e.T); for (const m of e.materials) m.material.emissive?.copy(g); }
