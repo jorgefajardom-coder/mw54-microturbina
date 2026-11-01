@@ -50,7 +50,7 @@ export async function createComposer(renderer, scene, camera, profile, options =
   if (profile.kind === "celular" || profile.tier === "baja") {
     return { render: () => renderer.render(scene, camera), setSize() {}, bloom: null };
   }
-  const { createDesktopComposer } = await import("./postprocessing.js?v=20261031-flame2");
+  const { createDesktopComposer } = await import("./postprocessing.js?v=20261031-flame3");
   return createDesktopComposer(renderer, scene, camera, profile, options);
 }
 

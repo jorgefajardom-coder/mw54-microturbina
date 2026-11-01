@@ -3,12 +3,12 @@
 // corte, flujo, lectura y misión. Este archivo no escucha ratón, teclado ni toques; las interfaces (desktop.js,
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
-import { setupEnvironment } from "../environment.js?v=20261031-flame2";
+import { setupEnvironment } from "../environment.js?v=20261031-flame3";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { createFloor } from "../floor.js?v=20261031-flame2";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-flame2";
-import { createFlame } from "../flame.js?v=20261031-flame2";
-import { createFlight } from "../flight.js?v=20261031-flame2";
+import { createFloor } from "../floor.js?v=20261031-flame3";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js?v=20261031-flame3";
+import { createFlame } from "../flame.js?v=20261031-flame3";
+import { createFlight } from "../flight.js?v=20261031-flame3";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -388,14 +388,14 @@ export async function start(profile, cfg) {
         uniform float time, heat, share, onlyFlame; varying vec2 vUv; varying float vBurn;
         void main(){
           #include <clipping_planes_fragment>
-          float hot=smoothstep(.03,.35,vBurn)*heat;
+          float hot=smoothstep(.03,.35,vBurn)*sqrt(heat);
           float tongues=.76+.14*sin(vUv.y*37.7-vUv.x*22.+time*4.)
             +.1*sin(vUv.y*69.1+vUv.x*31.-time*6.);
           float fade=smoothstep(0.,.035,vUv.x)*(1.-smoothstep(.9,1.,vUv.x));
-          vec3 color=mix(vec3(.16,.38,1.),vec3(1.,.36,.055),smoothstep(.15,.8,vBurn));
-          color=mix(color,vec3(1.,.85,.45),smoothstep(.75,1.2,vBurn)*.6);
-          float alpha=fade*share*tongues*(.13*(1.-onlyFlame)*(1.-hot)+.5*hot);
-          gl_FragColor=vec4(color,alpha);
+          vec3 color=mix(vec3(.16,.38,1.),vec3(1.,.62,.04),smoothstep(.15,.8,vBurn));
+          color=mix(color,vec3(1.,.95,.4),smoothstep(.75,1.2,vBurn)*.6);
+          float alpha=fade*share*tongues*(.13*(1.-onlyFlame)*(1.-hot)+.95*hot);
+          gl_FragColor=vec4(color*(1.+.45*hot),min(.95,alpha));
         }`,
     });
     const roots = parts.filter((e) => e.data.group === "engine" && e.data.part === cfg.engine);
@@ -647,6 +647,17 @@ export async function start(profile, cfg) {
     composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
   }
   setExploded(1);
+  // Introducción breve: piezas escalonadas que terminan de montar en unos 2,5 s.
+  assemble();
+  if (timeline) {
+    const lastAt = Math.max(...timeline.steps.map((step) => step.at), .001);
+    for (const step of timeline.steps) {
+      step.at = step.at / lastAt * 1.3;
+      step.dur = .75;
+    }
+    timeline.start += .4;
+    timeline.total = 2.1;
+  }
   frame();
   return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, maxMach: cfg.maxMach };
 }

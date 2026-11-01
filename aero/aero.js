@@ -4,13 +4,13 @@
 // coeficiente de sustentación que pide el vuelo nivelado, la resistencia (de forma, de onda e inducida) y la finura.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { setupEnvironment } from "../environment.js?v=20261031-flame2";
-import { detect, profileFor } from "../device.js?v=20261031-flame2";
-import { loadModel, guardContext, studioLights } from "../look.js?v=20261031-flame2";
-import * as sr71 from "../sr71/sim.js?v=20261031-flame2";
-import * as f22 from "../f22/sim.js?v=20261031-flame2";
-import * as f14 from "../f14/sim.js?v=20261031-flame2";
-import * as sr72 from "../sr72/sim.js?v=20261031-flame2";
+import { setupEnvironment } from "../environment.js?v=20261031-flame3";
+import { detect, profileFor } from "../device.js?v=20261031-flame3";
+import { loadModel, guardContext, studioLights } from "../look.js?v=20261031-flame3";
+import * as sr71 from "../sr71/sim.js?v=20261031-flame3";
+import * as f22 from "../f22/sim.js?v=20261031-flame3";
+import * as f14 from "../f14/sim.js?v=20261031-flame3";
+import * as sr72 from "../sr72/sim.js?v=20261031-flame3";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });

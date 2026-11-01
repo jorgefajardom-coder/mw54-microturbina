@@ -3,13 +3,13 @@
 // (desktop.js, mobile.js) decide cómo se usa y llama a las acciones que devuelve `start`. La calidad de imagen viene
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
-import { setupEnvironment } from "./environment.js?v=20261031-flame2";
+import { setupEnvironment } from "./environment.js?v=20261031-flame3";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-flame2";
-import { createFlight } from "./flight.js?v=20261031-flame2";
-import { createFloor } from "./floor.js?v=20261031-flame2";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-flame2";
-import { createFlame } from "./flame.js?v=20261031-flame2";
+import { op, metal, PARTS, SPEC } from "./model.js?v=20261031-flame3";
+import { createFlight } from "./flight.js?v=20261031-flame3";
+import { createFloor } from "./floor.js?v=20261031-flame3";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "./look.js?v=20261031-flame3";
+import { createFlame } from "./flame.js?v=20261031-flame3";
 
 const $ = (id) => document.getElementById(id);
 
@@ -322,10 +322,12 @@ const flameVol = (() => {
         float body = smoothstep(.0, .045, u) * (1. - smoothstep(tip - .18, tip, u));
         float a = body * (.68 + .12 * sin(th * 37.699 - u * 4. + uTime * speed));
         a *= mix(.7, 1., 1. - abs(layer - .5) * 2.);
-        vec3 col = mix(vec3(.12, .32, 1.), vec3(1., .65, .12), smoothstep(.08, .45, u));
+        vec3 col = mix(vec3(.12, .38, 1.), vec3(1., .85, .18), smoothstep(.04, .26, u));
         col = mix(col, vec3(1., .2, .025), smoothstep(.5, .92, u));
-        a *= uHeat * (.5 + .5 * uFlow);
-        gl_FragColor = vec4(col, a * .65);
+        a *= sqrt(uHeat) * (.85 + .15 * uFlow);
+        // Núcleo amarillo vivo y borde naranja legibles incluso al arrancar.
+        col += vec3(.35, .2, .035) * (1. - smoothstep(.35, .8, u));
+        gl_FragColor = vec4(col * 1.35, min(.94, a * 1.75));
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
@@ -625,6 +627,17 @@ function resize() {
   composer.render();   // cambiar el tamaño borra el lienzo: se vuelve a dibujar en el acto para que no parpadee en negro
 }
 setExploded(1);
+  // Introducción breve: piezas escalonadas que terminan de montar en unos 2,5 s.
+  assemble();
+  if (timeline) {
+    const lastAt = Math.max(...timeline.steps.map((step) => step.at), .001);
+    for (const step of timeline.steps) {
+      step.at = step.at / lastAt * 1.3;
+      step.dur = .75;
+    }
+    timeline.start += .4;
+    timeline.total = 2.1;
+  }
 frame();
 return { actions, state, pick, focusPicked, resize, onChange: (fn) => { listeners.add(fn); fn(state()); }, canvas: renderer.domElement, renderer };
 }

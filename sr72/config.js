@@ -1,6 +1,6 @@
 // El SR-72 con la forma del Darkstar para el visor común: modelo, piezas, física y mecanismos.
-import * as sim from "./sim.js?v=20261031-flame2";
-import { fmt } from "../jet/core.js?v=20261031-flame2";
+import * as sim from "./sim.js?v=20261031-flame3";
+import { fmt } from "../jet/core.js?v=20261031-flame3";
 
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const clamp1 = (v) => Math.max(-1, Math.min(1, v));
