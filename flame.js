@@ -72,7 +72,9 @@ export function createFlame(scene, spec, { steps = 40 } = {}) {
         if (t.y <= t.x) discard;
         float dt = (t.y - t.x) / float(STEPS);
         vec3 acc = vec3(0.);
-        float jitter = h(vec3(gl_FragCoord.xy, uTime)) * dt;
+        // tramado fijo por píxel (ruido de gradiente entrelazado): reparte los pasos sin cambiar de un cuadro al otro, así
+        // el volumen se ve continuo; un desfase aleatorio nuevo en cada cuadro hacía hervir la llama como chispas
+        float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715)))) * dt;
         for (int i = 0; i < STEPS; i++){
           vec3 p = ro + rd * (t.x + jitter + dt * float(i));
           float u = clamp(-p.x, 0., 1.);

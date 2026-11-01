@@ -281,49 +281,75 @@ flame.add(plumeHolder, EXIT, { length: 0.55, r: 0.03 });   // boca de la tobera 
 // ── cámara de combustión: un segundo punto de vista con el motor cortado por la mitad y la llama dentro ──
 const pipCam = new THREE.PerspectiveCamera(38, 340 / 220, 0.005, 5);
 const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-const FLAMES = 900;
-const flameGeo = new THREE.BufferGeometry();
-const fpos = new Float32Array(FLAMES * 3);
-const fseed = new Float32Array(FLAMES);
-for (let i = 0; i < FLAMES; i++) fseed[i] = Math.random();
-flameGeo.setAttribute("position", new THREE.BufferAttribute(fpos, 3));
-flameGeo.setAttribute("seed", new THREE.BufferAttribute(fseed, 1));
-const flameMat = new THREE.ShaderMaterial({
-  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  uniforms: { uSize: { value: 26 } },
-  vertexShader: `attribute float seed; varying float vLife; uniform float uSize;
-    void main(){ vLife = fract(seed); vec4 mv = modelViewMatrix * vec4(position,1.); gl_PointSize = uSize * (1.-vLife*.6) / -mv.z * 0.1; gl_Position = projectionMatrix * mv; }`,
-  fragmentShader: `varying float vLife;
-    void main(){ vec2 c = gl_PointCoord - .5; float d = length(c); float a = smoothstep(.5, .0, d);
-      vec3 col = mix(vec3(.55,.75,1.), vec3(1.,.7,.25), smoothstep(.0,.25,vLife)); col = mix(col, vec3(1.,.35,.1), smoothstep(.4,.9,vLife));
-      gl_FragColor = vec4(col * a * (1.-vLife) * 1.4, a * (1.-vLife)); }`,
-});
-const flames = new THREE.Points(flameGeo, flameMat);
-flames.layers.set(1);
-flames.frustumCulled = false;
-scene.add(flames);
+// la llama como volumen, no como chispas: una corona entre los dos tubos del anular (r 22–33 mm, de la cabeza de los
+// vaporizadores a la entrada del estátor), con seis antorchas, azul en la zona primaria y amarilla a naranja hacia la
+// turbina, con lenguas que avanzan con el gasto. Va en la capa 1 (sólo la ve la cámara de combustión) y la corta el
+// mismo plano que al motor.
+const flameVol = (() => {
+  const S = 48, A = 96, Rr = [22, 27.5, 33];
+  const pos = [], uv = [], idx = [];
+  for (let k = 0; k < Rr.length; k++) {
+    const base = pos.length / 3;
+    for (let i = 0; i <= S; i++) for (let j = 0; j <= A; j++) {
+      const u = i / S, th = (j / A) * Math.PI * 2;
+      const r = Rr[k] + Math.sin(th * 6 + 3.1) * 1.2 * u;
+      pos.push(...fromBlender([-(54 + u * 52), r * Math.cos(th), r * Math.sin(th)]).toArray());
+      uv.push(u, th / (Math.PI * 2), k / (Rr.length - 1));
+    }
+    for (let i = 0; i < S; i++) for (let j = 0; j < A; j++) {
+      const a = base + i * (A + 1) + j, b = a + A + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("fuv", new THREE.Float32BufferAttribute(uv, 3));
+  geo.setIndex(idx);
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, clipping: true,
+    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uFlow: { value: 0 } },
+    vertexShader: `#include <clipping_planes_pars_vertex>
+      attribute vec3 fuv; varying vec3 vUv;
+      void main(){ vUv = fuv; vec4 mvPosition = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mvPosition;
+        #include <clipping_planes_vertex>
+      }`,
+    fragmentShader: `#include <clipping_planes_pars_fragment>
+      uniform float uTime; uniform float uHeat; uniform float uFlow; varying vec3 vUv;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+        return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ float a = .5, s = 0.; for (int i = 0; i < 4; i++) { s += a * n2(p); p *= 2.03; a *= .5; } return s; }
+      void main(){
+        #include <clipping_planes_fragment>
+        float u = vUv.x, th = vUv.y, layer = vUv.z;
+        float speed = .6 + 2.4 * uFlow;
+        float torch = pow(.5 + .5 * cos((th * 6. - .5) * 6.2832), mix(6., 1.2, u));
+        float tongues = fbm(vec2(th * 18., u * 5. - uTime * speed));
+        float flick = fbm(vec2(th * 40. + layer * 3., u * 9. - uTime * speed * 1.7));
+        float body = smoothstep(.0, .08, u) * (1. - smoothstep(.55, 1., u));
+        float a = body * (.35 + .65 * torch) * smoothstep(.25 + .35 * u, .95, tongues + .35 * flick + .2 * (1. - u));
+        a *= mix(1., .55, abs(layer - .5) * 2.);
+        vec3 blue = vec3(.25, .45, 1.), yel = vec3(1., .78, .35), org = vec3(1., .4, .1);
+        vec3 col = mix(blue, yel, smoothstep(.08, .35, u)); col = mix(col, org, smoothstep(.45, .85, u));
+        col += vec3(1., .9, .7) * pow(max(tongues + flick - .9, 0.), 2.) * 2.;
+        a *= uHeat * (.5 + .5 * uFlow);
+        gl_FragColor = vec4(col * a * .85, a);
+      }`,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.layers.set(1);
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  engineRoot?.obj.add(mesh);
+  return { mesh, mat };
+})();
 pipCam.layers.enable(1);
 function stepFlames(dt) {
   if (!engineRoot) return;
-  const burning = motor.heat;
-  flames.visible = burning > 0.02;
-  if (!flames.visible) return;
-  const M = engineRoot.obj.matrixWorld;
-  const speed = 0.4 + 1.6 * motor.f;
-  for (let i = 0; i < FLAMES; i++) {
-    fseed[i] = (fseed[i] + dt * speed * (0.6 + 0.8 * ((i * 0.618) % 1))) % 1;
-    const life = fseed[i];
-    const jet = i % 6;
-    const th = (jet / 6) * Math.PI * 2 + 0.52 + (((i * 0.37) % 1) - 0.5) * 0.9 * life;
-    const s = 56 + life * 46;
-    const r = 27 + Math.sin(i * 1.7) * (4 + 6 * life);
-    // marco del motor en Blender: punto(s, r, θ) = (−s, r cos θ, r sin θ)
-    const p = fromBlender([-s, r * Math.cos(th), r * Math.sin(th)]);
-    p.applyMatrix4(M);
-    fpos.set([p.x, p.y, p.z], i * 3);
-  }
-  flameGeo.attributes.position.needsUpdate = true;
-  flameGeo.attributes.seed.needsUpdate = true;
+  flameVol.mesh.visible = motor.heat > 0.02;
+  flameVol.mat.uniforms.uTime.value += dt;
+  flameVol.mat.uniforms.uHeat.value = motor.heat;
+  flameVol.mat.uniforms.uFlow.value = motor.f;
 }
 
 // ── mapa de calor: cada pieza con el color de su temperatura (escala turbo) ──

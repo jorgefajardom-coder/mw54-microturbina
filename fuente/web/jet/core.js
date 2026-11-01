@@ -221,14 +221,16 @@ export async function start(profile, cfg) {
   // ── corte por el plano medio del motor, con el aire que lo recorre coloreado por su temperatura ──
   const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), cfg.cut.z);
   let cutOn = false;
-  const FLOW = profile.tier === "baja" ? 700 : 1400;
+  const FLOW = profile.tier === "baja" ? 360 : 640;
   const flowGeo = new THREE.BufferGeometry();
-  const fpos = new Float32Array(FLOW * 3);
-  const fcol = new Float32Array(FLOW * 3);
+  // cada parcela de gas deja una estela corta a lo largo de su línea de corriente (segmento de la cabeza a la cola, que
+  // se apaga hacia atrás): se lee como flujo continuo y no como granos
+  const fpos = new Float32Array(FLOW * 6);
+  const fcol = new Float32Array(FLOW * 6);
   const fseed = Float32Array.from({ length: FLOW }, () => Math.random());
   flowGeo.setAttribute("position", new THREE.BufferAttribute(fpos, 3));
   flowGeo.setAttribute("color", new THREE.BufferAttribute(fcol, 3));
-  const flow = new THREE.Points(flowGeo, new THREE.PointsMaterial({ size: cfg.flow.size ?? 0.11, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const flow = new THREE.LineSegments(flowGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending }));
   flow.frustumCulled = false;
   flow.visible = false;
   scene.add(flow);
@@ -245,12 +247,17 @@ export async function start(profile, cfg) {
       const alive = i / FLOW < Math.max(0.04, share);
       fseed[i] = (fseed[i] + dt * cfg.flow.speed(path, o) * (0.7 + 0.6 * ((i * 0.618) % 1))) % 1;
       const u = fseed[i];
-      const p = curves[path].getPointAt(u);
-      const [sy, sz] = cfg.flow.spread(path, u);
-      tmpV.copy(fromBlender([p.x, alive ? sy * (((i * 0.37) % 1) - 0.5) * 2 : 1e6, p.z + sz * (((i * 0.73) % 1) - 0.5) * 2])).applyMatrix4(M);
-      fpos.set([tmpV.x, tmpV.y, tmpV.z], i * 3);
-      const c = turbo(gasAlong(path, u, o, running) / 2200);
-      fcol.set([c.r, c.g, c.b], i * 3);
+      const tail = Math.max(0, u - 0.09);
+      const oy = ((i * 0.37) % 1) - 0.5, oz = ((i * 0.73) % 1) - 0.5;
+      for (const [k, w] of [[0, u], [1, tail]]) {
+        const p = curves[path].getPointAt(w);
+        const [sy, sz] = cfg.flow.spread(path, w);
+        tmpV.copy(fromBlender([p.x, alive ? sy * oy * 2 : 1e6, p.z + sz * oz * 2])).applyMatrix4(M);
+        fpos.set([tmpV.x, tmpV.y, tmpV.z], i * 6 + k * 3);
+        const c = turbo(gasAlong(path, w, o, running) / 2200);
+        const fade = k ? 0.15 : 1;
+        fcol.set([c.r * fade, c.g * fade, c.b * fade], i * 6 + k * 3);
+      }
     }
     flowGeo.attributes.position.needsUpdate = true;
     flowGeo.attributes.color.needsUpdate = true;
