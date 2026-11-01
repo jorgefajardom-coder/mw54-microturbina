@@ -140,10 +140,12 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
 
   // ── viento real: brisa constante con ráfagas y turbulencia que crece al despegarse del suelo ──
   const wind = new THREE.Vector3();
-  const BREEZE = new THREE.Vector3(-2.2, 0, 0.9);
+  // brisa moderada casi de cara a la pista (las pistas se orientan al viento dominante): se nota en la manga sin
+  // empujar el avión fuera del eje al rodar
+  const BREEZE = new THREE.Vector3(-1.6, 0, 0.2);
   function stepWind(t, alt) {
     const gust = 0.6 + 0.4 * Math.sin(t * 0.37) * Math.sin(t * 0.11 + 1.3);
-    const turb = THREE.MathUtils.clamp(alt / 20, 0.15, 1) * 0.9;
+    const turb = THREE.MathUtils.clamp(alt / 25, 0.1, 1) * 0.55;
     wind.copy(BREEZE).multiplyScalar(gust);
     wind.x += turb * (Math.sin(t * 1.7) + 0.5 * Math.sin(t * 4.3 + 2));
     wind.y += turb * 0.6 * (Math.sin(t * 2.1 + 0.7) + 0.5 * Math.sin(t * 5.9));
@@ -219,8 +221,14 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     let yawIn = clamp1(want("z", "x") + (ax?.yaw ?? 0));
     const fwdNow = new THREE.Vector3(1, 0, 0).applyQuaternion(s.q);
     const psi = Math.atan2(fwdNow.z, fwdNow.x);
-    if (!s.onGround || Math.abs(yawIn) > 0.02 || s.v.length() < 1) s.hold = psi;
-    else if (s.assist) yawIn = THREE.MathUtils.clamp(Math.atan2(Math.sin(psi - s.hold), Math.cos(psi - s.hold)) * 6 + s.w.y * 0.4, -1, 1);
+    // sólo rodando (menos de 25 m/s) y con fuerza que baja con la velocidad: cerca de la rotación el timón ya muerde
+    // fuerte y un golpe a fondo, con el diedro, tumbaba el avión al despegar
+    const vGround = s.v.length();
+    if (!s.onGround || Math.abs(yawIn) > 0.02 || vGround < 1 || vGround > 25) s.hold = psi;
+    else if (s.assist) {
+      const lim = THREE.MathUtils.clamp(10 / vGround, 0.4, 1);
+      yawIn = THREE.MathUtils.clamp(Math.atan2(Math.sin(psi - s.hold), Math.cos(psi - s.hold)) * 6 + s.w.y * 0.4, -lim, lim);
+    }
     s.yaw += (yawIn - s.yaw) * Math.min(1, dt * 5);
     if (keys.has("shift") || keys.has("arrowup")) s.throttle = Math.min(1, s.throttle + dt * 0.5);
     if (keys.has("control") || keys.has("arrowdown")) s.throttle = Math.max(0, s.throttle - dt * 0.5);
@@ -241,9 +249,13 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     const beta = Math.asin(THREE.MathUtils.clamp(vb.z / V, -1, 1));
     const qbar = 0.5 * RHO * V * V;
     // tirar (S) sube el morro: borde de salida del estabilizador hacia arriba, deflexión negativa
-    const de = -s.pitch * THREE.MathUtils.degToRad(16);
-    const da = s.roll * THREE.MathUtils.degToRad(20);
-    const dr = -s.yaw * THREE.MathUtils.degToRad(22);
+    // doble régimen automático con el giróscopo puesto (como en los reactores de radiocontrol): el recorrido baja con la
+    // presión dinámica, así la palanca a fondo da el mismo giro firme a 90 que a 200 km/h; con las teclas (todo o nada)
+    // los recorridos completos a 140 km/h daban más de 250°/s y el piloto entraba en oscilación
+    const rate = s.assist ? THREE.MathUtils.clamp((22 / Math.max(V, 1)) ** 2, 0.22, 1) : 1;
+    const de = -s.pitch * THREE.MathUtils.degToRad(16) * rate;
+    const da = s.roll * THREE.MathUtils.degToRad(20) * rate;
+    const dr = -s.yaw * THREE.MathUtils.degToRad(22) * Math.max(rate, 0.45);
     const flap = s.flap * 0.8;
     const gearDown = 1 - gearState.t;
     // sustentación con pérdida: por encima de ~15° de ataque cae hacia una placa plana
@@ -274,8 +286,8 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
       const bank = Math.asin(THREE.MathUtils.clamp(-right.y, -1, 1));
       const gamma = Math.asin(THREE.MathUtils.clamp(s.v.y / V, -1, 1));
       const kq = qbar * AC.S;
-      M.x += Math.abs(s.roll) < 0.05 ? kq * AC.b * (-0.06 * bank - 0.25 * p) : kq * AC.b * -0.05 * p;
-      M.z += Math.abs(s.pitch) < 0.05 ? kq * AC.c * (-0.35 * gamma - 2.5 * qd) : kq * AC.c * -1.0 * qd;
+      M.x += Math.abs(s.roll) < 0.05 ? kq * AC.b * (-0.06 * bank - 0.3 * p) : kq * AC.b * -0.2 * p;
+      M.z += Math.abs(s.pitch) < 0.05 ? kq * AC.c * (-0.35 * gamma - 3 * qd) : kq * AC.c * -3 * qd;
     }
     // gravedad y suelo, en ejes de mundo
     const Fw = F.clone().applyMatrix4(R);
@@ -299,8 +311,12 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
       const side = new THREE.Vector3(0, 1, 0).cross(fwd);
       const mu = contacts === BELLY ? 0.5 : 0.02 + 0.5 * s.brake;
       fc.addScaledVector(fwd, -Math.sign(vel.dot(fwd)) * Math.min(Math.abs(vel.dot(fwd)) * 40, mu * n));
-      const steerV = c.steer ? vel.dot(side) - fwd.dot(vel) * dr * 0.8 : vel.dot(side);
-      fc.addScaledVector(side, -THREE.MathUtils.clamp(steerV * 60, -0.9 * n, 0.9 * n));
+      // rueda de morro en el mismo sentido que el timón (Z a la izquierda, X a la derecha); antes giraba al revés y en
+      // tierra el asistente de rumbo agrandaba el desvío hasta el trompo
+      const steerV = c.steer ? vel.dot(side) + fwd.dot(vel) * dr * 0.8 : vel.dot(side);
+      // el neumático no se deja arrastrar de lado: rigidez lateral de 400 N·s/m hasta el límite de adherencia (con 60 el
+      // viento cruzado sobre la deriva hacía girar el avión parado hasta dar un trompo)
+      fc.addScaledVector(side, -THREE.MathUtils.clamp(steerV * 400, -0.9 * n, 0.9 * n));
       Fw.add(fc);
       Mw.add(rp.clone().cross(fc));
       if (contacts === BELLY && -vel.y > 2.5) crash("aterrizaje de panza demasiado fuerte");
