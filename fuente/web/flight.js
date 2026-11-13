@@ -27,7 +27,7 @@ export const HAWK = { AC, CL, CD, CM, CR, CN, WHEELS, SKIN, BELLY, world: 1, siz
 // Célula de un avión a escala real a partir de sus datos (los de Aerodinámica) y de su modelo 3D: ruedas, morro, cola,
 // deriva y puntas de ala salen de la caja de cada pieza, no de números a mano. Coeficientes de un ala de ese
 // alargamiento (pendiente de Helmbold, pérdida tardía en los deltas) y momentos de inercia de un caza de ese tamaño.
-export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, thrust, hud, world = 10 }) {
+export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy = [], thrust, hud, world = 10 }) {
   const b = Math.sqrt(AR * S);
   const c = S / b;
   model.updateMatrixWorld(true);
@@ -68,6 +68,21 @@ export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, thrust,
       if (v.z < zl) { zl = v.z; tipL.copy(v); }
     }
   });
+  // Ojos en la vista de cabina: la cúpula es opaca y se esconde en esa vista, así que los ojos van justo por encima de
+  // lo que haya debajo de ella (el puesto, o el fuselaje en un avión sin piloto), nunca dentro de una pieza.
+  const hidden = new Set();
+  for (const c of canopy) c.traverse((o) => hidden.add(o));
+  let under = -Infinity;
+  model.traverse((o) => {
+    if (!o.isMesh || hidden.has(o)) return;
+    const pos = o.geometry.attributes.position;
+    const mtx = inv.clone().multiply(o.matrixWorld);
+    for (let i = 0; i < pos.count; i += 3) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mtx);
+      if (Math.abs(v.x - eye[0]) < 0.4 && Math.abs(v.z) < 0.35 && v.y > under) under = v.y;
+    }
+  });
+  const eyeY = Math.max(eye[1], under + 0.15);
   tipR.sub(cg);
   tipL.sub(cg);
   all.min.sub(cg);
@@ -87,7 +102,7 @@ export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, thrust,
     CM: { z: 0, a: -0.55, q: -10, de: -0.8, flap: -0.04 },
     CR: { b: -0.06, p: -0.4, da: 0.12, r: 0.06 },
     CN: { b: 0.1, r: -0.15, dr: -0.07 },
-    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eye[1] - cg.y], tips: [tipR, tipL], thrust, hud, fixedGear: true, cg,
+    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eyeY - cg.y], canopy, tips: [tipR, tipL], thrust, hud, fixedGear: true, cg,
   };
 }
 
@@ -504,6 +519,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     const fovWant = s.cam === "chase" ? null : 70;
     if (fovWant && camera.fov !== fovWant) { camera.fov = fovWant; camera.updateProjectionMatrix(); }
     if (!fovWant && s.cam !== update.cam) fit();
+    if (s.cam !== update.cam) showCanopy(s.cam !== "cockpit");
     update.cam = s.cam;
     const o = airframe.hud ? null : op(motor.f);
     const alt = Math.max(0, s.p.y - terrain.heightAt(s.p.x, s.p.z));
@@ -526,6 +542,8 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
       `Viento ${wind.length().toFixed(1)} m/s · Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * 40).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${stall ? " · <b>PÉRDIDA</b>" : ""}`,
     );
   }
+  // la cúpula de los jets es opaca y su puesto una caja de relleno: desde dentro taparían la vista
+  function showCanopy(on) { for (const c of airframe.canopy ?? []) c.visible = on; }
   let lastHud = "";
   function $hud(html) { if (html !== lastHud) { lastHud = html; document.getElementById("hud").innerHTML = html; } }
   // campo de visión horizontal fijo (~56°): en un teléfono vertical el avión no se sale por los lados
@@ -563,6 +581,8 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
       removeEventListener("keydown", kd);
       removeEventListener("keyup", ku);
       keys.clear();
+      showCanopy(true);
+      update.cam = null;
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       model.position.copy(home.pos);
       model.quaternion.copy(home.quat);

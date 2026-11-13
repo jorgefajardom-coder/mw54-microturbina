@@ -8,6 +8,7 @@ Figura isométrica interactiva de la microturbina Wren MW54: despiece, simulaci�
 npm run build   # dist/index.html y dist/light.html
 npm run audit   # comprueba la geometría
 npm run vuelos  # 100 vuelos de pista a un punto B y de vuelta a tierra con cada avión; falla si uno no aterriza
+npm run vuelos -- --celular  # lo mismo con la interfaz de celular (390 × 844, terreno ligero)
 ```
 
 Datos del motor: [GTBA · MW54](https://www.gtba.co.uk/engine_designs/mw54.php).
@@ -45,6 +46,7 @@ Interactive isometric figure of the Wren MW54 micro-turbine: exploded view, asse
 npm run build   # dist/index.html and dist/light.html
 npm run audit   # checks the geometry
 npm run vuelos  # 100 flights from the runway to a point B and back to a full stop with every aircraft; fails if one does not land
+npm run vuelos -- --celular  # the same with the phone interface (390 × 844, light terrain)
 ```
 
 Engine data: [GTBA · MW54](https://www.gtba.co.uk/engine_designs/mw54.php).

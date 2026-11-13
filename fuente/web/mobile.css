@@ -135,3 +135,7 @@ body[data-orient="landscape"] .stick { width: min(26vw, 150px); }
 body:has(#legend[style*="block"]) #mode, body:has(#sheet[data-open]) #mode { display: none !important; }
 body:has(#mode[style*="block"]) #legend { top: calc(58px + env(safe-area-inset-top)); }
 body[data-orient="landscape"] #mode { max-width: calc(100% - 120px); transform: translateX(calc(-50% - 42px)); }
+/* volando: en vertical las consolas ocupan la franja de arriba, así que el aviso del régimen va debajo de ellas; en
+   horizontal no hay barra lateral y va centrado bajo el HUD, entre las dos palancas */
+body[data-flying] #mode { top: calc(216px + env(safe-area-inset-top)); max-width: calc(100% - 24px); }
+body[data-flying][data-orient="landscape"] #mode { top: calc(74px + env(safe-area-inset-top)); max-width: min(420px, calc(100% - 2 * min(26vw, 150px) - 40px)); transform: translateX(-50%); }

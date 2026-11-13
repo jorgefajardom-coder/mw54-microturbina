@@ -486,7 +486,7 @@ export async function start(profile, cfg) {
       eye = [bb.min.x + 0.62 * (bb.max.x - bb.min.x), bb.max.y - 0.32];
     }
     const airframe = jetAirframe({
-      model, parts, ...F, eye: eye ?? [0.3 * F.length, 1],
+      model, parts, ...F, eye: eye ?? [0.3 * F.length, 1], canopy: parts.filter((e) => e.data.part.startsWith("cabina")).map((e) => e.obj),
       thrust: ({ V, h, rho }) => {
         const M = V / sound(h);
         motor.Mtarget = Math.min(M, cfg.maxMach);
