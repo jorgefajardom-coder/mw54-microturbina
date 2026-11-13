@@ -9,6 +9,7 @@ import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { createFloor } from "../floor.js";
 import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js";
 import { createFlame } from "../flame.js";
+import { createFlight, jetAirframe } from "../flight.js";
 
 const $ = (id) => document.getElementById(id);
 export const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -77,7 +78,8 @@ export async function start(profile, cfg) {
   scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.4));
   studioLights(scene, cfg.view.max / 4);
   const composer = createComposer(renderer, scene, camera, profile, { aoRadius: cfg.view.max / 140 });
-  scene.add(createFloor(renderer, { ...cfg.floor, res: profile.textureSize }));
+  const floor = createFloor(renderer, { ...cfg.floor, res: profile.textureSize });
+  scene.add(floor);
 
   // ── modelo ──
   const gltf = await modelLoad;
@@ -466,7 +468,46 @@ export async function start(profile, cfg) {
   const listeners = new Set();
   let heatTick = 0;
   let demo = false;
-  const state = () => ({ exploded, running: motor.on, heat: heatOn, cut: cutOn, surfaces: demo, mission: !!motor.mission, mach: motor.Mtarget, throttle: motor.target });
+  // ── vuelo: el mismo simulador que el Hawk con la célula de este avión (datos de Aerodinámica, ruedas y cabina
+  // medidas en su modelo) y el empuje de su modelo de motor a la Mach y altitud reales, en un aeródromo a escala ──
+  let flying = false;
+  let flight = null;
+  const flyState = { M: 0, thrust: 0, ab: 0 };
+  const sound = (h) => Math.sqrt(1.4 * 287 * (h < 11000 ? 288.15 - 0.0065 * h : 216.65));
+  function ensureFlight() {
+    if (flight) return flight;
+    const F = cfg.fly;
+    const cockpit = parts.find((e) => e.data.part === "cabina");
+    let eye = null;
+    if (cockpit) {
+      model.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(cockpit.obj).applyMatrix4(model.matrixWorld.clone().invert());
+      // ojos del piloto (el de delante en los biplazas): en la mitad delantera de la cúpula, 30 cm bajo el techo
+      eye = [bb.min.x + 0.62 * (bb.max.x - bb.min.x), bb.max.y - 0.32];
+    }
+    const airframe = jetAirframe({
+      model, parts, ...F, eye: eye ?? [0.3 * F.length, 1],
+      thrust: ({ V, h, rho }) => {
+        const M = V / sound(h);
+        motor.Mtarget = Math.min(M, cfg.maxMach);
+        const oo = op(Math.min(M, cfg.maxMach), motor.thr);
+        const rhoOp = 1.225 * Math.exp(-(oo.h ?? 0) / 7.6);
+        flyState.M = M;
+        flyState.ab = oo.ab ?? 0;
+        flyState.thrust = motor.on ? F.engines * oo.thrust * 1000 * Math.pow(rho / rhoOp, 0.75) * motor.spin : 0;
+        return flyState.thrust;
+      },
+      hud: (info, s, short) => {
+        const gas = `gas ${(s.throttle * 100).toFixed(0)} %${flyState.ab > 0.2 ? " · postquemador" : ""}`;
+        if (!motor.on) return `${cfg.say.engines} apagados · ${short ? "Arranque" : "E"} para arrancar`;
+        return short ? `Mach <b>${flyState.M.toFixed(2)}</b> · ${(flyState.thrust / 1000).toFixed(0)} kN · ${gas}` : `${cfg.say.engines} · Mach <b>${flyState.M.toFixed(2)}</b> · <b>${(flyState.thrust / 1000).toFixed(0)}</b> kN · ${gas}`;
+      },
+    });
+    flight = createFlight({ scene, renderer, camera, model, op: () => ({}), motor, lite: profile.kind === "celular", setGear: () => {}, setSurfaces: (c) => Object.assign(surf, { roll: c.roll, pitch: c.pitch, yaw: c.yaw }), gearState: { t: 0, target: 0 }, pad: profile.pad, airframe });
+    return flight;
+  }
+  const camBack = { near: camera.near, far: camera.far, fov: camera.fov };
+  const state = () => ({ exploded, running: motor.on, heat: heatOn, cut: cutOn, surfaces: demo, mission: !!motor.mission, mach: motor.Mtarget, throttle: motor.target, flying });
   const notify = () => { const st = state(); for (const fn of listeners) fn(st); };
   const actions = {
     assemble() { assemble(); notify(); },
@@ -477,9 +518,27 @@ export async function start(profile, cfg) {
     mission() { motor.mission = motor.mission ? null : { start: performance.now() / 1000 }; if (motor.mission && !motor.on) { motor.on = true; settle(); } notify(); },
     heat() { heatOn = !heatOn; $("legend").style.display = heatOn ? "block" : "none"; paintHeat(); notify(); },
     cut() { setCut(!cutOn); if (cutOn) settle(); flyCamera(cutOn ? "cut" : "home"); if (heatOn) paintHeat(); notify(); },
+    fly() {
+      flying = !flying;
+      document.body.toggleAttribute("data-flying", flying);
+      if (flying) {
+        timeline = null; settle(); setExploded(0);
+        if (cutOn) setCut(false);
+        motor.mission = null; demo = false;
+        controls.enabled = false; floor.visible = false;
+        ensureFlight().enter();
+      } else {
+        flight.exit();
+        Object.assign(camera, camBack); camera.updateProjectionMatrix();
+        controls.enabled = true; floor.visible = true;
+        Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); motor.Mtarget = 0;
+        flyCamera("home");
+      }
+      notify();
+    },
     surfaces() { demo = !demo; if (!demo) Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); notify(); },
   };
-  window.__sim = { motor, camera, controls, model, op: () => o };
+  window.__sim = { motor, camera, controls, model, op: () => o, get flight() { return flight; } };
 
   function missionMach(t) {
     const legs = cfg.mission;
@@ -546,8 +605,8 @@ export async function start(profile, cfg) {
     const ro = motor.on || motor.M > 0.05 ? cfg.readout(o, motor, md, K) : `En tierra · ${parts.length} piezas · ${cfg.say.engines}`;
     if (ro !== frame.ro) { frame.ro = ro; $("readout").innerHTML = ro; }
     profile.onFrame?.(motor);
-    stepCamera(now);
-    controls.update();
+    if (flying) flight.update(dt);
+    else { stepCamera(now); controls.update(); }
     // el cambio de resolución va antes de dibujar: si va después, ese cuadro se ve negro
     adapt(dt);
     if (shadowDirty || timeline || demo || now - shadowAt > 0.5) { renderer.shadowMap.needsUpdate = true; shadowAt = now; shadowDirty = false; }

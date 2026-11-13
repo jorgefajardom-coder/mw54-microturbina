@@ -41,7 +41,11 @@ function baseHeight(x, z) {
   return rawHeight(x, z) - 26 * Math.exp(-d2 / (LAKE.r * LAKE.r));
 }
 
-export function createTerrain({ lite }) {
+// `scale` agranda el paisaje en planta (y `vscale` en altura) para los aviones a escala real: con 10 la pista mide
+// 3,2 km y el valle, decenas de kilómetros; hangares, manga y árboles crecen menos (`AZ`, `TZ`), como en un aeródromo
+// de verdad. Con 1 es el aeródromo de la maqueta del Hawk.
+export function createTerrain({ lite, scale = 1, vscale = scale }) {
+  const K = scale, VS = vscale, AZ = Math.min(scale, 2.5), TZ = Math.min(scale, 1.6);
   const group = new THREE.Group();
   const N = lite ? 160 : 240;
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, N, N);
@@ -93,17 +97,22 @@ export function createTerrain({ lite }) {
   for (let i = 0; i < uvs.count; i++) uvs.setXY(i, pos.getX(i) / 24, pos.getZ(i) / 24);
   // el suelo, los árboles y el hormigón son mates del todo: Lambert da lo mismo que el PBR con mucho menos cálculo por píxel
   const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, map: detail }));
+  ground.scale.set(K, VS, K);
   ground.receiveShadow = true;
   group.add(ground);
 
   const water = new THREE.Mesh(new THREE.CircleGeometry(LAKE.r * 2.2, 48), new THREE.MeshStandardMaterial({ color: 0x2c4a5e, roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.88 }));
   water.rotation.x = -Math.PI / 2;
-  water.position.set(LAKE.x, lakeLevel, LAKE.z);
+  water.position.set(LAKE.x * K, lakeLevel * VS, LAKE.z * K);
+  water.scale.set(K, K, 1);
   group.add(water);
 
   // altura en cualquier punto, leyendo la malla tal como se dibuja (dos triángulos por celda)
   const step = SIZE / N;
   function heightAt(x, z) {
+    return VS * baseAt(x / K, z / K);
+  }
+  function baseAt(x, z) {
     const gx = clamp((x + SIZE / 2) / step, 0, N - 1e-6), gz = clamp((z + SIZE / 2) / step, 0, N - 1e-6);
     const i = Math.floor(gx), j = Math.floor(gz), u = gx - i, v = gz - j;
     const a = H[j * (N + 1) + i], b = H[j * (N + 1) + i + 1], cc = H[(j + 1) * (N + 1) + i], d = H[(j + 1) * (N + 1) + i + 1];
@@ -112,7 +121,7 @@ export function createTerrain({ lite }) {
 
   // ── obstáculos para las colisiones: cajas (hangares) y cilindros verticales (árboles, mástil) en una rejilla de 25 m,
   // así cada consulta mira sólo los de alrededor ──
-  const CELL = 25;
+  const CELL = 25 * K;
   const grid = new Map();
   const boxes = [];
   const cellKey = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
@@ -133,7 +142,7 @@ export function createTerrain({ lite }) {
 
   // ── aeródromo: calle de rodaje, plataforma, hangares y la manga de viento ──
   const concrete = new THREE.MeshLambertMaterial({ color: 0x6d6c68 });
-  const flat = (w, d, x, z) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), concrete); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z); m.receiveShadow = true; group.add(m); };
+  const flat = (w, d, x, z) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w * (w > 200 ? K : AZ), d * AZ), concrete); m.rotation.x = -Math.PI / 2; m.position.set(x * K, 0.02, z * AZ); m.receiveShadow = true; group.add(m); };
   flat(300, 7, 120, -28);
   flat(8, 22, 20, -14);
   flat(8, 22, 220, -14);
@@ -141,24 +150,26 @@ export function createTerrain({ lite }) {
   const shed = new THREE.MeshStandardMaterial({ color: 0x8a8f94, roughness: 0.6, metalness: 0.3 });
   const roof = new THREE.MeshStandardMaterial({ color: 0x5b6067, roughness: 0.5, metalness: 0.4 });
   for (const hx of [90, 150]) {
-    const body = new THREE.Mesh(new THREE.BoxGeometry(26, 6, 18), shed);
-    body.position.set(hx, 3, -84);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 26, 20, 1, false, 0, Math.PI), roof);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(26 * AZ, 6 * AZ, 18 * AZ), shed);
+    body.position.set(hx * K, 3 * AZ, -84 * AZ);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(9 * AZ, 9 * AZ, 26 * AZ, 20, 1, false, 0, Math.PI), roof);
     // medio cilindro con el eje a lo largo del hangar, aplastado a una bóveda de 4 m
     top.rotation.z = Math.PI / 2;
-    top.position.set(hx, 6, -84);
+    top.position.set(hx * K, 6 * AZ, -84 * AZ);
     top.scale.set(0.45, 1, 1);
     body.castShadow = top.castShadow = true;
-    boxes.push({ name: "un hangar", x0: hx - 13, x1: hx + 13, z0: -93, z1: -75, top: 10 });
+    boxes.push({ name: "un hangar", x0: hx * K - 13 * AZ, x1: hx * K + 13 * AZ, z0: -93 * AZ, z1: -75 * AZ, top: 10 * AZ });
     group.add(body, top);
   }
   // la manga apunta hacia donde va el viento y se llena con la velocidad (a ~7 m/s queda horizontal)
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 6, 6), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
-  pole.position.set(60, 3, -22);
-  addPost({ name: "el mástil de la manga", x: 60, z: -22, y0: 0, top: 6.2, r: 0.2 });
+  pole.position.set(60 * K, 3 * AZ, -22 * AZ);
+  pole.scale.setScalar(AZ);
+  addPost({ name: "el mástil de la manga", x: 60 * K, z: -22 * AZ, y0: 0, top: 6.2 * AZ, r: 0.2 * AZ });
   group.add(pole);
   const sockPivot = new THREE.Group();
-  sockPivot.position.set(60, 5.9, -22);
+  sockPivot.position.set(60 * K, 5.9 * AZ, -22 * AZ);
+  sockPivot.scale.setScalar(AZ);
   const sockGeo = new THREE.CylinderGeometry(0.35, 0.16, 2.6, 12, 5, true);
   sockGeo.rotateZ(-Math.PI / 2);
   sockGeo.translate(1.3, 0, 0);
@@ -200,15 +211,16 @@ export function createTerrain({ lite }) {
     if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r * 1.1) continue;
     const forest = fbm(x / 400 + 31, z / 400 + 17, 3);
     if (forest < (e < 1 ? 0.56 : 0.44) && Math.random() > 0.04) continue;
-    const y = heightAt(x, z);
-    if (y > 330 || y < lakeLevel + 1) continue;
-    const conifer = y > 60 || (e > 1.2 && Math.random() < 0.7);
-    const k = 0.7 + Math.random() * 0.8;
+    const yb = baseAt(x, z);
+    if (yb > 330 || yb < lakeLevel + 1) continue;
+    const y = yb * VS;
+    const conifer = yb > 60 || (e > 1.2 && Math.random() < 0.7);
+    const k = (0.7 + Math.random() * 0.8) * TZ;
     const sy = k * (0.9 + Math.random() * 0.4);
     q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
-    m4.compose(p.set(x, y - 0.3, z), q, s.set(k, sy, k));
+    m4.compose(p.set(x * K, y - 0.3, z * K), q, s.set(k, sy, k));
     // copa como cilindro: un poco más estrecha que el cono o la bola, que se afinan arriba y abajo
-    addPost({ name: "un árbol", x, z, y0: y - 0.3, top: y - 0.3 + (conifer ? 10.5 : 8) * sy, r: (conifer ? 1.5 : 2.3) * k });
+    addPost({ name: "un árbol", x: x * K, z: z * K, y0: y - 0.3, top: y - 0.3 + (conifer ? 10.5 : 8) * sy, r: (conifer ? 1.5 : 2.3) * k });
     trunks.setMatrixAt(nt++, m4);
     tint.setHSL(conifer ? 0.3 + Math.random() * 0.04 : 0.22 + Math.random() * 0.08, 0.45, conifer ? 0.16 + Math.random() * 0.06 : 0.22 + Math.random() * 0.08);
     if (conifer) { cones.setMatrixAt(nc, m4); cones.setColorAt(nc++, tint); }
@@ -219,5 +231,5 @@ export function createTerrain({ lite }) {
   rounds.count = nr;
   for (const m of [trunks, cones, rounds]) { m.castShadow = !lite; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; group.add(m); }
 
-  return { group, heightAt, setWind, hit };
+  return { group, heightAt, setWind, hit, scale: K, side: AZ };
 }

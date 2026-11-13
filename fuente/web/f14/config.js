@@ -57,6 +57,8 @@ export default {
   // tobera de pétalos ≈ 0,5 m de radio en la boca
   plumes: [1450, -1450].map((y) => ({ at: [-8500, y, -250], length: 10, r: 0.8, tail: 0.6 })),
   cut: { z: 1.45, pos: [-4, -1.1, 15], target: [-4.5, -0.3, 1.45] },
+  // vuelo: superficie alar, masa en vuelo, alargamiento, Oswald y resistencia (los de Aerodinámica)
+  fly: { S: 52.5, m: 27000, AR: 7.3, e: 0.8, cd0: 0.02, engines: 2, vref: 70, length: 19.1 },
   flow: {
     paths: {
       core: [[5500, 0], [2600, 0], [0, 0], [-950, 0], [-2100, 0], [-2700, 0], [-3300, 0], [-5300, 0], [-5900, 0], [-8500, 0]],

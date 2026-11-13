@@ -65,6 +65,8 @@ export default {
   // boca del eyector ≈ 0,62 m de radio: r · 0,62 (lo que mide la llama al salir) = radio de la boca
   plumes: [3300, -3300].map((y) => ({ at: [-14450, y, -150], length: 14, r: 1.0, tail: 0.5 })),
   cut: { z: 3.3, pos: [-5, -1.6, 25], target: [-5.5, -0.4, 3.3] },
+  // vuelo: superficie alar, masa en vuelo, alargamiento, Oswald y resistencia (los de Aerodinámica)
+  fly: { S: 167, m: 50000, AR: 1.7, e: 0.7, cd0: 0.011, engines: 2, vref: 95, length: 32.7 },
   flow: {
     paths: {
       core: [[6500, 700], [4500, 760], [2300, 650], [0, 420], [-1600, 330], [-2300, 360], [-2800, 300], [-3200, 300], [-8000, 320], [-8800, 300], [-12500, 280]],

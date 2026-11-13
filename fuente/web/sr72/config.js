@@ -64,6 +64,8 @@ export default {
   // boca de la tobera de rampa única: ≈ 0,86 m de ancho por 0,94 m de alto
   plumes: [1600, -1600].map((y) => ({ at: [-9180, y, -750], length: 11, r: 0.8, h: 0.95, w: 0.87 })),
   cut: { z: 1.6, pos: [-3, -2.4, 15], target: [-3.5, -0.9, 1.6] },
+  // vuelo: superficie alar, masa en vuelo, alargamiento, Oswald y resistencia (los de Aerodinámica)
+  fly: { S: 90, m: 35000, AR: 1.3, e: 0.65, cd0: 0.01, engines: 2, vref: 95, length: 21.2 },
   flow: {
     size: 0.08,
     paths: {

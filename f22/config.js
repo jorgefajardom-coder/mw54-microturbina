@@ -55,6 +55,8 @@ export default {
   // tobera bidimensional: boca de ≈ 1,12 m de ancho por 0,6 m de alto
   plumes: [620, -620].map((y) => ({ at: [-8660, y, -150], length: 10, r: 0.6, h: 0.8, w: 1.5, tail: 0.75 })),
   cut: { z: 0.62, pos: [-4.5, -1.3, 16], target: [-4.8, -0.2, 0.62] },
+  // vuelo: superficie alar, masa en vuelo, alargamiento, Oswald y resistencia (los de Aerodinámica)
+  fly: { S: 78, m: 29000, AR: 2.4, e: 0.75, cd0: 0.016, engines: 2, vref: 72, length: 18.9 },
   flow: {
     paths: {
       core: [[1800, 0], [0, 0], [-900, 0], [-1700, 0], [-2300, 0], [-2700, 0], [-4300, 0], [-5160, 0], [-8000, 0]],

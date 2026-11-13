@@ -7,7 +7,7 @@ El kit de dibujo isométrico está en `.claude/skills/anatomy/kit`.
 - `src/build.mjs`: geometría con el kit (`.claude/skills/anatomy/kit`), escribe `dist/index.html` (oscuro) y `dist/light.html`.
 - `src/live.js`, `src/mw54.css`: el comportamiento y estilo de la página.
 
-Comandos: `npm run build`, `npm run audit` (debe terminar en `audit passed`), `npm run lines` (debe dar `line ends: 0`), `npm run shot`. Las comprobaciones necesitan Chrome o Chromium.
+Comandos: `npm run build`, `npm run audit` (debe terminar en `audit passed`), `npm run lines` (debe dar `line ends: 0`), `npm run shot`, `npm run vuelos` (cada avión debe dar 100/100 vuelos exitosos: si no, el simulador de vuelo está mal). Las comprobaciones necesitan Chrome o Chromium.
 
 Reglas del repo: los commits y PR van **sin** líneas de coautoría ni atribución de Claude; el README es bilingüe (español primero, luego inglés).
 

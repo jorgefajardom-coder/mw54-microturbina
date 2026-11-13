@@ -2,6 +2,7 @@
 // calor, corte, mandos), tarjeta que sigue al cursor y clic para acercarse a la pieza.
 import { start, fmt } from "./core.js";
 import { debugPanel } from "../device.js";
+import { createPad } from "../controls.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,20 +18,26 @@ export default async function desktop(profile, cfg) {
       <button id="heat">Mapa de calor</button>
       <button id="cut">Corte</button>
       <button id="surfaces">Mandos</button>
-    </div>`,
+      <button id="fly">Volar</button>
+    </div>
+    <div class="ui" id="hud"></div>
+    <div class="ui" id="keys">E arrancar · Mayús/Ctrl gas · W/S cabeceo · A/D alabeo · Z/X timón · F flaps · B frenos · T giróscopo · C cámara · R reiniciar</div>`,
   );
   profile.onStats = debugPanel(profile);
+  // mando de juego, si hay uno conectado
+  profile.pad = createPad({ touch: false });
   profile.onFrame = (motor) => {
     if (motor.mission) $("mach").value = Math.round(motor.Mtarget * 10);
     $("machv").textContent = fmt(motor.Mtarget, 1);
   };
   const api = await start(profile, cfg);
   const A = api.actions;
-  for (const id of ["explode", "run", "mission", "heat", "cut", "surfaces"]) $(id).onclick = A[id];
+  for (const id of ["explode", "run", "mission", "heat", "cut", "surfaces", "fly"]) $(id).onclick = A[id];
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   $("mach").oninput = (e) => A.mach(e.target.value / 10);
   api.onChange((st) => {
-    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces })) $(id).toggleAttribute("data-on", on);
+    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces, fly: st.flying })) $(id).toggleAttribute("data-on", on);
+    $("fly").textContent = st.flying ? "Volver al taller" : "Volar";
     $("explode").textContent = st.exploded ? "Montar" : "Despiece";
     $("run").lastChild.textContent = st.running ? "Apagar" : "Arrancar";
   });

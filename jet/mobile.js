@@ -3,6 +3,8 @@
 // cada giro y con la barra de direcciones; la calidad la fija el perfil del teléfono.
 import { start, fmt } from "./core.js";
 import { debugPanel } from "../device.js";
+import { createPad } from "../controls.js";
+import { padHTML, mountFlightUI } from "../flightui.js";
 
 const $ = (id) => document.getElementById(id);
 const icon = (d) => `<i aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg></i>`;
@@ -10,6 +12,7 @@ const ICONS = {
   run: icon('<circle cx="12" cy="12" r="8"/><path d="M12 7v5"/>'),
   explode: icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
   cut: icon('<path d="M4 20L20 4"/><rect x="3" y="8" width="18" height="8" rx="2"/>'),
+  fly: icon('<path d="M2 13l8-2 4-7 2 1-2 6 6 1v2l-6 1 2 6-2 1-4-7-8-2z"/>'),
   mission: icon('<path d="M3 18c4-1 6-5 9-9s5-5 9-5"/><circle cx="21" cy="4" r="1.5"/>'),
   more: icon('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'),
 };
@@ -29,10 +32,14 @@ export default async function mobile(profile, cfg) {
       <button id="explode">${ICONS.explode}<span>Despiece</span></button>
       <button id="cut">${ICONS.cut}<span>Corte</span></button>
       <button id="mission">${ICONS.mission}<span>Misión</span></button>
+      <button id="fly">${ICONS.fly}<span>Volar</span></button>
       <button id="more">${ICONS.more}<span>Más</span></button>
-    </nav>`,
+    </nav>
+    <div class="ui" id="hud"></div>
+    ${padHTML({ engine: cfg.say?.engines ?? "los motores", gear: false })}`,
   );
   profile.onStats = debugPanel(profile);
+  profile.pad = createPad({ touch: true, haptic });
   profile.onFrame = (motor) => {
     if (motor.mission) $("mach").value = Math.round(motor.Mtarget * 10);
     $("machv").textContent = fmt(motor.Mtarget, 1);
@@ -52,11 +59,12 @@ export default async function mobile(profile, cfg) {
   const tap = (id, fn, keep) => ($(id).onclick = () => { haptic(); fn(); if (!keep) closeSheet(); });
   for (const id of ["run", "explode", "cut", "mission", "heat"]) tap(id, A[id]);
   tap("surfaces", A.surfaces, true);
+  tap("fly", () => { A.fly(); setFlying(api.state().flying); });
   tap("more", () => { const open = !sheet.hasAttribute("data-open"); sheet.toggleAttribute("data-open", open); $("more").toggleAttribute("data-on", open); }, true);
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   $("mach").oninput = (e) => A.mach(e.target.value / 10);
   api.onChange((st) => {
-    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces })) $(id).toggleAttribute("data-on", on);
+    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces, fly: st.flying })) $(id).toggleAttribute("data-on", on);
     $("explode").lastChild.textContent = st.exploded ? "Montar" : "Despiece";
     $("run").lastChild.textContent = st.running ? "Apagar" : "Motor";
   });
@@ -71,7 +79,7 @@ export default async function mobile(profile, cfg) {
   let lastTap = 0;
   api.canvas.addEventListener("pointerdown", (ev) => { down = { x: ev.clientX, y: ev.clientY, t: performance.now() }; });
   api.canvas.addEventListener("pointerup", (ev) => {
-    if (!down || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 10 || performance.now() - down.t > 350) return;
+    if (!down || api.state().flying || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 10 || performance.now() - down.t > 350) return;
     closeSheet();
     const name = api.pick(ev.clientX, ev.clientY);
     const now = performance.now();
@@ -86,4 +94,7 @@ export default async function mobile(profile, cfg) {
   addEventListener("resize", relayout);
   visualViewport?.addEventListener("resize", relayout);
   screen.orientation?.addEventListener("change", relayout);
+  // volar: el mismo simulador y la misma consola que el Hawk, con los datos de este avión
+  const setFlying = mountFlightUI({ relayout });
+  document.querySelector('[data-action="salir"]').onclick = () => { haptic(); A.fly(); setFlying(false); };
 }
