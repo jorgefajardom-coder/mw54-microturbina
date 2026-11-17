@@ -114,29 +114,36 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
   world.visible = false;
   scene.add(world);
   // ── terreno, pista y cielo ──
-  const terrain = createTerrain({ lite, scale: K, vscale: K > 1 ? 3 : 1 });
-  world.add(terrain.group);
-  const cv = document.createElement("canvas");
-  cv.width = 256;
-  cv.height = 4096;
-  const g = cv.getContext("2d");
-  g.fillStyle = "#2b2c2e";
-  g.fillRect(0, 0, 256, 4096);
-  for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`; g.fillRect(Math.random() * 256, Math.random() * 4096, 2, 2); }
-  g.fillStyle = "#e8e6e0";
-  for (let y = 300; y < 3800; y += 160) g.fillRect(124, y, 8, 80);
-  g.fillRect(8, 0, 6, 4096);
-  g.fillRect(242, 0, 6, 4096);
-  for (let k = 0; k < 8; k++) { g.fillRect(24 + k * 26, 60, 14, 160); g.fillRect(24 + k * 26, 3876, 14, 160); }
-  const tex = new THREE.CanvasTexture(cv);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = lite ? 2 : 8;
-  const runway = new THREE.Mesh(new THREE.PlaneGeometry(14 * terrain.side * (K > 1 ? 1.3 : 1), 320 * K), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
-  runway.rotation.x = -Math.PI / 2;
-  runway.rotation.z = Math.PI / 2;
-  runway.position.set(120 * K, 0.03, 0);
-  runway.receiveShadow = true;
-  world.add(runway);
+  // se construyen al despegar por primera vez (o cuando una prueba los pide), no al abrir la página: el taller no los
+  // ve, y el terreno con su ruido y la textura de la pista retrasaban el primer cuadro
+  let terrain = null;
+  function buildWorld() {
+    terrain = createTerrain({ lite, scale: K, vscale: K > 1 ? 3 : 1 });
+    world.add(terrain.group);
+    const cv = document.createElement("canvas");
+    cv.width = 256;
+    cv.height = 4096;
+    const g = cv.getContext("2d");
+    g.fillStyle = "#2b2c2e";
+    g.fillRect(0, 0, 256, 4096);
+    for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`; g.fillRect(Math.random() * 256, Math.random() * 4096, 2, 2); }
+    g.fillStyle = "#e8e6e0";
+    for (let y = 300; y < 3800; y += 160) g.fillRect(124, y, 8, 80);
+    g.fillRect(8, 0, 6, 4096);
+    g.fillRect(242, 0, 6, 4096);
+    for (let k = 0; k < 8; k++) { g.fillRect(24 + k * 26, 60, 14, 160); g.fillRect(24 + k * 26, 3876, 14, 160); }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = lite ? 2 : 8;
+    const runway = new THREE.Mesh(new THREE.PlaneGeometry(14 * terrain.side * (K > 1 ? 1.3 : 1), 320 * K), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
+    runway.rotation.x = -Math.PI / 2;
+    runway.rotation.z = Math.PI / 2;
+    runway.position.set(120 * K, 0.03, 0);
+    runway.receiveShadow = true;
+    world.add(runway);
+    return terrain;
+  }
+  const ground = () => terrain ?? buildWorld();
   const sky = new Sky();
   sky.scale.setScalar(10000);
   const sun = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(60), THREE.MathUtils.degToRad(160));
@@ -418,7 +425,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     for (const c of contacts) {
       const rp = c.p.clone().applyQuaternion(s.q);
       const pw = rp.clone().add(s.p);
-      const pen = terrain.heightAt(pw.x, pw.z) - pw.y;
+      const pen = ground().heightAt(pw.x, pw.z) - pw.y;
       if (pen <= 0) continue;
       // meterse 30 cm en el suelo sólo pasa chocando contra una ladera o un árbol de frente
       if (pen > 0.3 * L) crash("contra el terreno");
@@ -453,9 +460,9 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     // colisiones: cada punto del fuselaje y las alas contra el terreno y contra árboles, hangares y el mástil
     for (const c of SKIN) {
       const pw = tmp.copy(c).applyQuaternion(s.q).add(s.p);
-      const what = terrain.hit(pw);
+      const what = ground().hit(pw);
       if (what) { crash(`choque contra ${what}`); break; }
-      if (terrain.heightAt(pw.x, pw.z) - pw.y > 0.03 * L) { crash(c.z ? "una punta de ala tocó el suelo" : c.x > 0 ? "el morro contra el suelo" : "la cola contra el suelo"); break; }
+      if (ground().heightAt(pw.x, pw.z) - pw.y > 0.03 * L) { crash(c.z ? "una punta de ala tocó el suelo" : c.x > 0 ? "el morro contra el suelo" : "la cola contra el suelo"); break; }
     }
     // dinámica angular en ejes del cuerpo
     const Mb = M.add(Mw.applyMatrix4(Rt));
@@ -493,7 +500,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
       for (let i = 0; i < 8; i++) info = step(dt / 8);
     }
     paintWind(dt, info);
-    terrain.setWind(wind, dt);
+    ground().setWind(wind, dt);
     // el modelo se coloca por su origen; la física va en el centro de gravedad
     model.position.copy(s.p);
     if (airframe.cg) model.position.sub(tmp.copy(airframe.cg).applyQuaternion(s.q));
@@ -522,7 +529,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     if (s.cam !== update.cam) showCanopy(s.cam !== "cockpit");
     update.cam = s.cam;
     const o = airframe.hud ? null : op(motor.f);
-    const alt = Math.max(0, s.p.y - terrain.heightAt(s.p.x, s.p.z));
+    const alt = Math.max(0, s.p.y - ground().heightAt(s.p.x, s.p.z));
     const kmh = info.V * 3.6;
     const vs = s.v.y;
     const stall = info.alpha > CL.stall;
@@ -554,6 +561,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
 
   // el aeródromo con su cielo, compartido con la exhibición; fx son los efectos de viento del avión pilotado
   function showWorld(on, withFx = on) {
+    if (on) ground();
     if (on && !world.visible) { skyCube ??= bakeSky(); bgBefore = scene.background; scene.background = skyCube; }
     if (!on && world.visible) scene.background = bgBefore;
     world.visible = on;
@@ -593,7 +601,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     fit,
     showWorld,
     home,
-    terrain,
+    get terrain() { return ground(); },
     airframe,
     state: s,
   };
