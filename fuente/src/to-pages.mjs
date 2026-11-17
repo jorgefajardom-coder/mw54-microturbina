@@ -6,23 +6,24 @@ import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AUTHOR, SITE, PORTFOLIO, seoHead } from "./seo.mjs";
+import { bundle, useBundle } from "./bundle.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = resolve(process.argv[2] ?? join(ROOT, ".."));
 mkdirSync(join(OUT, "anatomia"), { recursive: true });
-for (const d of ["sr72", "f22", "f14", "sr71", "jet"]) mkdirSync(join(OUT, d), { recursive: true });
-copyFileSync(join(ROOT, "src", "model.mjs"), join(ROOT, "web", "model.js"));
-for (const f of ["app.js", "core.js", "desktop.js", "mobile.js", "device.js", "flight.js", "flightui.js", "terrain.js", "controls.js", "floor.js", "look.js", "flame.js", "base.css", "desktop.css", "mobile.css", "model.js", "mw54.glb", "hangar.hdr"]) copyFileSync(join(ROOT, "web", f), join(OUT, f));
-mkdirSync(join(OUT, "draco"), { recursive: true });
-for (const f of ["draco_decoder.wasm", "draco_wasm_wrapper.js"]) copyFileSync(join(ROOT, "web", "draco", f), join(OUT, "draco", f));
+for (const d of ["sr72", "f22", "f14", "sr71", "css", "assets/draco"]) mkdirSync(join(OUT, d), { recursive: true });
+copyFileSync(join(ROOT, "src", "model.mjs"), join(ROOT, "web", "js", "model.js"));
+// js/: el visor empaquetado y minificado (ver bundle.mjs), css/: estilos, assets/: modelo, iluminación y decodificador Draco
+const BUNDLE = await bundle(join(ROOT, "web"), OUT);
+for (const f of ["base.css", "desktop.css", "mobile.css"]) copyFileSync(join(ROOT, "web", "css", f), join(OUT, "css", f));
+for (const f of ["mw54.glb", "hangar.hdr", "draco/draco_decoder.wasm", "draco/draco_wasm_wrapper.js"]) copyFileSync(join(ROOT, "web", "assets", f), join(OUT, "assets", f));
 const head = seoHead({
   title: `Wren MW54 en un entrenador a reacción · visor 3D interactivo · ${AUTHOR}`,
   description: `Visor 3D interactivo por ${AUTHOR}: la microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador tipo Hawk. Montaje y despiece, tren retráctil con compuertas, mandos de vuelo, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo.`,
   url: SITE,
   name: "Wren MW54 en un entrenador a reacción",
 });
-writeFileSync(join(OUT, "index.html"), readFileSync(join(ROOT, "web", "index.html"), "utf8").replace("<!--SEO-->", head));
-for (const f of ["core.js", "desktop.js", "mobile.js", "boot.js"]) copyFileSync(join(ROOT, "web", "jet", f), join(OUT, "jet", f));
+writeFileSync(join(OUT, "index.html"), useBundle(readFileSync(join(ROOT, "web", "index.html"), "utf8").replace("<!--SEO-->", head), BUNDLE.hawk, "./"));
 const JETS = {
   sr72: {
     title: `Lockheed Martin SR-72 y su motor TBCC · visor 3D interactivo · ${AUTHOR}`,
@@ -46,17 +47,17 @@ const JETS = {
   },
 };
 mkdirSync(join(OUT, "aero"), { recursive: true });
-for (const f of ["aero.js", "aero.css"]) copyFileSync(join(ROOT, "web", "aero", f), join(OUT, "aero", f));
-writeFileSync(join(OUT, "aero", "index.html"), readFileSync(join(ROOT, "web", "aero", "index.html"), "utf8").replace("<!--SEO-->", seoHead({
+copyFileSync(join(ROOT, "web", "aero", "aero.css"), join(OUT, "aero", "aero.css"));
+writeFileSync(join(OUT, "aero", "index.html"), useBundle(readFileSync(join(ROOT, "web", "aero", "index.html"), "utf8").replace("<!--SEO-->", seoHead({
   title: `Aerodinámica del Hawk, el SR-71, el F-22, el F-14 y el SR-72 · ${AUTHOR}`,
   description: `Visor 3D interactivo por ${AUTHOR}: cada avión en vuelo con las líneas de corriente del aire, el cono de Mach, la atmósfera a su altitud, la presión dinámica, la temperatura de remanso, la sustentación, la resistencia de forma, de onda e inducida y la finura, del Mach 0,1 al Mach 6.`,
   url: `${SITE}aero/`,
   name: "Aerodinámica de los aviones del visor",
   image: `${SITE}sr71/og.png`,
-})));
+})), BUNDLE.aero, "../"));
 for (const [jet, meta] of Object.entries(JETS)) {
-  for (const f of ["app.js", "config.js", "sim.js", "parts.json", `${jet}.glb`, "og.png"]) copyFileSync(join(ROOT, "web", jet, f), join(OUT, jet, f));
-  const html = readFileSync(join(ROOT, "web", jet, "index.html"), "utf8").replace("<!--SEO-->", seoHead({ ...meta, url: `${SITE}${jet}/`, image: `${SITE}${jet}/og.png` }));
+  for (const f of ["parts.json", `${jet}.glb`, "og.png"]) copyFileSync(join(ROOT, "web", jet, f), join(OUT, jet, f));
+  const html = useBundle(readFileSync(join(ROOT, "web", jet, "index.html"), "utf8").replace("<!--SEO-->", seoHead({ ...meta, url: `${SITE}${jet}/`, image: `${SITE}${jet}/og.png` })), BUNDLE[jet], "../");
   writeFileSync(join(OUT, jet, "index.html"), html);
 }
 copyFileSync(join(ROOT, "dist", "index.html"), join(OUT, "anatomia", "index.html"));
@@ -72,5 +73,5 @@ writeFileSync(
 );
 // la imagen para redes sale de una captura del visor; si no la hay, se conserva la que ya tiene el sitio
 if (existsSync(join(ROOT, "shots", "hawk-v3.png"))) execFileSync("python", ["-c", `from PIL import Image, ImageOps; im = Image.open(r"${join(ROOT, "shots", "hawk-v3.png")}").convert("RGB"); im = ImageOps.fit(im, (1200, 630), centering=(0.5, 0.5)); im.save(r"${join(OUT, "og.png")}", "PNG", optimize=True)`], { stdio: "inherit" });
-else copyFileSync(join(ROOT, "web", "og-hawk.png"), join(OUT, "og.png"));
+else copyFileSync(join(ROOT, "web", "assets", "og-hawk.png"), join(OUT, "og.png"));
 console.log("sitio listo en", OUT);

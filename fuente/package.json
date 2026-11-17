@@ -13,5 +13,9 @@
     "shot": "node .claude/skills/anatomy/scripts/capture.mjs dist/index.html --out shots",
     "portfolio": "node src/to-portfolio.mjs",
     "vuelos": "node tests/vuelos.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "three": "0.180.0"
   }
 }

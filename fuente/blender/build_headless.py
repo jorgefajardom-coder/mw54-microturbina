@@ -1,4 +1,4 @@
-# Construye el avión con sus MW54 y exporta web/mw54.glb sin abrir Blender (bpy como módulo: pip install bpy).
+# Construye el avión con sus MW54 y exporta web/assets/mw54.glb sin abrir Blender (bpy como módulo: pip install bpy).
 # Uso: python blender/build_headless.py [salida.glb]
 import json
 import os
@@ -12,7 +12,7 @@ import engine  # noqa: E402
 import hawk  # noqa: E402
 import lib  # noqa: E402
 
-out = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].endswith(".glb") else os.path.join(os.path.dirname(HERE), "web", "mw54.glb")
+out = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].endswith(".glb") else os.path.join(os.path.dirname(HERE), "web", "assets", "mw54.glb")
 sc = bpy.data.scenes.new("MW54")
 for other in list(bpy.data.scenes):
     if other != sc:

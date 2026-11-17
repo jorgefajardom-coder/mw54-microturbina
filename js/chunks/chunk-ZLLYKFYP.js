@@ -1,0 +1,16 @@
+var m=l=>document.getElementById(l);function p({engine:l="el motor",gear:a=!0}={}){return`<div id="pad" aria-hidden="true">
+      <div class="stick" id="stickL"><span>Gas \xB7 tim\xF3n</span><div class="knob"></div></div>
+      <div class="stick" id="stickR"><span>Cabeceo \xB7 alabeo</span><div class="knob"></div></div>
+      <div class="console" id="consoleL">
+        <button class="cmp sw guarded" data-key="e" aria-label="Arranque de ${l}"><i class="plate"><i class="bat"></i><i class="cover"></i></i><b>Arranque</b></button>
+        ${a?'<button class="cmp gear" data-key="g" aria-label="Palanca del tren"><i class="plate"><i class="slot"><i class="wheel"></i></i><i class="lights"><em></em><em></em><em></em></i></i><b>Tren</b></button>':'<button class="cmp sw" data-key="t" aria-label="Gir\xF3scopo estabilizador"><i class="plate"><i class="bat"></i><i class="led"></i></i><b>Gir\xF3scopo</b></button>'}
+        <button class="cmp flaps" data-key="f" aria-label="Palanca de flaps"><i class="plate"><i class="slot"><i class="grip"></i></i><i class="marks"><em>0</em><em>20</em><em>40</em></i></i><b>Flaps</b></button>
+        <button class="cmp tee" data-key="b" aria-label="Freno, mantener"><i class="plate"><i class="handle"></i></i><b>Freno</b></button>
+      </div>
+      <div class="console" id="consoleR">
+        <button class="cmp rotary" data-key="c" aria-label="Selector de vista"><i class="plate"><i class="dial"><i class="ptr"></i></i><i class="pos"><em>EXT</em><em>CAB</em></i></i><b>Vista</b></button>
+        <button class="cmp sw" data-action="inclinar" aria-label="Inclinaci\xF3n con el giroscopio"><i class="plate"><i class="bat"></i><i class="led"></i></i><b>Inclinar</b></button>
+        <button class="cmp push" data-key="r" aria-label="Reiniciar en la pista"><i class="plate"><i class="cap"></i></i><b>Reinicio</b></button>
+        <button class="cmp eject" data-action="salir" aria-label="Salir del vuelo"><i class="plate"><i class="loop"></i></i><b>Salir</b></button>
+      </div>
+    </div>`}function g({relayout:l}){let a=m("pad"),c=null;function u(){var r,d,i,b;let s=window.__sim,t=(r=s==null?void 0:s.flight)==null?void 0:r.state;if(!document.body.hasAttribute("data-flying")||!t)return;let n=((d=s.gearState)==null?void 0:d.t)??0,o=n<.05?"down":n>.95?"up":"transit",e=String(Math.round(t.flap*2));a.dataset.gear!==o&&(a.dataset.gear=o),a.dataset.flap!==e&&(a.dataset.flap=e),a.dataset.cam!==t.cam&&(a.dataset.cam=t.cam),a.toggleAttribute("data-motor",!!((i=s.motor)!=null&&i.on)),a.toggleAttribute("data-brake",t.brake>0),(b=a.querySelector('[data-key="t"]'))==null||b.toggleAttribute("data-on",!!t.assist),requestAnimationFrame(u)}return async function(t){var n,o,e,r,d,i,b;t&&requestAnimationFrame(u);try{t?(await((o=(n=document.documentElement).requestFullscreen)==null?void 0:o.call(n,{navigationUI:"hide"})),await((r=(e=screen.orientation)==null?void 0:e.lock)==null?void 0:r.call(e,"landscape")),c=await((d=navigator.wakeLock)==null?void 0:d.request("screen"))):((b=(i=screen.orientation)==null?void 0:i.unlock)==null||b.call(i),document.fullscreenElement&&await document.exitFullscreen(),await(c==null?void 0:c.release()),c=null)}catch{}l()}}export{p as a,g as b};

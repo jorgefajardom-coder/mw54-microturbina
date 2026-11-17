@@ -59,7 +59,7 @@ def export(path=None):
     win = bpy.context.window_manager.windows[0]
     root = bpy.data.objects["Avion_MW54"]
     obs = [root] + list(root.children_recursive)
-    path = path or os.path.join(os.path.dirname(HERE), "web", "mw54.glb")
+    path = path or os.path.join(os.path.dirname(HERE), "web", "assets", "mw54.glb")
     # nada seleccionado en otras escenas (el cubo de la escena de inicio se colaba en el GLB)
     for other in bpy.data.scenes:
         for vl in other.view_layers:

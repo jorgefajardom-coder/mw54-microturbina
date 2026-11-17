@@ -23,7 +23,7 @@ for other in list(bpy.data.scenes):
     if other != sc:
         bpy.data.scenes.remove(other)
 if name == "hawk":
-    # la maqueta 1:7 con su MW54, como blender/build_headless.py; el orden y los caminos son los de web/core.js
+    # la maqueta 1:7 con su MW54, como blender/build_headless.py; el orden y los caminos son los de web/js/core.js
     import engine
     import hawk
     model = json.load(open(os.path.join(HERE, "model.json"), encoding="utf8"))

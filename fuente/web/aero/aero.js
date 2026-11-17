@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { loadModel, guardContext, studioLights } from "../look.js";
+import { loadModel, guardContext, studioLights } from "../js/look.js";
 import * as sr71 from "../sr71/sim.js";
 import * as f22 from "../f22/sim.js";
 import * as f14 from "../f14/sim.js";
@@ -21,7 +21,7 @@ const G0 = 9.80665;
 // empuje máximo y altitud según el Mach (de su propio sim.js). Valores públicos aproximados; el SR-72, estimado.
 const AIRCRAFT = {
   hawk: {
-    name: "Hawk 1:7 con MW54", glb: "../mw54.glb", S: 0.34, m: 7.5, AR: 5.3, e: 0.8, cd0: 0.03, peak: 1, sup: 1, maxM: 0.3, step: 0.005,
+    name: "Hawk 1:7 con MW54", glb: "../assets/mw54.glb", S: 0.34, m: 7.5, AR: 5.3, e: 0.8, cd0: 0.03, peak: 1, sup: 1, maxM: 0.3, step: 0.005,
     engines: 1, thrust: () => 0.054, h: () => 0.1,
     note: "Una maqueta de 2 m vuela a menos de 300 km/h: el aire es incompresible y la resistencia la ponen el roce y la que induce la sustentación.",
   },
@@ -164,7 +164,7 @@ async function show(id) {
   if (current) scene.remove(models[current]);
   $("loading").hidden = false;
   if (!models[id]) {
-    const gltf = await loadModel(c.glb, "../draco/");
+    const gltf = await loadModel(c.glb, "../assets/draco/");
     models[id] = gltf.scene;
   }
   $("loading").hidden = true;
