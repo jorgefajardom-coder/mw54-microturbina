@@ -1,7 +1,8 @@
 // Prueba de vuelo: con cada avión, 100 vuelos (o los que se pidan) de la pista a un punto B y de vuelta a tierra,
 // pilotados por tests/piloto.js con los mismos mandos que una persona. Si alguno no aterriza y se detiene en la
 // pista, la prueba falla: el simulador de vuelo tiene que funcionar con todos.
-// Uso: node tests/vuelos.mjs [hawk sr71 f22 f14 sr72] [--vuelos 100] [--semilla 12345] [--celular]
+// Uso: node tests/vuelos.mjs [hawk sr71 f22 f14 sr72] [--vuelos 100] [--semilla 12345] [--celular] [--sitio URL]
+// --sitio prueba el sitio publicado (por ejemplo https://jorgefajardom-coder.github.io/mw54-microturbina/) en vez de web/.
 // Necesita Chrome o Chromium (lo abre la skill anatomy, igual que las otras comprobaciones).
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -12,6 +13,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 const args = process.argv.slice(2);
+const text = (name) => { const i = args.indexOf(name); return i < 0 ? null : args.splice(i, 2)[1]; };
 const opt = (name, dflt) => { const i = args.indexOf(name); return i < 0 ? dflt : Number(args.splice(i, 2)[1]); };
 const flag = (name) => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 1); return i >= 0; };
 const total = opt("--vuelos", 100);
@@ -20,9 +22,11 @@ const seed = opt("--semilla", 12345);
 const phone = flag("--celular");
 const planes = args.length ? args : ["hawk", "sr71", "f22", "f14", "sr72"];
 const PORT = 8790;
+const site = text("--sitio");
+const base = site ? site.replace(/\/?$/, "/") : `http://127.0.0.1:${PORT}/`;
 
-const server = spawn(process.execPath, [join(root, "src/serve.mjs"), join(root, "web"), String(PORT)], { stdio: "ignore" });
-await new Promise((r) => setTimeout(r, 800));
+const server = site ? null : spawn(process.execPath, [join(root, "src/serve.mjs"), join(root, "web"), String(PORT)], { stdio: "ignore" });
+if (server) await new Promise((r) => setTimeout(r, 800));
 const tmp = mkdtempSync(join(tmpdir(), "vuelos-"));
 const pilot = readFileSync(join(here, "piloto.js"), "utf8").trim();
 const body = pilot.slice(1, pilot.lastIndexOf(")"));
@@ -31,7 +35,7 @@ const drive = join(root, ".claude/skills/anatomy/scripts/drive.mjs");
 let failed = false;
 try {
   for (const plane of planes) {
-    const url = `http://127.0.0.1:${PORT}/${plane === "hawk" ? "" : plane + "/"}?vista=${phone ? "celular" : "escritorio"}`;
+    const url = `${base}${plane === "hawk" ? "" : plane + "/"}?vista=${phone ? "celular" : "escritorio"}`;
     const results = [];
     let info = null;
     // tandas de 25 para no pasar del tiempo de espera de cada evaluación; cada tanda con su propia semilla
@@ -61,7 +65,7 @@ try {
     if (ok < total) failed = true;
   }
 } finally {
-  server.kill();
+  server?.kill();
 }
 console.log(failed ? "prueba de vuelo: FALLA" : "prueba de vuelo: todos los vuelos aterrizaron");
 process.exit(failed ? 1 : 0);

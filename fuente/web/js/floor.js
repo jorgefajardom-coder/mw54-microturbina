@@ -3,7 +3,9 @@
 import * as THREE from "three";
 
 const TILE = 4; // metros que cubre una repetición de la textura
-function floorTextures(renderer, N) {
+// Píxeles del concreto (color y rugosidad). Función autónoma: corre dentro de un Worker (se pasa como texto), así
+// el millón o más de píxeles no frena la página mientras llega el modelo; sin Workers corre aquí mismo.
+function paintFloor(N) {
   // ruido de valor periódico, para que la textura case consigo misma al repetirse
   const noise = (cells, seed) => {
     const g = new Float32Array(cells * cells);
@@ -24,13 +26,8 @@ function floorTextures(renderer, N) {
   };
   const octaves = [[5, 0.25], [12, 0.25], [30, 0.2], [80, 0.15], [200, 0.15]].map(([c, w], k) => [noise(c, 7 + k * 31), w]);
   const sheen = [noise(3, 101), noise(11, 202)];
-  const color = document.createElement("canvas");
-  const rough = document.createElement("canvas");
-  color.width = color.height = rough.width = rough.height = N;
-  const c = color.getContext("2d");
-  const r = rough.getContext("2d");
-  const ci = c.createImageData(N, N);
-  const ri = r.createImageData(N, N);
+  const c = new Uint8ClampedArray(N * N * 4);
+  const r = new Uint8ClampedArray(N * N * 4);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const u = x / N;
     const v = y / N;
@@ -41,25 +38,52 @@ function floorTextures(renderer, N) {
     const grain = q > 0.985 ? 0.12 * Math.random() : q < 0.01 ? -0.16 * Math.random() : (Math.random() - 0.5) * 0.04;
     const tone = 36 + (m - 0.5) * 12 + grain * 110;
     const i = (y * N + x) * 4;
-    ci.data[i] = tone;
-    ci.data[i + 1] = tone + 2;
-    ci.data[i + 2] = tone + 5;
-    ci.data[i + 3] = 255;
+    c[i] = tone;
+    c[i + 1] = tone + 2;
+    c[i + 2] = tone + 5;
+    c[i + 3] = 255;
     // brillo del pulido: zonas amplias más lisas, y el árido algo más mate
     const s = 0.5 * sheen[0](u, v) + 0.5 * sheen[1](u, v);
     const g = 160 + (s - 0.5) * 60 + Math.abs(grain) * 300;
-    ri.data[i] = ri.data[i + 1] = ri.data[i + 2] = g;
-    ri.data[i + 3] = 255;
+    r[i] = r[i + 1] = r[i + 2] = g;
+    r[i + 3] = 255;
   }
-  c.putImageData(ci, 0, 0);
-  r.putImageData(ri, 0, 0);
-  const out = [color, rough].map((cv) => {
+  return { c, r };
+}
+
+function floorTextures(renderer, N) {
+  // el piso aparece al instante con su tono medio y recibe el grano en cuanto el Worker lo termina
+  const canvases = [["#24262a"], ["#a0a0a0"]].map(([fill]) => {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = N;
+    const g = cv.getContext("2d");
+    g.fillStyle = fill;
+    g.fillRect(0, 0, N, N);
+    return cv;
+  });
+  const out = canvases.map((cv) => {
     const t = new THREE.CanvasTexture(cv);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
     return t;
   });
   out[0].colorSpace = THREE.SRGBColorSpace;
+  const apply = ({ c, r }) => {
+    [c, r].forEach((px, k) => {
+      canvases[k].getContext("2d").putImageData(new ImageData(px, N, N), 0, 0);
+      out[k].needsUpdate = true;
+    });
+  };
+  try {
+    const src = `onmessage = (e) => { const o = (${paintFloor})(e.data); postMessage(o, [o.c.buffer, o.r.buffer]); close(); };`;
+    const url = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+    const worker = new Worker(url);
+    worker.onmessage = (e) => { apply(e.data); URL.revokeObjectURL(url); };
+    worker.onerror = (e) => { e.preventDefault(); URL.revokeObjectURL(url); apply(paintFloor(N)); };
+    worker.postMessage(N);
+  } catch {
+    apply(paintFloor(N));
+  }
   return out;
 }
 // El borde se funde con el color de fondo, así el piso no termina en un canto.
