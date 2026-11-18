@@ -44,7 +44,10 @@
   // circuito de entrada: un punto a 1,5 senda de la cabecera, desplazado de lado tres radios de viraje; desde allí un
   // viraje de 180° hacia el eje deja el avión casi alineado (como el tramo base de un circuito de tránsito)
   const R0 = (VA * VA) / (G * Math.tan(30 * D2R));
-  const EX = x0 - 1.5 * dApp;
+  // en los reactores la final se alarga con el radio de viraje: un avión rápido necesita más recta para quedar en el eje
+  // antes de la enderezada (con la final fija, el SR-72 llegaba a la enderezada fuera del eje y daba motor y al aire 2 de
+  // cada 3 vuelos). El Hawk ya queda alineado con la final fija, y alargarla lo deja alto y largo en cada aproximación.
+  const EX = x0 - 1.5 * dApp - (isJet ? 2 * R0 : 0);
   const results = [];
   window.__progress = 0;
   for (let n = 0; n < N; n++) {
@@ -64,6 +67,7 @@
       if (k === 499) B.bad = true;
     }
     let goArounds = 0;
+    const gaWhy = [];
     const R = 1.2 * (VC * VC) / (G * Math.tan(35 * D2R));
     let side = 0, alphaF = 0, phase = 'arranque', t = 0, tPhase = 0, iP = 0, iV = 0.6, thr = 0, reachedB = false, minB = Infinity;
     let td = null, why = '', brake = false;
@@ -132,7 +136,7 @@
           gDes = clamp(Math.asin(clamp(vsWant / V, -1, 1)), -6 * D2R, 2 * D2R);
         }
         // larga o descolocada: motor y al aire, como manda el procedimiento, y otra vuelta a la final
-        if (!s.onGround && (s.p.x > xTD + 0.3 * (x1 - x0) || (phase === 'enderezada' && Math.abs(s.p.z) > 0.7 * halfW))) { goArounds++; go('al aire'); }
+        if (!s.onGround && (s.p.x > xTD + 0.3 * (x1 - x0) || (phase === 'enderezada' && Math.abs(s.p.z) > 0.7 * halfW))) { goArounds++; gaWhy.push(`${s.p.x > xTD + 0.3 * (x1 - x0) ? 'larga' : 'descolocada'} en ${phase} a ${(V * 3.6).toFixed(0)} km/h y ${agl.toFixed(1)} m`); go('al aire'); }
         if (s.onGround) { td = { x: s.p.x, z: s.p.z, vs: s.v.y, V }; go('rodaje'); }
       } else if (phase === 'al aire') {
         thr = 1; hdgTo(0, 10); gDes = 8 * D2R;
@@ -179,7 +183,7 @@
     const ok = !why && reachedB && phase === 'rodaje' && s.v.length() < 0.5 && onRwy && !s.crashed;
     if (!why && !ok) why = !reachedB ? `no llegó a B (min ${minB.toFixed(0)} m)` : phase !== 'rodaje' ? `tiempo agotado en ${phase}` : `fuera de pista x ${s.p.x.toFixed(0)} z ${s.p.z.toFixed(1)}`;
     if (B.bad) why = 'sin punto B en el valle ' + why;
-    results.push({ n, ok, ga: goArounds, t: Math.round(t), why, td: td && `x ${(td.x - x0).toFixed(0)} z ${td.z.toFixed(1)} vs ${td.vs.toFixed(2)} V ${(td.V * 3.6).toFixed(0)}`, stop: `x ${(s.p.x - x0).toFixed(0)} z ${s.p.z.toFixed(1)}` });
+    results.push({ n, ok, ga: goArounds, gaWhy, t: Math.round(t), why, td: td && `x ${(td.x - x0).toFixed(0)} z ${td.z.toFixed(1)} vs ${td.vs.toFixed(2)} V ${(td.V * 3.6).toFixed(0)}`, stop: `x ${(s.p.x - x0).toFixed(0)} z ${s.p.z.toFixed(1)}` });
     window.__progress = n + 1;
   }
   F.endTest();

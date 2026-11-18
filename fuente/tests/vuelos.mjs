@@ -63,6 +63,11 @@ try {
     const goArounds = results.reduce((a, r) => a + r.ga, 0);
     console.log(`\r${plane}: ${ok}/${total} vuelos exitosos · aproximación ${info.aproximacion} km/h · ${goArounds} motor y al aire`);
     for (const r of results.filter((r) => !r.ok).slice(0, 10)) console.log(`  #${r.n} ${r.why} · toma ${r.td ?? "—"}`);
+    // por qué hubo que dar motor y al aire: larga (pasó el tercio de pista sin tocar) o descolocada (fuera del eje)
+    const why = {};
+    for (const r of results) for (const w of r.gaWhy ?? []) { const k = w.split(" a ")[0]; why[k] = (why[k] ?? 0) + 1; }
+    if (goArounds) console.log(`  motor y al aire: ${Object.entries(why).map(([k, n]) => `${n} ${k}`).join(" · ")}`);
+    if (goArounds) console.log(`  ejemplos: ${results.flatMap((r) => r.gaWhy ?? []).slice(0, 4).join(" | ")}`);
     if (ok < total) failed = true;
   }
 } finally {
