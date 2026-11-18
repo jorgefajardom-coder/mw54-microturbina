@@ -16,13 +16,14 @@ const args = process.argv.slice(2);
 const text = (name) => { const i = args.indexOf(name); return i < 0 ? null : args.splice(i, 2)[1]; };
 const opt = (name, dflt) => { const i = args.indexOf(name); return i < 0 ? dflt : Number(args.splice(i, 2)[1]); };
 const flag = (name) => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 1); return i >= 0; };
+const site = text("--sitio");
 const total = opt("--vuelos", 100);
 const seed = opt("--semilla", 12345);
 // --celular: la interfaz de teléfono (390 × 844, terreno ligero y palancas táctiles), la misma que abre un celular
 const phone = flag("--celular");
 const planes = args.length ? args : ["hawk", "sr71", "f22", "f14", "sr72"];
+if (args.some((a) => a.startsWith("-"))) throw new Error(`opción desconocida: ${args.join(" ")}`);
 const PORT = 8790;
-const site = text("--sitio");
 const base = site ? site.replace(/\/?$/, "/") : `http://127.0.0.1:${PORT}/`;
 
 const server = site ? null : spawn(process.execPath, [join(root, "src/serve.mjs"), join(root, "web"), String(PORT)], { stdio: "ignore" });
