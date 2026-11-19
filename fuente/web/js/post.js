@@ -43,5 +43,7 @@ export function buildComposer(renderer, scene, camera, profile, { aoRadius = 0.5
     setSize(width, height) { composer.setSize(width, height); gtao?.setSize(width, height); },
     setPixelRatio(r) { composer.setPixelRatio(r); },
     bloom,
+    // la escena se dibuja primero en este búfer (sin tono ni sRGB, que pone OutputPass): con él se compilan sus materiales
+    target: composer.readBuffer,
   };
 }

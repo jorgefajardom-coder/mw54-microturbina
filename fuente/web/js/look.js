@@ -3,6 +3,7 @@
 // tienen coordenadas de textura) y el brillo de cuerpo negro del metal caliente.
 import * as THREE from "three";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
@@ -45,9 +46,9 @@ export function studioLights(scene, size) {
 // tono y espacio de color), así la primera imagen no lo espera. `aoRadius` en unidades de escena.
 export function createComposer(renderer, scene, camera, profile, options = {}) {
   const plain = () => renderer.render(scene, camera);
-  if (profile.tier === "baja") return { render: plain, setSize() {}, setPixelRatio() {} };
+  if (profile.tier === "baja") return { render: plain, setSize() {}, setPixelRatio() {}, ready: Promise.resolve(), target: null };
   let real = null, size = null, ratio = null;
-  import("./post.js")
+  const ready = import("./post.js")
     .then(({ buildComposer }) => {
       real = buildComposer(renderer, scene, camera, profile, options);
       if (ratio) real.setPixelRatio(ratio);
@@ -58,20 +59,41 @@ export function createComposer(renderer, scene, camera, profile, options = {}) {
     render: () => (real ? real.render() : plain()),
     setSize(w, h) { size = [w, h]; real?.setSize(w, h); },
     setPixelRatio(r) { ratio = r; real?.setPixelRatio(r); },
+    ready,                                   // se cumple cuando el posproceso está listo (o no llegó)
+    get target() { return real?.target ?? null; },
   };
 }
 
 // Reflejos de una nave industrial real (Poly Haven, CC0). Se piden cuando el modelo ya bajó, para no quitarle ancho de
 // banda en la primera visita; hasta entonces ilumina el estudio generado (RoomEnvironment). El celular y la gama baja
 // reciben la copia de 256 × 128 (src/hdr-small.mjs), que pesa la cuarta parte y en reflejos borrosos casi no se distingue.
-export function hangarEnvironment(scene, pmrem, assets, profile, intensity, after) {
-  const file = profile.kind === "celular" || profile.tier === "baja" ? "hangar-256.hdr" : "hangar.hdr";
-  after.then(() => new HDRLoader().load(`${assets}${file}`, (hdr) => {
+// El estudio se genera del mismo tamaño que el PMREM del HDR (un cuarto de su ancho): si no, al llegar el HDR cambian
+// las constantes de los sombreadores y la GPU vuelve a compilar todos los materiales del modelo con la página ya abierta.
+export function hangarEnvironment(scene, pmrem, assets, profile, { room = 1, hangar = 1 } = {}, after) {
+  const small = profile.kind === "celular" || profile.tier === "baja";
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04, 0.1, 100, { size: small ? 64 : 128 }).texture;
+  scene.environmentIntensity = room;
+  after.then(() => new HDRLoader().load(`${assets}${small ? "hangar-256.hdr" : "hangar.hdr"}`, (hdr) => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     scene.environment = pmrem.fromEquirectangular(hdr).texture;
-    scene.environmentIntensity = intensity;
+    scene.environmentIntensity = hangar;
     hdr.dispose();
   }), () => {});
+}
+
+// Compila los sombreadores de la escena antes de mostrarla, en paralelo y sin bloquear la página donde el navegador
+// lo permite (KHR_parallel_shader_compile); si no, el primer cuadro los compilaba uno tras otro con todo detenido.
+// Se compilan para donde de verdad se dibuja la escena: el búfer del posproceso (sin tono ni sRGB) o, sin posproceso, el
+// lienzo; un material dibujado en los dos sitios son dos programas distintos y la GPU compilaría todo dos veces.
+// La revisión de errores de sombreador (que espera a cada uno) queda sólo para ?debug.
+export async function compileScene(renderer, scene, camera, composer) {
+  if (!new URLSearchParams(location.search).has("debug")) renderer.debug.checkShaderErrors = false;
+  await composer.ready;
+  const before = renderer.getRenderTarget();
+  renderer.setRenderTarget(composer.target);
+  const done = renderer.compileAsync(scene, camera);   // crea los programas aquí mismo, con el destino de arriba
+  renderer.setRenderTarget(before);
+  try { await done; } catch {}
 }
 
 // Microdetalle para metales sin UV: ruido en coordenadas del objeto (en mm del modelo) que varía la rugosidad, deja

@@ -4,11 +4,10 @@
 // del perfil del dispositivo (device.js).
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { op, metal, PARTS, SPEC } from "./model.js";
 import { createFlight } from "./flight.js";
 import { createFloor } from "./floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment } from "./look.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment, compileScene } from "./look.js";
 import { createFlame } from "./flame.js";
 
 const $ = (id) => document.getElementById(id);
@@ -42,10 +41,8 @@ guardContext(renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f12);
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.9;
 // reflejos de una nave industrial real: la pintura y el metal reflejan luces, vigas y puertas, no una caja (look.js)
-hangarEnvironment(scene, pmrem, "./assets/", profile, 0.75, modelLoad);
+hangarEnvironment(scene, pmrem, "./assets/", profile, { room: 0.9, hangar: 0.75 }, modelLoad);
 const camera = new THREE.PerspectiveCamera(32, profile.size()[0] / profile.size()[1], 0.01, 50);
 // el perfil decide cuánto alejar la cámara para que quepa la envergadura en esa pantalla
 function homeView() {
@@ -92,8 +89,9 @@ model.traverse((o) => {
     // la cubeta de la cabina es una lámina abierta: se ve por las dos caras
     o.material.side = o.material.name.startsWith("Gris de cabina") ? THREE.DoubleSide : THREE.FrontSide;
     // en el teléfono la transmisión obliga a pintar la escena dos veces por cuadro (de 28 a 46 fps al quitarla en un
-    // Adreno 610, medido en mw54-anatomy): el mismo tinte con transparencia se ve igual a esta escala
-    if (profile.kind === "celular" && o.material.transmission > 0) {
+    // Adreno 610, medido en mw54-anatomy): el mismo tinte con transparencia se ve igual a esta escala. Igual en el
+    // computador de gama baja, que además compilaría cada material opaco dos veces (lienzo y búfer de la transmisión)
+    if ((profile.kind === "celular" || profile.tier === "baja") && o.material.transmission > 0) {
       o.material.opacity = Math.min(o.material.opacity, 1 - 0.55 * o.material.transmission);
       o.material.transmission = 0;
       o.material.depthWrite = false;
@@ -148,6 +146,7 @@ function poseControls() {
   }
 }
 spinners = ["wheel", "turbine", "nut"].map((k) => engineParts[k]).filter(Boolean);
+await compileScene(renderer, scene, camera, composer);
 $("loading").remove();
 
 // La pieza "física" de la que cuelga una malla (para el cursor).

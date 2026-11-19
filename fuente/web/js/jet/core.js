@@ -4,9 +4,8 @@
 // mobile.js) llaman a las acciones que devuelve `start`.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { createFloor } from "../floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment } from "../look.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment, compileScene } from "../look.js";
 import { createFlame } from "../flame.js";
 import { createFlight, jetAirframe } from "../flight.js";
 
@@ -49,8 +48,7 @@ export async function start(profile, cfg) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0d0f12);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  hangarEnvironment(scene, pmrem, "../assets/", profile, 0.8, modelLoad);
+  hangarEnvironment(scene, pmrem, "../assets/", profile, { hangar: 0.8 }, modelLoad);
   const [W0, H0] = profile.size();
   const camera = new THREE.PerspectiveCamera(32, W0 / H0, 0.1, 600);
   const homeView = () => new THREE.Vector3(...cfg.view.home).multiplyScalar(profile.fit(camera.aspect));
@@ -88,8 +86,9 @@ export async function start(profile, cfg) {
       o.castShadow = o.receiveShadow = true;
       o.material.side = cfg.doubleSided?.test(o.material.name) ? THREE.DoubleSide : THREE.FrontSide;
       // en el teléfono la transmisión del parabrisas obliga a pintar la escena dos veces por cuadro (SR-71 en un Adreno
-      // 610: de 35 a 56 fps al quitarla): el mismo tinte con transparencia se ve igual a esta distancia
-      if (profile.kind === "celular" && o.material.transmission > 0) {
+      // 610: de 35 a 56 fps al quitarla): el mismo tinte con transparencia se ve igual a esta distancia. Igual en el
+      // computador de gama baja, que además compilaría cada material opaco dos veces (lienzo y búfer de la transmisión)
+      if ((profile.kind === "celular" || profile.tier === "baja") && o.material.transmission > 0) {
         o.material.opacity = Math.min(o.material.opacity, 1 - 0.55 * o.material.transmission);
         o.material.transmission = 0;
         o.material.transparent = true;
@@ -131,6 +130,7 @@ export async function start(profile, cfg) {
   model.traverse((o) => {
     if (o.userData.subcontrol) subControls.push({ obj: o, kind: o.userData.subcontrol, rest: o.quaternion.clone(), axis: fromBlender(o.userData.hinge).normalize(), value: null });
   });
+  await compileScene(renderer, scene, camera, composer);
   $("loading")?.remove();
   const meshes = [];
   for (const e of parts) for (const m of e.materials) { m.userData.entry = e; meshes.push(m); }
