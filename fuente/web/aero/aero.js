@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { loadModel, guardContext, studioLights } from "../js/look.js";
+import { loadModel, guardContext, studioLights, compileScene } from "../js/look.js";
 import * as sr71 from "../sr71/sim.js";
 import * as f22 from "../f22/sim.js";
 import * as f14 from "../f14/sim.js";
@@ -165,9 +165,16 @@ async function show(id) {
   $("loading").hidden = false;
   if (!models[id]) {
     const gltf = await loadModel(c.glb, "../assets/draco/");
+    // la cabina con transmisión obliga a pintar la escena dos veces por cuadro y a compilar cada material opaco dos
+    // veces (lienzo y búfer de la transmisión); a la escala del avión entero el mismo tinte con transparencia se ve igual
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh || !(o.material.transmission > 0)) return;
+      o.material.opacity = Math.min(o.material.opacity, 1 - 0.55 * o.material.transmission);
+      o.material.transmission = 0;
+      Object.assign(o.material, { transparent: true, depthWrite: false });
+    });
     models[id] = gltf.scene;
   }
-  $("loading").hidden = true;
   current = id;
   const model = models[id];
   scene.add(model);
@@ -178,6 +185,10 @@ async function show(id) {
   const L = size.x;
   if (lights) scene.remove(lights.fill, lights.rim);
   lights = studioLights(scene, L);
+  // con las luces ya puestas (cambian la clave de cada programa), los sombreadores del avión se compilan en paralelo
+  // antes de quitar el aviso, no en el primer cuadro
+  await compileScene(renderer, scene, camera, { ready: Promise.resolve(), target: null });
+  $("loading").hidden = true;
   camera.near = L / 200;
   camera.far = L * 60;
   camera.updateProjectionMatrix();
