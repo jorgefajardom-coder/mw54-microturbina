@@ -13,15 +13,16 @@ export default async function desktop(profile, cfg) {
       <button id="explode">Despiece</button>
       <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="${Math.round((cfg.throttle ?? 0.85) * 100)}" aria-label="Palanca de gases"></label>
-      <label class="chip">Mach <input id="mach" type="range" min="0" max="${cfg.maxMach * 10}" value="0" aria-label="Mach objetivo"><output id="machv">0</output></label>
+      <label class="chip" id="machchip">Mach <input id="mach" type="range" min="0" max="${cfg.maxMach * 10}" value="0" aria-label="Mach objetivo"><output id="machv">0</output></label>
       <button id="mission">Misión</button>
       <button id="heat">Mapa de calor</button>
       <button id="cut">Corte</button>
+      <button id="gear">Tren</button>
       <button id="surfaces">Mandos</button>
       <button id="fly">Volar</button>
     </div>
     <div class="ui" id="hud"></div>
-    <div class="ui" id="keys">E arrancar · Mayús/Ctrl gas · W/S cabeceo · A/D alabeo · Z/X timón · F flaps · B frenos · T giróscopo · C cámara · R reiniciar</div>`,
+    <div class="ui" id="keys">E arrancar · Mayús/Ctrl gas · W/S cabeceo · A/D alabeo · Z/X timón · G tren · F flaps · B frenos · T giróscopo · C cámara · R reiniciar</div>`,
   );
   profile.onStats = debugPanel(profile);
   // mando de juego, si hay uno conectado
@@ -32,11 +33,11 @@ export default async function desktop(profile, cfg) {
   };
   const api = await start(profile, cfg);
   const A = api.actions;
-  for (const id of ["explode", "run", "mission", "heat", "cut", "surfaces", "fly"]) $(id).onclick = A[id];
+  for (const id of ["explode", "run", "mission", "heat", "cut", "gear", "surfaces", "fly"]) $(id).onclick = A[id];
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   $("mach").oninput = (e) => A.mach(e.target.value / 10);
   api.onChange((st) => {
-    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces, fly: st.flying })) $(id).toggleAttribute("data-on", on);
+    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, gear: st.gear, surfaces: st.surfaces, fly: st.flying })) $(id).toggleAttribute("data-on", on);
     $("fly").textContent = st.flying ? "Volver al taller" : "Volar";
     $("explode").textContent = st.exploded ? "Montar" : "Despiece";
     $("run").lastChild.textContent = st.running ? "Apagar" : "Arrancar";

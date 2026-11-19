@@ -43,7 +43,7 @@ body:has(#card[style*="block"]) nav.sections { display: none; }
 /* al volar: sólo el HUD, las palancas y sus botones */
 #hud { top: calc(6px + env(safe-area-inset-top)); font-size: 11px; padding: 6px 10px; width: max-content; max-width: calc(100% - 16px); }
 body[data-flying] #hud { display: block; }
-body[data-flying] header, body[data-flying] nav.sections, body[data-flying] #bar, body[data-flying] #sheet, body[data-flying] #readout, body[data-flying] #card, body[data-flying] #legend, body[data-flying] #pip, body[data-flying] #steps { display: none !important; }
+body[data-flying] header, body[data-flying] nav.sections, body[data-flying] #bar, body[data-flying] #sheet, body[data-flying] #readout, body[data-flying] #card, body[data-flying] #legend, body[data-flying] #pip, body[data-flying] #steps, body[data-flying] #mode { display: none !important; }
 #pad { display: none; position: fixed; inset: 0; z-index: 5; pointer-events: none; }
 body[data-flying] #pad { display: block; }
 .stick { position: absolute; bottom: calc(24px + env(safe-area-inset-bottom)); width: min(36vw, 150px); aspect-ratio: 1; border-radius: 50%; background: #0008; box-shadow: inset 0 0 0 1px #ffffff26, inset 0 0 30px #0006; pointer-events: auto; touch-action: none; }
@@ -135,7 +135,3 @@ body[data-orient="landscape"] .stick { width: min(26vw, 150px); }
 body:has(#legend[style*="block"]) #mode, body:has(#sheet[data-open]) #mode { display: none !important; }
 body:has(#mode[style*="block"]) #legend { top: calc(58px + env(safe-area-inset-top)); }
 body[data-orient="landscape"] #mode { max-width: calc(100% - 120px); transform: translateX(calc(-50% - 42px)); }
-/* volando: en vertical las consolas ocupan la franja de arriba, así que el aviso del régimen va debajo de ellas; en
-   horizontal no hay barra lateral y va centrado bajo el HUD, entre las dos palancas */
-body[data-flying] #mode { top: calc(216px + env(safe-area-inset-top)); max-width: calc(100% - 24px); }
-body[data-flying][data-orient="landscape"] #mode { top: calc(74px + env(safe-area-inset-top)); max-width: min(420px, calc(100% - 2 * min(26vw, 150px) - 40px)); transform: translateX(-50%); }

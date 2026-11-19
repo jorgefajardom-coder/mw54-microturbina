@@ -69,9 +69,10 @@ export function createComposer(renderer, scene, camera, profile, options = {}) {
 // reciben la copia de 256 × 128 (src/hdr-small.mjs), que pesa la cuarta parte y en reflejos borrosos casi no se distingue.
 // El estudio se genera del mismo tamaño que el PMREM del HDR (un cuarto de su ancho): si no, al llegar el HDR cambian
 // las constantes de los sombreadores y la GPU vuelve a compilar todos los materiales del modelo con la página ya abierta.
+export const envSize = (profile) => (profile.kind === "celular" || profile.tier === "baja" ? 64 : 128);
 export function hangarEnvironment(scene, pmrem, assets, profile, { room = 1, hangar = 1 } = {}, after) {
-  const small = profile.kind === "celular" || profile.tier === "baja";
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04, 0.1, 100, { size: small ? 64 : 128 }).texture;
+  const small = envSize(profile) === 64;
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04, 0.1, 100, { size: envSize(profile) }).texture;
   scene.environmentIntensity = room;
   after.then(() => new HDRLoader().load(`${assets}${small ? "hangar-256.hdr" : "hangar.hdr"}`, (hdr) => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
@@ -121,8 +122,9 @@ export function enrichMetal(material, { scale = 1 } = {}) {
       .replace("#include <common>", `#include <common>\nuniform float uLkScale;\n${NOISE}`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 lkP = vObjPos * uLkScale;
-        // el detalle fino se apaga cuando es más pequeño que un píxel (si no, centellea)
-        float lkAA = clamp(1. - length(fwidth(lkP)) * .25, 0., 1.);
+        // el detalle fino se apaga antes de llegar al tamaño de un píxel: el relieve se deriva por bloques de 2 × 2 píxeles
+        // y, en piezas pulidas y finas como los montantes del tren, centelleaba en mosaico
+        float lkAA = clamp(1. - length(fwidth(lkP)) * 1.5, 0., 1.);
         float lkBig = lkF(lkP * .012);
         float lkFine = mix(.5, lkBrush(lkP), lkAA);
         diffuseColor.rgb *= .9 + .16 * lkBig + .05 * (lkFine - .5);`)

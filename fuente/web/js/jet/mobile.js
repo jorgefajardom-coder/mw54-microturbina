@@ -24,6 +24,7 @@ export default async function mobile(profile, cfg) {
     `<div class="ui" id="sheet">
       <button id="heat">Mapa de calor</button>
       <button id="surfaces">Mandos</button>
+      <button id="gear">Tren</button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="${Math.round((cfg.throttle ?? 0.85) * 100)}" aria-label="Palanca de gases"></label>
       <label class="chip">Mach <input id="mach" type="range" min="0" max="${cfg.maxMach * 10}" value="0" aria-label="Mach objetivo"><output id="machv">0</output></label>
     </div>
@@ -36,7 +37,7 @@ export default async function mobile(profile, cfg) {
       <button id="more">${ICONS.more}<span>Más</span></button>
     </nav>
     <div class="ui" id="hud"></div>
-    ${padHTML({ engine: cfg.say?.engines ?? "los motores", gear: false })}`,
+    ${padHTML({ engine: cfg.say?.engines ?? "los motores", })}`,
   );
   profile.onStats = debugPanel(profile);
   profile.pad = createPad({ touch: true, haptic });
@@ -59,12 +60,13 @@ export default async function mobile(profile, cfg) {
   const tap = (id, fn, keep) => ($(id).onclick = () => { haptic(); fn(); if (!keep) closeSheet(); });
   for (const id of ["run", "explode", "cut", "mission", "heat"]) tap(id, A[id]);
   tap("surfaces", A.surfaces, true);
+  tap("gear", A.gear, true);
   tap("fly", () => { A.fly(); setFlying(api.state().flying); });
   tap("more", () => { const open = !sheet.hasAttribute("data-open"); sheet.toggleAttribute("data-open", open); $("more").toggleAttribute("data-on", open); }, true);
   $("throttle").oninput = (e) => A.throttle(e.target.value / 100);
   $("mach").oninput = (e) => A.mach(e.target.value / 10);
   api.onChange((st) => {
-    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces, fly: st.flying })) $(id).toggleAttribute("data-on", on);
+    for (const [id, on] of Object.entries({ explode: st.exploded, run: st.running, mission: st.mission, heat: st.heat, cut: st.cut, surfaces: st.surfaces, gear: st.gear, fly: st.flying })) $(id).toggleAttribute("data-on", on);
     $("explode").lastChild.textContent = st.exploded ? "Montar" : "Despiece";
     $("run").lastChild.textContent = st.running ? "Apagar" : "Motor";
   });

@@ -7,7 +7,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { op, metal, PARTS, SPEC } from "./model.js";
 import { createFlight } from "./flight.js";
 import { createFloor } from "./floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment, compileScene } from "./look.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment, compileScene, envSize } from "./look.js";
 import { createFlame } from "./flame.js";
 
 const $ = (id) => document.getElementById(id);
@@ -62,6 +62,8 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(profile.shadowSize, profile.shadowSize);
 Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.4, near: 0.5, far: 10 });
 sun.shadow.bias = -0.0004;
+// los montantes del tren son finos: sin desplazamiento por la normal se sombreaban a sí mismos a puntos (acné)
+sun.shadow.normalBias = 0.003;
 scene.add(sun, new THREE.HemisphereLight(0xbcd2ff, 0x2a2622, 0.4));
 studioLights(scene, 1.6);
 const composer = createComposer(renderer, scene, camera, profile, { aoRadius: 0.05 });
@@ -489,7 +491,7 @@ const actions = {
 let demoSurfaces = false;
 let flying = false;
 const pad = profile.pad;
-const flight = createFlight({ scene, renderer, camera, model, op, motor, lite: profile.kind === "celular", setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad });
+const flight = createFlight({ scene, renderer, camera, model, op, motor, lite: profile.kind === "celular", setGear: (t) => (gearState.target = t), setSurfaces, gearState, pad, envSize: envSize(profile) });
 
 // ── vista de cabina: la cámara entra por encima del puesto trasero y mira el tablero; los mandos se mueven solos ──
 const VIEWS = {

@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createFloor } from "../floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment, compileScene } from "../look.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment, compileScene, envSize } from "../look.js";
 import { createFlame } from "../flame.js";
 import { createFlight, jetAirframe } from "../flight.js";
 
@@ -124,6 +124,37 @@ export async function start(profile, cfg) {
     axis: e.data.hinge ? fromBlender(e.data.hinge).normalize() : null,
     slide: e.data.slide ? fromBlender(e.data.slide).normalize() : null,
   }));
+  // tren retráctil, con la misma palanca que el Hawk: cada pata gira 90° sobre lo alto de su montante (la de morro
+  // hacia delante, las principales hacia dentro) y, ya recogida, queda guardada en su pozo (el modelo no tiene compuertas)
+  const gearState = { t: 0, target: 0 };
+  const gearParts = [];
+  {
+    model.updateMatrixWorld(true);
+    const mc = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+    for (const e of parts.filter((p) => p.data.part.startsWith("tren"))) {
+      const b = new THREE.Box3().setFromObject(e.obj);
+      const top = new THREE.Vector3((b.min.x + b.max.x) / 2, b.max.y, (b.min.z + b.max.z) / 2);
+      const nose = e.data.part === "tren.morro";
+      const toParent = e.obj.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+      gearParts.push({
+        e, rest: e.quat.clone(), q: new THREE.Quaternion(), pivot: e.obj.parent.worldToLocal(top.clone()),
+        axis: (nose ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0)).applyQuaternion(toParent).normalize(),
+        angle: nose ? Math.PI / 2 : (Math.sign(top.z - mc.z) || 1) * (Math.PI / 2),
+      });
+    }
+  }
+  const smooth01 = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  function poseGear() {
+    const k = smooth01((gearState.t - 0.05) / 0.8);
+    for (const g of gearParts) { g.q.setFromAxisAngle(g.axis, g.angle * k); g.e.quat.copy(g.q).multiply(g.rest); }
+  }
+  const lever = new THREE.Vector3();
+  function placeGear() {
+    for (const g of gearParts) {
+      g.e.obj.position.add(lever.copy(g.e.home).sub(g.pivot).applyQuaternion(g.q).add(g.pivot).sub(g.e.home));
+      g.e.obj.visible = gearState.t < 0.97;
+    }
+  }
   // compuertas y flaps que van dentro de una pieza (puertas de la góndola, flaps del eyector, pétalos de la tobera):
   // giran sobre su bisagra y viajan con la pieza en el despiece
   const subControls = [];
@@ -497,15 +528,15 @@ export async function start(profile, cfg) {
         return short ? `Mach <b>${flyState.M.toFixed(2)}</b> · ${(flyState.thrust / 1000).toFixed(0)} kN · ${gas}` : `${cfg.say.engines} · Mach <b>${flyState.M.toFixed(2)}</b> · <b>${(flyState.thrust / 1000).toFixed(0)}</b> kN · ${gas}`;
       },
     });
-    flight = createFlight({ scene, renderer, camera, model, op: () => ({}), motor, lite: profile.kind === "celular", setGear: () => {}, setSurfaces: (c) => Object.assign(surf, { roll: c.roll, pitch: c.pitch, yaw: c.yaw }), gearState: { t: 0, target: 0 }, pad: profile.pad, airframe });
+    flight = createFlight({ scene, renderer, camera, model, op: () => ({}), motor, lite: profile.kind === "celular", setGear: (t) => (gearState.target = t), setSurfaces: (c) => Object.assign(surf, { roll: c.roll, pitch: c.pitch, yaw: c.yaw }), gearState, pad: profile.pad, airframe, envSize: envSize(profile) });
     return flight;
   }
   const camBack = { near: camera.near, far: camera.far, fov: camera.fov };
-  const state = () => ({ exploded, running: motor.on, heat: heatOn, cut: cutOn, surfaces: demo, mission: !!motor.mission, mach: motor.Mtarget, throttle: motor.target, flying });
+  const state = () => ({ exploded, running: motor.on, heat: heatOn, cut: cutOn, surfaces: demo, mission: !!motor.mission, mach: motor.Mtarget, throttle: motor.target, flying, gear: !!gearState.target });
   const notify = () => { const st = state(); for (const fn of listeners) fn(st); };
   const actions = {
-    assemble() { assemble(); notify(); },
-    explode() { explode(); notify(); },
+    assemble() { gearState.target = 0; assemble(); notify(); },
+    explode() { gearState.target = 0; explode(); notify(); },
     run() { motor.on = !motor.on; if (motor.on) settle(); notify(); },
     throttle(v) { motor.target = v; notify(); },
     mach(v) { motor.Mtarget = v; motor.mission = null; notify(); },
@@ -525,14 +556,15 @@ export async function start(profile, cfg) {
         flight.exit();
         Object.assign(camera, camBack); camera.updateProjectionMatrix();
         controls.enabled = true; floor.visible = true;
-        Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); motor.Mtarget = 0;
+        Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); motor.Mtarget = 0; gearState.target = 0;
         flyCamera("home");
       }
       notify();
     },
+    gear() { gearState.target = gearState.target ? 0 : 1; notify(); },
     surfaces() { demo = !demo; if (!demo) Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); notify(); },
   };
-  window.__sim = { motor, camera, controls, model, op: () => o, get flight() { return flight; } };
+  window.__sim = { motor, gearState, camera, controls, model, op: () => o, get flight() { return flight; } };
 
   function missionMach(t) {
     const legs = cfg.mission;
@@ -578,9 +610,15 @@ export async function start(profile, cfg) {
     motor.heat += ((motor.on ? 1 : 0) - motor.heat) * (1 - Math.exp(-dt / (motor.on ? 2.5 : 5)));
     o = op(motor.M, motor.thr);
     for (const e of parts) e.T += (tempTarget(e) - e.T) * (1 - Math.exp(-dt / 2.5));
+    const gearMoving = gearState.t !== gearState.target;
+    gearState.t += (gearState.target - gearState.t) * Math.min(1, dt * 0.9);
+    if (Math.abs(gearState.target - gearState.t) < 0.002) gearState.t = gearState.target;
+    if (gearMoving) shadowDirty = true;
     poseControls();
+    poseGear();
     applyPose(now);
     slideControls();
+    placeGear();
     motor.angle += dt * motor.spin * (8 + 30 * motor.thr) * (o.turbine ?? 1);
     for (const e of spinners) e.obj.rotation.x = motor.angle * (e.data.spin ?? 1);
     const assembled = parts.every((e) => e.t < 0.02);

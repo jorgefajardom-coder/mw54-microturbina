@@ -5,7 +5,7 @@
 
 const $ = (id) => document.getElementById(id);
 
-// `gear: false` quita la palanca del tren (los jets vuelan con el tren fijo)
+// `gear: false` cambia la palanca del tren por el interruptor del giróscopo (todos los aviones recogen ya el tren)
 export function padHTML({ engine = "el motor", gear = true } = {}) {
   return `<div id="pad" aria-hidden="true">
       <div class="stick" id="stickL"><span>Gas · timón</span><div class="knob"></div></div>

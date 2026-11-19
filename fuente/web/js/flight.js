@@ -102,11 +102,11 @@ export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy 
     CM: { z: 0, a: -0.55, q: -10, de: -0.8, flap: -0.04 },
     CR: { b: -0.06, p: -0.4, da: 0.12, r: 0.06 },
     CN: { b: 0.1, r: -0.15, dr: -0.07 },
-    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eyeY - cg.y], canopy, tips: [tipR, tipL], thrust, hud, fixedGear: true, cg,
+    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eyeY - cg.y], canopy, tips: [tipR, tipL], thrust, hud, cg,
   };
 }
 
-export function createFlight({ scene, renderer, camera, model, op, motor, lite, setGear, setSurfaces, gearState, pad, airframe = HAWK }) {
+export function createFlight({ scene, renderer, camera, model, op, motor, lite, setGear, setSurfaces, gearState, pad, airframe = HAWK, envSize = 128 }) {
   // datos de esta célula; con el Hawk son los de arriba y todo queda como estaba
   const { AC, CL, CD, CM, CR, CN, WHEELS, SKIN, BELLY } = airframe;
   const K = airframe.world, L = airframe.size, VREF = airframe.vref, VK = VREF / 22, MK = AC.m / 7.2;
@@ -161,6 +161,11 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     return rt.texture;
   }
   let bgBefore = null;
+  // los reflejos al aire libre salen del mismo cielo, no del hangar (con la luz del hangar los jets claros se veían
+  // blancos y lavados); mismo tamaño que el entorno del hangar para que los materiales no se recompilen al despegar
+  let skyEnv = null;
+  let envBefore = null;
+  let envIntensityBefore = 1;
 
   // ── viento visible: torbellinos de punta de ala (se ven cuando el ala carga) y vetas de aire que pasan junto al avión
   // a la velocidad relativa, más largas y opacas cuanto más rápido vuela ──
@@ -270,8 +275,8 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     for (const a of air) seedAir(a, false);
   }
   const act = {
-    // los jets vuelan con el tren fijo (su modelo no lo recoge)
-    gear() { if (!airframe.fixedGear && s.p.y > 1.5) { s.gearUp = !s.gearUp; gearState.target = s.gearUp ? 1 : 0; } },
+    // el tren sólo se recoge en el aire, con margen sobre la pista a la escala de cada avión
+    gear() { if (!s.onGround && s.p.y > airframe.ground + 1.3 * Math.max(1, K * 0.4)) { s.gearUp = !s.gearUp; gearState.target = s.gearUp ? 1 : 0; } },
     flap() { s.flap = s.flap > 0.6 ? 0 : s.flap + 0.5; },
     cam() { s.cam = s.cam === "chase" ? "cockpit" : "chase"; },
     reset,
@@ -562,8 +567,14 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
   // el aeródromo con su cielo, compartido con la exhibición; fx son los efectos de viento del avión pilotado
   function showWorld(on, withFx = on) {
     if (on) ground();
-    if (on && !world.visible) { skyCube ??= bakeSky(); bgBefore = scene.background; scene.background = skyCube; }
-    if (!on && world.visible) scene.background = bgBefore;
+    if (on && !world.visible) {
+      skyCube ??= bakeSky();
+      skyEnv ??= new THREE.PMREMGenerator(renderer).fromScene(skyScene, 0, 1, 20000, { size: envSize }).texture;
+      bgBefore = scene.background; scene.background = skyCube;
+      envBefore = scene.environment; envIntensityBefore = scene.environmentIntensity;
+      scene.environment = skyEnv; scene.environmentIntensity = 0.55;
+    }
+    if (!on && world.visible) { scene.background = bgBefore; scene.environment = envBefore; scene.environmentIntensity = envIntensityBefore; }
     world.visible = on;
     fx.visible = withFx;
     const fk = Math.sqrt(K);
