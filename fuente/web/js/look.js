@@ -1,12 +1,8 @@
 // Aspecto común de los visores: iluminación de estudio (sol, relleno frío y contraluz), posproceso con oclusión
-// ambiental (GTAO) y resplandor (bloom) según la gama del dispositivo, microdetalle procedural para los metales (que no
+// ambiental (GTAO) y resplandor (bloom) según la gama del dispositivo (en post.js), microdetalle procedural para los metales (que no
 // tienen coordenadas de textura) y el brillo de cuerpo negro del metal caliente.
 import * as THREE from "three";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
-import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
@@ -44,44 +40,38 @@ export function studioLights(scene, size) {
   return { fill, rim };
 }
 
-// Posproceso: alta gama con oclusión ambiental y resplandor, media sólo con resplandor, baja sin posproceso.
-// `aoRadius` en unidades de escena; devuelve { render(), setSize(w, h), bloom }.
-export function createComposer(renderer, scene, camera, profile, { aoRadius = 0.5 } = {}) {
-  const tier = profile.tier;
-  if (tier === "baja") return { render: () => renderer.render(scene, camera), setSize() {}, bloom: null };
-  const [w, h] = profile.size();
-  // búfer de color con decimales sólo donde la GPU sabe dibujar en él (si no, el lienzo sale negro) y suavizado de bordes
-  // con las muestras que admita
-  const ext = renderer.extensions;
-  const half = ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float");
-  const samples = profile.antialias ? Math.min(4, renderer.capabilities.maxSamples || 0) : 0;
-  const target = new THREE.WebGLRenderTarget(w, h, { type: half ? THREE.HalfFloatType : THREE.UnsignedByteType, samples });
-  const composer = new EffectComposer(renderer, target);
-  composer.addPass(new RenderPass(scene, camera));
-  let gtao = null;
-  if (tier === "alta") {
-    gtao = new GTAOPass(scene, camera, w, h);
-    gtao.updateGtaoMaterial({ radius: aoRadius, distanceExponent: 1.4, thickness: aoRadius * 2, scale: 1.1, samples: 12, screenSpaceRadius: false });
-    gtao.blendIntensity = 0.85;
-    // la oclusión no debe ver los volúmenes de llama ni los vidrios: se esconden mientras dibuja sus normales
-    const hide = gtao._overrideVisibility.bind(gtao);
-    gtao._overrideVisibility = () => {
-      hide();
-      scene.traverse((o) => {
-        if (o.isMesh && o.visible && (o.userData.noAO || (o.material?.transparent && o.material.opacity < 0.95))) { o.visible = false; gtao._visibilityCache.push(o); }
-      });
-    };
-    composer.addPass(gtao);
-  }
-  const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.3, 0.45, 1.0);
-  composer.addPass(bloom);
-  composer.addPass(new OutputPass());
+// Posproceso: alta gama con oclusión ambiental y resplandor, media sólo con resplandor, baja sin posproceso. El de las
+// gamas alta y media vive en post.js y se descarga aparte; mientras llega, se dibuja la escena tal cual (con el mismo
+// tono y espacio de color), así la primera imagen no lo espera. `aoRadius` en unidades de escena.
+export function createComposer(renderer, scene, camera, profile, options = {}) {
+  const plain = () => renderer.render(scene, camera);
+  if (profile.tier === "baja") return { render: plain, setSize() {}, setPixelRatio() {} };
+  let real = null, size = null, ratio = null;
+  import("./post.js")
+    .then(({ buildComposer }) => {
+      real = buildComposer(renderer, scene, camera, profile, options);
+      if (ratio) real.setPixelRatio(ratio);
+      if (size) real.setSize(...size);
+    })
+    .catch(() => {});   // sin posproceso si el módulo no llega: la escena se sigue viendo
   return {
-    render: () => composer.render(),
-    setSize(width, height) { composer.setSize(width, height); gtao?.setSize(width, height); },
-    setPixelRatio(r) { composer.setPixelRatio(r); },
-    bloom,
+    render: () => (real ? real.render() : plain()),
+    setSize(w, h) { size = [w, h]; real?.setSize(w, h); },
+    setPixelRatio(r) { ratio = r; real?.setPixelRatio(r); },
   };
+}
+
+// Reflejos de una nave industrial real (Poly Haven, CC0). Se piden cuando el modelo ya bajó, para no quitarle ancho de
+// banda en la primera visita; hasta entonces ilumina el estudio generado (RoomEnvironment). El celular y la gama baja
+// reciben la copia de 256 × 128 (src/hdr-small.mjs), que pesa la cuarta parte y en reflejos borrosos casi no se distingue.
+export function hangarEnvironment(scene, pmrem, assets, profile, intensity, after) {
+  const file = profile.kind === "celular" || profile.tier === "baja" ? "hangar-256.hdr" : "hangar.hdr";
+  after.then(() => new HDRLoader().load(`${assets}${file}`, (hdr) => {
+    hdr.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = pmrem.fromEquirectangular(hdr).texture;
+    scene.environmentIntensity = intensity;
+    hdr.dispose();
+  }), () => {});
 }
 
 // Microdetalle para metales sin UV: ruido en coordenadas del objeto (en mm del modelo) que varía la rugosidad, deja

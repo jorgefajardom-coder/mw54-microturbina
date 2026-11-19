@@ -31,9 +31,11 @@ export async function bundle(webDir, outDir) {
   const out = {};
   const outputs = result.metafile.outputs;
   // todo lo que la página va a pedir, también lo que llega por import() (la interfaz y three.js), para precargarlo
-  // en paralelo en vez de descubrirlo módulo a módulo
+  // en paralelo en vez de descubrirlo módulo a módulo; salvo el posproceso (post.js), que sólo piden las gamas media y
+  // alta: precargarlo haría que el celular y los equipos de gama baja lo descargaran sin usarlo
+  const optional = (path) => outputs[path]?.entryPoint?.replaceAll("\\", "/").endsWith("web/js/post.js");
   const closure = (file, seen = new Set()) => {
-    for (const i of outputs[file]?.imports ?? []) if (!i.external && !seen.has(i.path)) { seen.add(i.path); closure(i.path, seen); }
+    for (const i of outputs[file]?.imports ?? []) if (!i.external && !seen.has(i.path) && !optional(i.path)) { seen.add(i.path); closure(i.path, seen); }
     return seen;
   };
   for (const [file, info] of Object.entries(outputs)) {

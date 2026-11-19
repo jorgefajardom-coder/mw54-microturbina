@@ -16,7 +16,7 @@ copyFileSync(join(ROOT, "src", "model.mjs"), join(ROOT, "web", "js", "model.js")
 // js/: el visor empaquetado y minificado (ver bundle.mjs), css/: estilos, assets/: modelo, iluminación y decodificador Draco
 const BUNDLE = await bundle(join(ROOT, "web"), OUT);
 for (const f of ["base.css", "desktop.css", "mobile.css"]) copyFileSync(join(ROOT, "web", "css", f), join(OUT, "css", f));
-for (const f of ["mw54.glb", "hangar.hdr", "draco/draco_decoder.wasm", "draco/draco_wasm_wrapper.js"]) copyFileSync(join(ROOT, "web", "assets", f), join(OUT, "assets", f));
+for (const f of ["mw54.glb", "hangar.hdr", "hangar-256.hdr", "draco/draco_decoder.wasm", "draco/draco_wasm_wrapper.js"]) copyFileSync(join(ROOT, "web", "assets", f), join(OUT, "assets", f));
 const head = seoHead({
   title: `Wren MW54 en un entrenador a reacción · visor 3D interactivo · ${AUTHOR}`,
   description: `Visor 3D interactivo por ${AUTHOR}: la microturbina Wren MW54 según sus planos, instalada en una maqueta 1:7 de un entrenador tipo Hawk. Montaje y despiece, tren retráctil con compuertas, mandos de vuelo, mezcla de combustible, cámara de combustión, mapa de calor de materiales y simulador de vuelo.`,

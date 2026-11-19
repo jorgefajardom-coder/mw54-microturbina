@@ -5,9 +5,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { createFloor } from "../floor.js";
-import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext } from "../look.js";
+import { studioLights, createComposer, enrichMetal, blackbody, organicPose, disassemblyOrder, sequenceSteps, loadModel, guardContext, hangarEnvironment } from "../look.js";
 import { createFlame } from "../flame.js";
 import { createFlight, jetAirframe } from "../flight.js";
 
@@ -51,12 +50,7 @@ export async function start(profile, cfg) {
   scene.background = new THREE.Color(0x0d0f12);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  new HDRLoader().load("../assets/hangar.hdr", (hdr) => {
-    hdr.mapping = THREE.EquirectangularReflectionMapping;
-    scene.environment = pmrem.fromEquirectangular(hdr).texture;
-    scene.environmentIntensity = 0.8;
-    hdr.dispose();
-  });
+  hangarEnvironment(scene, pmrem, "../assets/", profile, 0.8, modelLoad);
   const [W0, H0] = profile.size();
   const camera = new THREE.PerspectiveCamera(32, W0 / H0, 0.1, 600);
   const homeView = () => new THREE.Vector3(...cfg.view.home).multiplyScalar(profile.fit(camera.aspect));
