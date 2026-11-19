@@ -375,8 +375,11 @@ def build_cockpit(M, part):
             obs.append(scr)
         if hud:
             obs.append(box(f"{name}_hudbase", (x - 8, 0, zt + 4), (8, 14, 3), M["black"], bevel=0.6))
-            g = box(f"{name}_hudglass", (x - 9, 0, zt + 11), (0.6, 13, 12), M["hud"])
-            g.rotation_euler = (0, math.radians(-tilt), 0)
+            # box() deja el origen del objeto en el del avión: la inclinación se aplica a la malla alrededor de su propio
+            # centro (con rotation_euler giraba alrededor del origen y el cristal quedaba 10 cm por encima de la cúpula)
+            c = Vector((x - 9, 0, zt + 11))
+            g = box(f"{name}_hudglass", c, (0.6, 13, 12), M["hud"])
+            g.data.transform(Matrix.Translation(c) @ Matrix.Rotation(math.radians(-tilt), 4, "Y") @ Matrix.Translation(-c))
             obs.append(g)
         return obs
     front_panel = panel("fp", 533, 56, 76, 60, [M["pfd"], M["mfd"]], hud=True)
