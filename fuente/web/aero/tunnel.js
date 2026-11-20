@@ -9,14 +9,16 @@
 //   minmod), términos viscosos de Navier-Stokes con el tensor completo, trabajo viscoso, disipación y conducción de
 //   calor, y Runge-Kutta SSP de segundo orden. Unidades: ρ∞ = 1, a∞ = 1 (u∞ = Mach), p∞ = 1/γ, T = γp/ρ.
 //
-// El cuerpo es una máscara de celdas sólidas: rebote a mitad de camino (Boltzmann) o pared que no deja pasar masa y
-// empuja con la presión del problema de Riemann contra la superficie (volúmenes). Las paredes inclinadas quedan en
-// escalones de la malla, que engruesan un poco el cuerpo: un choque oblicuo sale unos 3° más abierto que el exacto.
+// El cuerpo llega como una máscara con varias muestras por celda. Boltzmann usa celdas sólidas enteras con rebote a mitad
+// de camino. Los volúmenes finitos usan celdas cortadas: cada celda sabe qué fracción es aire y cuánto de cada cara está
+// abierto, los flujos pasan por la parte abierta y la pared que corta la celda (con su longitud y normal verdaderas)
+// empuja con la presión del problema de Riemann. Así una pared inclinada no se comporta como una escalera: el aire que
+// corre a lo largo de ella no choca con cada escalón y los choques oblicuos salen con su ángulo exacto.
 // El aire entra por la izquierda en la dirección +x con la velocidad impuesta; arriba y abajo el borde copia su vecina
 // (gradiente nulo), para que el aire que desvía el cuerpo salga sin rozar contra un borde impuesto; a la derecha sale a
 // la presión del aire libre (Boltzmann) o con gradiente nulo (volúmenes, donde el flujo supersónico no mira atrás).
 // Las pruebas de tests/tunel.mjs lo comparan con soluciones conocidas: Poiseuille, la calle de vórtices de un cilindro,
-// el choque oblicuo exacto de Mach 2 desviado 10° y el error de una rampa escalonada.
+// el tubo de Sod, el choque oblicuo de una placa (θ-β-M) y rampas que cortan las celdas en diagonal.
 import * as THREE from "three";
 
 const VERT = "in vec3 position; void main() { gl_Position = vec4(position.xy, 0., 1.); }";
@@ -122,7 +124,7 @@ void main() {
 }`;
 
 const NS = /* glsl */ `precision highp float; precision highp int;
-uniform sampler2D Q, Q0, MASK, NORM;
+uniform sampler2D Q, Q0, GEO;
 uniform ivec2 N;
 uniform float dt, mu, kap, ca, cb;
 uniform vec4 Winf;
@@ -131,24 +133,21 @@ out vec4 o;
 const float G = 1.4;
 vec4 prim(vec4 q) { float r = max(q.x, 1e-4); vec2 u = q.yz / r; return vec4(r, u, max((G - 1.) * (q.w - .5 * r * dot(u, u)), 1e-6)); }
 vec4 cons(vec4 w) { return vec4(w.x, w.x * w.yz, w.w / (G - 1.) + .5 * w.x * dot(w.yz, w.yz)); }
-bool solid(ivec2 p) { if (any(lessThan(p, ivec2(0))) || any(greaterThanEqual(p, N))) return false; return texelFetch(MASK, p, 0).r > .5; }
+// geometría de celdas cortadas: r = fracción de la celda que es aire (κ), g = apertura de la cara derecha, b = de la de
+// arriba. Fuera de la malla, aire libre con las caras abiertas
+vec4 geo(ivec2 p) { if (any(lessThan(p, ivec2(0))) || any(greaterThanEqual(p, N))) return vec4(1.); return texelFetch(GEO, p, 0); }
+bool solid(ivec2 p) { return geo(p).r < .002; }
 // fuera de la malla: aire libre que entra por la izquierda; en los otros bordes, el valor de la celda del borde
 vec4 W(ivec2 p) { if (p.x < 0) return Winf; return prim(texelFetch(Q, clamp(p, ivec2(0), N - 1), 0)); }
 // celda fantasma de una pared para las pendientes: la misma celda con la velocidad normal a la cara invertida
 vec4 ghost(vec4 w, ivec2 e) { if (e.x != 0) w.y = -w.y; else w.z = -w.z; return w; }
-// flujo por la cara de una pared: no pasa masa ni energía, sólo la presión de la pared. Esa presión sale del problema de
-// Riemann contra la superficie con la velocidad normal a la forma suavizada, no a la cara del escalón de la malla: si el
-// aire corre a lo largo de la superficie empuja cada escalón con la presión local, y escalones y peldaños suman la fuerza
-// de la pared inclinada; contra cada escalón se frenaría de golpe y llenaría la pared de choques falsos
-vec4 wallFlux(vec4 w, ivec2 e, ivec2 s) {
-  vec2 n = texelFetch(NORM, s, 0).xy * 2. - 1.;
-  n = dot(n, n) < .25 ? -vec2(e) : normalize(n);
-  float un = -dot(w.yz, n);   // velocidad hacia la pared
-  float a = sqrt(G * w.w / w.x), ps;
-  // compresión: choque reflejado (p* − p = ρ un W); expansión: onda de rarefacción isentrópica
-  if (un > 0.) { float k = (G + 1.) / 4. * un; ps = w.w + w.x * un * (k + sqrt(k * k + a * a)); }
-  else ps = w.w * pow(max(1. + .5 * (G - 1.) * un / a, 0.), 2. * G / (G - 1.));
-  return vec4(0., ps * vec2(e), 0.);
+// presión de la pared: el problema de Riemann contra la superficie con la velocidad normal n (hacia el sólido). Al
+// comprimir, choque reflejado (p* − p = ρ un W); al alejarse, onda de rarefacción isentrópica
+float wallPressure(vec4 w, vec2 n) {
+  float un = dot(w.yz, n);
+  float a = sqrt(G * w.w / w.x);
+  if (un > 0.) { float k = (G + 1.) / 4. * un; return w.w + w.x * un * (k + sqrt(k * k + a * a)); }
+  return w.w * pow(max(1. + .5 * (G - 1.) * un / a, 0.), 2. * G / (G - 1.));
 }
 vec4 mm(vec4 a, vec4 b) { return (sign(a) + sign(b)) * .5 * min(abs(a), abs(b)); }
 vec4 safe(vec4 w, vec4 fallback) { return (w.x > 1e-4 && w.w > 1e-6) ? w : fallback; }
@@ -161,20 +160,24 @@ vec4 hll(vec4 L, vec4 R, vec2 n) {
   if (sR <= 0.) return FR;
   return (sR * FL - sL * FR + sL * sR * (cons(R) - cons(L))) / (sR - sL);
 }
-// diferencia de flujos en una dirección: MUSCL de segundo orden, de primer orden junto a una pared
-vec4 divDir(ivec2 p, ivec2 e, vec4 w0) {
+// diferencia de flujos en una dirección, cada cara pesada por su apertura (lo que tiene de aire): MUSCL de segundo
+// orden donde las cinco celdas son aire entero, de primer orden junto al cuerpo
+vec4 divDir(ivec2 p, ivec2 e, vec4 w0, float k0, float ar, float al) {
   vec2 n = vec2(e);
-  bool sp1 = solid(p + e), sm1 = solid(p - e);
-  vec4 wp1 = sp1 ? ghost(w0, e) : W(p + e);
-  vec4 wm1 = sm1 ? ghost(w0, e) : W(p - e);
-  bool sp2 = sp1 || solid(p + 2 * e), sm2 = sm1 || solid(p - 2 * e);
-  vec4 wp2 = sp2 ? wp1 : W(p + 2 * e);
-  vec4 wm2 = sm2 ? wm1 : W(p - 2 * e);
-  vec4 s0 = (sp1 || sm1) ? vec4(0.) : mm(w0 - wm1, wp1 - w0);
-  vec4 sp = sp1 ? vec4(0.) : mm(wp1 - w0, wp2 - wp1);
-  vec4 sm = sm1 ? vec4(0.) : mm(wm1 - wm2, w0 - wm1);
-  vec4 Fr = sp1 ? wallFlux(w0, e, p + e) : hll(safe(w0 + .5 * s0, w0), safe(wp1 - .5 * sp, wp1), n);
-  vec4 Fl = sm1 ? wallFlux(w0, e, p - e) : hll(safe(wm1 + .5 * sm, wm1), safe(w0 - .5 * s0, w0), n);
+  float kp1 = geo(p + e).r, km1 = geo(p - e).r;
+  vec4 wp1 = kp1 < .002 ? ghost(w0, e) : W(p + e);
+  vec4 wm1 = km1 < .002 ? ghost(w0, e) : W(p - e);
+  bool full = k0 > .998 && kp1 > .998 && km1 > .998 && geo(p + 2 * e).r > .998 && geo(p - 2 * e).r > .998;
+  vec4 Fr = vec4(0.), Fl = vec4(0.);
+  if (full) {
+    vec4 wp2 = W(p + 2 * e), wm2 = W(p - 2 * e);
+    vec4 s0 = mm(w0 - wm1, wp1 - w0), sp = mm(wp1 - w0, wp2 - wp1), sm = mm(wm1 - wm2, w0 - wm1);
+    Fr = hll(safe(w0 + .5 * s0, w0), safe(wp1 - .5 * sp, wp1), n);
+    Fl = hll(safe(wm1 + .5 * sm, wm1), safe(w0 - .5 * s0, w0), n);
+  } else {
+    if (ar > .002) Fr = ar * hll(w0, wp1, n);
+    if (al > .002) Fl = al * hll(wm1, w0, n);
+  }
   return Fr - Fl;
 }
 // velocidad y temperatura de una vecina para los términos viscosos: en la pared, no desliza (u = 0 en la cara) y no
@@ -188,9 +191,20 @@ void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   vec4 q0 = texelFetch(Q0, p, 0);
   if (init) { o = cons(Winf); return; }
-  if (solid(p)) { o = q0; return; }
+  vec4 g0 = geo(p);
+  float k0 = g0.r;
+  if (k0 < .002) { o = q0; return; }
   vec4 w0 = W(p);
-  vec4 L = -divDir(p, ivec2(1, 0), w0) - divDir(p, ivec2(0, 1), w0);
+  float axr = g0.g, axl = geo(p - ivec2(1, 0)).g, ayt = g0.b, ayb = geo(p - ivec2(0, 1)).b;
+  vec4 L = -divDir(p, ivec2(1, 0), w0, k0, axr, axl) - divDir(p, ivec2(0, 1), w0, k0, ayt, ayb);
+  // la pared que corta la celda: lo que les falta a las caras para cerrar el contorno es su longitud por su normal
+  // (hacia el sólido). Empuja con la presión de Riemann a lo largo de esa normal verdadera, no la del escalón
+  vec2 Lw = -vec2(axr - axl, ayt - ayb);
+  float lw = length(Lw);
+  if (lw > 1e-3) L.yz -= wallPressure(w0, Lw / lw) * Lw;
+  // se divide por el aire de la celda; las celdas muy pequeñas cuentan como media celda para no exigir pasos de
+  // tiempo diminutos (cambia cómo llegan al estado estable, no cuál es)
+  L /= max(k0, .5);
   if (mu > 0.) {
     // difusión explícita: donde el aire está muy enrarecido (la estela tras la base) ν = μ/ρ dispararía la difusión por
     // encima de lo que aguanta el paso de tiempo; ahí se limita μ local (el número de difusión queda por debajo de ½)
@@ -293,9 +307,10 @@ export function createTunnel(renderer, { nx, ny }) {
   const mask = new Uint8Array(nx * ny);
   const maskTex = new THREE.DataTexture(mask, nx, ny, THREE.RedFormat, THREE.UnsignedByteType);
   maskTex.needsUpdate = true;
-  const normals = new Uint8Array(nx * ny * 4);
-  const normalTex = new THREE.DataTexture(normals, nx, ny, THREE.RGBAFormat, THREE.UnsignedByteType);
-  normalTex.needsUpdate = true;
+  const kappa = new Float32Array(nx * ny).fill(1), apX = new Float32Array(nx * ny).fill(1), apY = new Float32Array(nx * ny).fill(1);
+  const geometry = new Uint8Array(nx * ny * 4).fill(255);
+  const geoTex = new THREE.DataTexture(geometry, nx, ny, THREE.RGBAFormat, THREE.UnsignedByteType);
+  geoTex.needsUpdate = true;
   const N = new THREE.Vector2(nx, ny);
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
   quad.frustumCulled = false;
@@ -308,7 +323,7 @@ export function createTunnel(renderer, { nx, ny }) {
   const macroRT = target();
   const lbmMat = raw(LBM, { A: { value: null }, B: { value: null }, C: { value: null }, MASK: { value: maskTex }, N: { value: N }, tau: { value: 0.6 }, U: { value: 0.08 }, smag: { value: 0 }, init: { value: false }, sponge: { value: true } });
   const lbmMacro = raw(LBM_MACRO, { A: { value: null }, B: { value: null }, C: { value: null }, MASK: { value: maskTex } });
-  const nsMat = raw(NS, { Q: { value: null }, Q0: { value: null }, MASK: { value: maskTex }, NORM: { value: normalTex }, N: { value: N }, dt: { value: 0.05 }, mu: { value: 0 }, kap: { value: 0 }, ca: { value: 0 }, cb: { value: 1 }, Winf: { value: new THREE.Vector4(1, 1, 0, 1 / 1.4) }, init: { value: false } });
+  const nsMat = raw(NS, { Q: { value: null }, Q0: { value: null }, GEO: { value: geoTex }, N: { value: N }, dt: { value: 0.05 }, mu: { value: 0 }, kap: { value: 0 }, ca: { value: 0 }, cb: { value: 1 }, Winf: { value: new THREE.Vector4(1, 1, 0, 1 / 1.4) }, init: { value: false } });
   const nsMacro = raw(NS_MACRO, { Q: { value: null } });
   const show = raw(SHOW, { F: { value: macroRT.texture }, MASK: { value: maskTex }, N: { value: N }, box: { value: new THREE.Vector4() }, field: { value: 0 }, pInf: { value: 1 / 3 }, qInf: { value: 1 }, uInf: { value: 1 }, vScale: { value: 1 } });
 
@@ -419,11 +434,23 @@ export function createTunnel(renderer, { nx, ny }) {
     return buf;
   }
 
-  // fuerzas sobre el cuerpo por la presión de las celdas de aire que tocan sus caras, en coeficientes de la sección
+  // fuerzas sobre el cuerpo por la presión, en coeficientes de la sección. Método compresible: cada pared cortada
+  // empuja con su presión a lo largo de su normal; incompresible: las celdas de aire que tocan caras del cuerpo
   function forces() {
     const m = read();
     if (!m) return null;
     let fx = 0, fy = 0;
+    if (flow.mode === "ns") {
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+        const k = j * nx + i;
+        if (kappa[k] <= 0) continue;
+        const lx = -(apX[k] - (i > 0 ? apX[k - 1] : 1)), ly = -(apY[k] - (j > 0 ? apY[k - nx] : 1));
+        fx += m[k * 4 + 3] * lx;
+        fy += m[k * 4 + 3] * ly;
+      }
+      const f = freestream();
+      return { cd: fx / (f.q * flow.chord), cl: fy / (f.q * flow.chord) };
+    }
     const solidAt = (i, j) => i >= 0 && j >= 0 && i < nx && j < ny && mask[j * nx + i] > 127;
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
       if (solidAt(i, j)) continue;
@@ -449,56 +476,53 @@ export function createTunnel(renderer, { nx, ny }) {
     macro();
   }
 
-  function setMask(data, chord) {
-    for (let i = 0; i < mask.length; i++) mask[i] = data[i] ? 255 : 0;
-    // se rellenan los bolsillos de una celda (aire con pared en tres o cuatro lados): ahí el aire queda encerrado, la
-    // viscosidad con paredes que no deslizan le quita la energía y la celda acaba tragando masa sin presión
+  // El cuerpo llega como una máscara (1 = sólido) de (nx·s) × (ny·s) muestras: s muestras por lado de celda. De ahí sale
+  // la geometría de celdas cortadas: la fracción de aire de cada celda (κ) y la apertura de sus caras derecha y de
+  // arriba (la parte de la cara con aire a los dos lados). Con s = 1 la pared queda en escalones, tal cual.
+  function setMask(data, chord, s = 1) {
+    const fx = nx * s, fy = ny * s;
+    const air = (x, y) => x < 0 || y < 0 || x >= fx || y >= fy || !data[y * fx + x];
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      let n = 0, ox = 0, oy = 0;
+      for (let b = 0; b < s; b++) for (let a = 0; a < s; a++) if (air(i * s + a, j * s + b)) n++;
+      for (let r = 0; r < s; r++) {
+        if (air(i * s + s - 1, j * s + r) && air((i + 1) * s, j * s + r)) ox++;
+        if (air(i * s + r, j * s + s - 1) && air(i * s + r, (j + 1) * s)) oy++;
+      }
+      const k = j * nx + i;
+      kappa[k] = n / (s * s);
+      apX[k] = ox / s;
+      apY[k] = oy / s;
+    }
+    // la máscara de celdas (Boltzmann, dibujo, fuerzas del método incompresible): sólida si tiene menos de media celda
+    // de aire. Se rellenan los bolsillos de una celda (aire con pared en tres o cuatro lados): ahí el aire queda
+    // encerrado, la viscosidad con paredes que no deslizan le quita la energía y la celda acaba tragando masa sin presión
+    for (let k = 0; k < nx * ny; k++) mask[k] = kappa[k] < 0.5 ? 255 : 0;
     for (let changed = true; changed; ) {
       changed = false;
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
         const k = j * nx + i;
         if (mask[k]) continue;
         const walls = (i > 0 && mask[k - 1] ? 1 : 0) + (i < nx - 1 && mask[k + 1] ? 1 : 0) + (j > 0 && mask[k - nx] ? 1 : 0) + (j < ny - 1 && mask[k + nx] ? 1 : 0);
-        if (walls >= 3) { mask[k] = 255; changed = true; }
+        if (walls >= 3) {
+          mask[k] = 255;
+          changed = true;
+          kappa[k] = apX[k] = apY[k] = 0;   // también se cierra para el método compresible
+          if (i > 0) apX[k - 1] = 0;
+          if (j > 0) apY[k - nx] = 0;
+        }
       }
+    }
+    for (let k = 0; k < nx * ny; k++) {
+      geometry[k * 4] = Math.round(kappa[k] * 255);
+      geometry[k * 4 + 1] = Math.round(apX[k] * 255);
+      geometry[k * 4 + 2] = Math.round(apY[k] * 255);
+      // para el dibujo, el borde suave: 1 − κ (las celdas rellenadas, del todo sólidas)
+      if (!mask[k]) mask[k] = Math.round((1 - kappa[k]) * 255) >> 1;
+      else mask[k] = Math.max(128, Math.round((1 - kappa[k]) * 255));
     }
     maskTex.needsUpdate = true;
-    // normal hacia fuera en cada celda sólida del borde: la dirección hacia la celda de aire más cercana, promediada con
-    // las celdas del borde vecinas que miran al mismo lado (en un perfil delgado no se mezclan el extradós y el intradós).
-    // Sobre una pared inclinada los escalones y los peldaños se promedian en la inclinación de la pared
-    const solidAt = (i, j) => i < 0 || j < 0 || i >= nx || j >= ny ? false : mask[j * nx + i] > 0;
-    const dir = new Float32Array(nx * ny * 2);
-    const edge = [];
-    const R = 4;
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-      if (!solidAt(i, j) || (solidAt(i + 1, j) && solidAt(i - 1, j) && solidAt(i, j + 1) && solidAt(i, j - 1))) continue;
-      let best = Infinity, bx = 0, by = 0;
-      for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
-        const x = i + di, y = j + dj;
-        if (x < 0 || y < 0 || x >= nx || y >= ny || solidAt(x, y)) continue;
-        const d = di * di + dj * dj;
-        if (d < best) { best = d; bx = di; by = dj; }
-      }
-      const l = Math.hypot(bx, by) || 1;
-      dir[(j * nx + i) * 2] = bx / l;
-      dir[(j * nx + i) * 2 + 1] = by / l;
-      edge.push(j * nx + i);
-    }
-    normals.fill(128);   // 128 = sin normal: se usa el eje de la cara
-    for (const k of edge) {
-      const i = k % nx, j = (k - i) / nx, ax = dir[k * 2], ay = dir[k * 2 + 1];
-      let sx = 0, sy = 0;
-      for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) {
-        const x = i + di, y = j + dj;
-        if (x < 0 || y < 0 || x >= nx || y >= ny) continue;
-        const q = y * nx + x, qx = dir[q * 2], qy = dir[q * 2 + 1];
-        if (qx * ax + qy * ay > 0) { sx += qx; sy += qy; }
-      }
-      const g = Math.hypot(sx, sy) || 1;
-      normals[k * 4] = Math.round(((sx / g) * 0.5 + 0.5) * 255);
-      normals[k * 4 + 1] = Math.round(((sy / g) * 0.5 + 0.5) * 255);
-    }
-    normalTex.needsUpdate = true;
+    geoTex.needsUpdate = true;
     if (chord) flow.chord = chord;
   }
 
@@ -506,12 +530,13 @@ export function createTunnel(renderer, { nx, ny }) {
   return {
     nx, ny, exact, mask, setMask, setFlow, reset, load, step, macro, render, read, forces,
     get steps() { return steps; }, get time() { return time; }, get flow() { return flow; },
-    dispose() { for (const rt of [...lbm, ...ns, macroRT]) rt.dispose(); for (const m of [lbmMat, lbmMacro, nsMat, nsMacro, show]) m.dispose(); maskTex.dispose(); normalTex.dispose(); quad.geometry.dispose(); },
+    dispose() { for (const rt of [...lbm, ...ns, macroRT]) rt.dispose(); for (const m of [lbmMat, lbmMacro, nsMat, nsMacro, show]) m.dispose(); maskTex.dispose(); geoTex.dispose(); quad.geometry.dispose(); },
   };
 }
 
 // Máscara del avión vista desde un costado (morro a la izquierda, aire hacia +x), con el ángulo de ataque α en grados
-// (morro arriba) y sin el tren de aterrizaje. Devuelve 1 en las celdas sólidas y la cuerda en celdas.
+// (morro arriba) y sin el tren de aterrizaje. Devuelve la máscara con 4 × 4 muestras por celda (1 = sólido; de ahí salen
+// las celdas cortadas del método compresible), su escala y la cuerda en celdas.
 // "perfil": la silueta lateral entera, dibujada en la GPU con el avión ocupando 38 % del ancho.
 // "ala": el corte del modelo por el plano z a 40 % de la semienvergadura. Se cortan los triángulos en la CPU, se dibuja
 // el contorno y se rellena lo que no se alcanza desde el borde de la malla (las mallas no siempre son sólidos cerrados,
@@ -522,7 +547,9 @@ export function silhouette(renderer, model, box, { nx, ny, alpha = 0, cut = "per
   // puntos: "tren.derecho" es "trenderecho"; "TBCC.compuerta", la del motor, no empieza así y se queda)
   model.traverse((o) => { if (o.visible && /^(tren|compuerta)/.test(o.name)) { o.visible = false; hidden.push(o); } });
   try {
-    return cut === "ala" ? section(model, box, nx, ny, alpha) : side(renderer, model, box, nx, ny, alpha);
+    const S = 4;
+    const r = cut === "ala" ? section(model, box, nx * S, ny * S, alpha) : side(renderer, model, box, nx * S, ny * S, alpha);
+    return { mask: r.mask, chord: Math.max(1, Math.round(r.chord / S)), scale: S };
   } finally {
     for (const o of hidden) o.visible = true;
   }

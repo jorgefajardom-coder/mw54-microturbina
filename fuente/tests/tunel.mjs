@@ -8,8 +8,8 @@
 //     problema de Riemann (error L1, posición del choque y densidad entre contacto y choque).
 //  4. Choque oblicuo: aire a Mach 2 y 3 desviado 10° por una placa alineada con la malla da el β de la relación θ-β-M
 //     (39,31° y 27,38°) y la densidad de Rankine-Hugoniot.
-//  5. La misma desviación con una rampa de escalones, como las paredes de los cuerpos del túnel: mide cuánto abre el
-//     choque la pared escalonada (unos grados) y que la densidad tras el choque siga siendo la de Rankine-Hugoniot.
+//  5. Rampas que cortan las celdas en diagonal, como las paredes de los cuerpos del túnel (10° a Mach 2 y 20° a Mach 3):
+//     con celdas cortadas el choque sale con el β de θ-β-M y la densidad de Rankine-Hugoniot, sin error de escalones.
 // Uso: node tests/tunel.mjs [poiseuille cilindro sod choque rampa] [--sitio URL]
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -106,23 +106,28 @@ return out;`,
   },
   rampa: {
     code: String.raw`
-const nx = 320, ny = 200, t = T.createTunnel(T.renderer, { nx, ny });
-// esquina de compresión: pared plana y desde x0 una rampa de 10° hecha de escalones de la malla, como los cuerpos del
-// túnel. Mide cuánto engruesa el cuerpo la pared escalonada: el choque sale unos grados más abierto que el exacto
-const x0 = 50, y0 = 12, tan = Math.tan((10 * Math.PI) / 180), m = new Uint8Array(nx * ny);
-for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) m[j * nx + i] = j + 0.5 <= y0 + Math.max(0, i + 0.5 - x0) * tan ? 1 : 0;
-t.setMask(m, 200);
-t.setFlow({ mode: "ns", M: 2, mu: 0 });
-t.reset();
-while (t.time < 400) { t.step(100); t.macro(); t.read(0, 0, 1, 1); await yieldNow(); }
-t.macro();
-const f = T.shockFit(t.read(), nx, ny, x0 + 60, x0 + 190, (i) => y0 + (i + 0.5 - x0) * tan, (1 + 1.4583) / 2);
-t.dispose();
-return { beta: f.angle, puntos: f.n, rho2: f.rho2 };`,
-    check: (r) => [
-      [`ángulo del choque β = ${Number(r.beta).toFixed(2)}° con ${r.puntos} puntos (exacto 39,31°; la pared escalonada lo abre, se admite hasta +4°)`, r.beta > 38.3 && r.beta < 43.3],
-      [`densidad tras el choque = ${Number(r.rho2).toFixed(3)} (Rankine-Hugoniot 1,458)`, Math.abs(r.rho2 / 1.4583 - 1) < 0.05],
-    ],
+// esquina de compresión: pared plana y desde x0 una rampa que corta las celdas en diagonal, como las paredes de los
+// cuerpos del túnel. La máscara llega con 8 × 8 muestras por celda y el método la trata como celdas cortadas
+const out = [];
+for (const [M, theta] of [[2, 10], [3, 20]]) {
+  const nx = 320, ny = 200, t = T.createTunnel(T.renderer, { nx, ny });
+  const x0 = 50, y0 = 12, tan = Math.tan((theta * Math.PI) / 180), S = 8, m = new Uint8Array(nx * S * ny * S);
+  for (let j = 0; j < ny * S; j++) for (let i = 0; i < nx * S; i++) m[j * nx * S + i] = (j + 0.5) / S <= y0 + Math.max(0, (i + 0.5) / S - x0) * tan ? 1 : 0;
+  t.setMask(m, 200, S);
+  t.setFlow({ mode: "ns", M, mu: 0 });
+  t.reset();
+  while (t.time < 400) { t.step(100); t.macro(); t.read(0, 0, 1, 1); await yieldNow(); }
+  t.macro();
+  const beta = T.obliqueBeta(M, theta), mn2 = (M * Math.sin((beta * Math.PI) / 180)) ** 2, rho2 = (2.4 * mn2) / (0.4 * mn2 + 2);
+  const f = T.shockFit(t.read(), nx, ny, x0 + 60, x0 + 190, (i) => y0 + (i + 0.5 - x0) * tan, (1 + rho2) / 2);
+  t.dispose();
+  out.push({ M, theta, beta, measured: f.angle, points: f.n, rho2, rho2Measured: f.rho2 });
+}
+return out;`,
+    check: (rs) => rs.flatMap((r) => [
+      [`rampa de ${r.theta}° a Mach ${r.M}: β = ${r.measured.toFixed(2)}° con ${r.points} puntos (θ-β-M: ${r.beta.toFixed(2)}°)`, Math.abs(r.measured - r.beta) < 1.5],
+      [`rampa de ${r.theta}° a Mach ${r.M}: densidad tras el choque = ${r.rho2Measured.toFixed(3)} (Rankine-Hugoniot ${r.rho2.toFixed(3)})`, Math.abs(r.rho2Measured / r.rho2 - 1) < 0.04],
+    ]),
   },
 };
 

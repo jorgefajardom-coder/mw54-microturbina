@@ -296,8 +296,8 @@ function fieldLabel() {
 
 function buildMask(restart) {
   if (!tunnel || !current) return;
-  const { mask, chord } = silhouette(renderer, models[current], box, { ...TN, alpha, cut });
-  tunnel.setMask(mask, chord);
+  const { mask, chord, scale } = silhouette(renderer, models[current], box, { ...TN, alpha, cut });
+  tunnel.setMask(mask, chord, scale);
   tunnelFlow();
   if (restart) tunnel.reset();
   fieldLabel();
@@ -315,7 +315,7 @@ function tunnelReadout() {
   const s = state(AIRCRAFT[current], M);
   const ns = tunnel.flow.mode === "ns";
   const chords = (tunnel.time * (ns ? M : tunnel.flow.U)) / tunnel.flow.chord;
-  $("tunnelInfo").innerHTML = `${FIELD_TEXT[field]} Corte 2D: es como un ala (o un fuselaje) infinitamente ancha con esta forma; las puntas y el flujo de un lado a otro no están.${ns ? " La superficie queda en escalones de la malla: los choques salen unos 3° más abiertos que en la forma lisa." : ""}`;
+  $("tunnelInfo").innerHTML = `${FIELD_TEXT[field]} Corte 2D: es como un ala (o un fuselaje) infinitamente ancha con esta forma; las puntas y el flujo de un lado a otro no están.${ns ? " La superficie corta las celdas de la malla como corta la forma real (celdas cortadas), así que los choques salen con el ángulo de la forma lisa." : ""}`;
   const rows = [
     ["Método", ns ? "Navier-Stokes compresible · volúmenes finitos HLL" : "Navier-Stokes incompresible · Lattice Boltzmann D2Q9"],
     ["Malla", `${tunnel.nx} × ${tunnel.ny} celdas · cuerda de ${tunnel.flow.chord}`],
