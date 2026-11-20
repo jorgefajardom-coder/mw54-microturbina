@@ -14,6 +14,8 @@ import { createTunnel, silhouette, supported, checkSod, checkOblique, obliqueBet
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
+const tx = (s) => window.mw54i18n?.t(s) ?? s; // traducción del texto que se dibuja en un canvas (ver i18n/i18n.js)
+addEventListener("mw54:lang", () => { try { drawChart(); } catch { /* aún no hay avión cargado */ } });
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const G0 = 9.80665;
 
@@ -353,7 +355,7 @@ function drawSod(r) {
   c.fillStyle = "#7fb2ff";
   r.x.forEach((x, i) => { if (i % 4 === 0) c.fillRect(px(x) - 1, py(r.sim[i]) - 1, 2.2, 2.2); });
   c.fillStyle = "#8b939c";
-  c.fillText("Sod · densidad en t = 0,2", 8, 12);
+  c.fillText(tx("Sod · densidad en t = 0,2"), 8, 12);
   c.fillText("x 0", 8, H - 4);
   c.fillText("1", W - 14, H - 4);
 }
@@ -371,7 +373,7 @@ function drawBeta(M, r) {
   dot(r.theta, r.beta, "#ff8a3c", true);
   dot(r.theta, r.measured, "#7fb2ff", false);
   c.fillStyle = "#8b939c";
-  c.fillText(`θ-β-M a Mach ${fmt(M, 1)} · β según θ`, 8, 12);
+  c.fillText(tx(`θ-β-M a Mach ${fmt(M, 1)} · β según θ`), 8, 12);
   c.fillText("θ 0", 8, H - 4);
   c.fillText(`${fmt(tmax, 0)}°`, W - 24, H - 4);
 }
@@ -551,7 +553,7 @@ function marker() {
   ctx.font = "10px ui-monospace, Menlo, monospace";
   ctx.fillStyle = "#8b939c";
   ctx.fillText("Mach 0", 8, H - 4);
-  ctx.fillText(`${fmt(curve.maxM, 1)}`, W - 30, H - 4);
+  ctx.fillText(tx(fmt(curve.maxM, 1)), W - 30, H - 4);
   if (curve.maxM > 1) ctx.fillText("1", px(1) - 3, H - 4);
 }
 

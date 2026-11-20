@@ -60,9 +60,16 @@ for (const [jet, meta] of Object.entries(JETS)) {
   const html = useBundle(readFileSync(join(ROOT, "web", jet, "index.html"), "utf8").replace("<!--SEO-->", seoHead({ ...meta, url: `${SITE}${jet}/`, image: `${SITE}${jet}/og.png` })), BUNDLE[jet], "../");
   writeFileSync(join(OUT, jet, "index.html"), html);
 }
-copyFileSync(join(ROOT, "dist", "index.html"), join(OUT, "anatomia", "index.html"));
-copyFileSync(join(ROOT, "dist", "light.html"), join(OUT, "anatomia", "light.html"));
-for (const f of ["j58.html", "f119.html", "f110.html", "tbcc.html"]) copyFileSync(join(ROOT, "dist", f), join(OUT, "anatomia", f));
+// idioma (español o inglés): el script y su diccionario van tal cual en /i18n/, y cada página los carga en el <head>
+mkdirSync(join(OUT, "i18n"), { recursive: true });
+for (const f of ["i18n.js", "en.js"]) copyFileSync(join(ROOT, "web", "i18n", f), join(OUT, "i18n", f));
+// las figuras de anatomía salen de build.mjs ya hechas: aquí se les añade el script del idioma
+const withLang = (html) => {
+  const out = html.replace("<head>", '<head><script src="../i18n/i18n.js"></script>');
+  if (!out.includes("i18n/i18n.js")) throw new Error("no se pudo añadir el idioma a una figura de anatomía");
+  return out;
+};
+for (const f of ["index.html", "light.html", "j58.html", "f119.html", "f110.html", "tbcc.html"]) writeFileSync(join(OUT, "anatomia", f), withLang(readFileSync(join(ROOT, "dist", f), "utf8")));
 writeFileSync(join(OUT, ".nojekyll"), "");
 writeFileSync(join(OUT, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: ${SITE}sitemap.xml\n`);
 const today = new Date().toISOString().slice(0, 10);
