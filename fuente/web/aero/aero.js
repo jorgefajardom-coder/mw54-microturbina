@@ -10,6 +10,7 @@ import * as sr71 from "../sr71/sim.js";
 import * as f22 from "../f22/sim.js";
 import * as f14 from "../f14/sim.js";
 import * as sr72 from "../sr72/sim.js";
+import { createTunnel, silhouette, supported, checkSod, checkOblique, obliqueBeta, obliqueTheta, shockDensity, shockFit } from "./tunnel.js";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n, d = 0) => Number(n).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -173,6 +174,8 @@ async function show(id) {
       o.material.transmission = 0;
       Object.assign(o.material, { transparent: true, depthWrite: false });
     });
+    // en vuelo: el tren de aterrizaje recogido (el cargador de three quita los puntos: "tren.derecho" llega "trenderecho")
+    gltf.scene.traverse((o) => { if (/^tren/.test(o.name)) o.visible = false; });
     models[id] = gltf.scene;
   }
   current = id;
@@ -202,6 +205,7 @@ async function show(id) {
   slider.step = c.step ?? 0.01;
   setMach(Math.min(c.maxM, id === "hawk" ? 0.15 : Math.max(0.85, c.maxM * 0.8)));
   drawChart();
+  if (view === "tunel") buildMask(true);
 }
 
 function setMach(value) {
@@ -248,6 +252,190 @@ function update() {
     coneHolder.rotation.set(0, 0, -Math.PI / 2);   // el eje del cono (y local) apunta hacia atrás (−x)
   }
   marker();
+  if (view === "tunel") { tunnelFlow(); fieldLabel(); }
+}
+
+// ── túnel de viento 2D ──
+// La misma escena vista como un corte: el avión (su silueta lateral o la sección del ala) dentro de una malla donde la
+// GPU resuelve Navier-Stokes en cada cuadro (tunnel.js). Por debajo de Mach 0,3 con Lattice Boltzmann incompresible; por
+// encima, con volúmenes finitos compresibles, que dan los choques. La malla no llega al Reynolds del avión real (decenas
+// de millones): el del túnel se muestra al lado, para que se vea qué parte del flujo es fiel y cuál no.
+const TN = small ? { nx: 256, ny: 128 } : { nx: 384, ny: 192 };
+let view = "3d";
+let tunnel = null;
+let cut = "perfil";
+let field = 0;
+let alpha = 4;
+let tunnelRe = 0;
+let tick = 0;
+const drawSize = new THREE.Vector2();
+
+function tunnelFlow() {
+  const chord = tunnel.flow.chord;
+  if (M < 0.3) {
+    // red con u = 0,08 (Mach de la red 0,14, lejos de su límite de compresibilidad); τ ≥ 0,515 para que no se vuelva
+    // inestable, más el modelo de submalla en los cortes fuertes
+    const U = 0.08;
+    const tau = Math.max(0.515, 0.5 + (3 * U * chord) / 1200);
+    tunnel.setFlow({ mode: "lbm", M, U, tau, cs: 0.15 });
+    tunnelRe = (U * chord) / ((tau - 0.5) / 3);
+  } else {
+    tunnelRe = 5000;
+    tunnel.setFlow({ mode: "ns", M, mu: (M * chord) / tunnelRe });
+  }
+}
+
+function fieldLabel() {
+  const ns = tunnel.flow.mode === "ns";
+  const b = $("field3");
+  b.textContent = ns ? "Choques" : "Remolinos";
+  b.dataset.field = ns ? "3" : "2";
+  if (field >= 2) { field = ns ? 3 : 2; }
+  document.querySelectorAll("[data-field]").forEach((x) => x.toggleAttribute("aria-pressed", Number(x.dataset.field) === field));
+}
+
+function buildMask(restart) {
+  if (!tunnel || !current) return;
+  const { mask, chord } = silhouette(renderer, models[current], box, { ...TN, alpha, cut });
+  tunnel.setMask(mask, chord);
+  tunnelFlow();
+  if (restart) tunnel.reset();
+  fieldLabel();
+}
+
+const FIELD_TEXT = [
+  "<b>Velocidad</b> · azul, más lento que el aire libre; oscuro, igual; naranja, más rápido.",
+  "<b>Presión</b> (Cp) · naranja, el aire se frena y aprieta; azul, succión. La diferencia entre arriba y abajo es la sustentación.",
+  "<b>Remolinos</b> (vorticidad) · el aire que gira: la capa límite que se despega y la estela que deja el avión.",
+  "<b>Choques</b> (schlieren numérico) · donde la densidad cambia de golpe: el choque del morro y los choques oblicuos donde la superficie se mete en el aire, y los abanicos de expansión de Prandtl-Meyer, más difusos, donde se aparta.",
+];
+
+function tunnelReadout() {
+  const f = tunnel.forces();
+  const s = state(AIRCRAFT[current], M);
+  const ns = tunnel.flow.mode === "ns";
+  const chords = (tunnel.time * (ns ? M : tunnel.flow.U)) / tunnel.flow.chord;
+  $("tunnelInfo").innerHTML = `${FIELD_TEXT[field]} Corte 2D: es como un ala (o un fuselaje) infinitamente ancha con esta forma; las puntas y el flujo de un lado a otro no están.${ns ? " La superficie queda en escalones de la malla: los choques salen unos 3° más abiertos que en la forma lisa." : ""}`;
+  const rows = [
+    ["Método", ns ? "Navier-Stokes compresible · volúmenes finitos HLL" : "Navier-Stokes incompresible · Lattice Boltzmann D2Q9"],
+    ["Malla", `${tunnel.nx} × ${tunnel.ny} celdas · cuerda de ${tunnel.flow.chord}`],
+    ["Reynolds del túnel", `${fmt(tunnelRe)} (el avión real: ${fmt(s.Re / 1e6)} millones)`],
+    ["Tiempo simulado", `${fmt(chords, 1)} cuerdas recorridas`],
+  ];
+  if (f) rows.push(["Cl / Cd del corte (por presión)", `${fmt(f.cl, 2)} / ${fmt(f.cd, 3)}`]);
+  if (ns && M > 1) {
+    // lo que dice la teoría a este Mach, para comparar con lo que se ve
+    const b = obliqueBeta(M, 10);
+    rows.push(["Ondas de Mach (μ = asen 1/M)", `${fmt((Math.asin(1 / M) * 180) / Math.PI, 1)}°`]);
+    rows.push(["Choque que desvía 10° (θ-β-M)", b ? `β = ${fmt(b, 1)}° · densidad × ${fmt(shockDensity(M, b), 2)}` : "se separa: choque curvo delante"]);
+  }
+  $("tunnelData").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+
+// ── comprobación en la página: Sod y θ-β-M con el mismo solucionador, dibujados contra la solución exacta ──
+let checking = false;
+function chartCtx(canvas) {
+  const r = Math.min(devicePixelRatio, 2);
+  canvas.width = canvas.clientWidth * r;
+  canvas.height = canvas.clientHeight * r;
+  const c = canvas.getContext("2d");
+  c.setTransform(r, 0, 0, r, 0, 0);
+  c.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  c.font = "10px ui-monospace, Menlo, monospace";
+  return [c, canvas.clientWidth, canvas.clientHeight];
+}
+function drawSod(r) {
+  const [c, W, H] = chartCtx($("sodChart"));
+  const px = (x) => 8 + x * (W - 16), py = (y) => H - 18 - (y / 1.05) * (H - 30);
+  c.strokeStyle = "#ff8a3c"; c.lineWidth = 1.5; c.beginPath();
+  r.x.forEach((x, i) => (i ? c.lineTo(px(x), py(r.exact[i])) : c.moveTo(px(x), py(r.exact[i]))));
+  c.stroke();
+  c.fillStyle = "#7fb2ff";
+  r.x.forEach((x, i) => { if (i % 4 === 0) c.fillRect(px(x) - 1, py(r.sim[i]) - 1, 2.2, 2.2); });
+  c.fillStyle = "#8b939c";
+  c.fillText("Sod · densidad en t = 0,2", 8, 12);
+  c.fillText("x 0", 8, H - 4);
+  c.fillText("1", W - 14, H - 4);
+}
+function drawBeta(M, r) {
+  const [c, W, H] = chartCtx($("betaChart"));
+  const mu = (Math.asin(1 / M) * 180) / Math.PI;
+  const pts = [];
+  for (let b = mu; b <= 90; b += 0.25) pts.push([obliqueTheta(M, b), b]);
+  const tmax = Math.max(...pts.map((p) => p[0])) * 1.08;
+  const px = (t) => 8 + (t / tmax) * (W - 16), py = (b) => H - 18 - ((b - mu) / (90 - mu)) * (H - 30);
+  c.strokeStyle = "#ffffff55"; c.lineWidth = 1.2; c.beginPath();
+  pts.forEach(([t, b], i) => (i ? c.lineTo(px(t), py(b)) : c.moveTo(px(t), py(b))));
+  c.stroke();
+  const dot = (t, b, color, ring) => { c.beginPath(); c.arc(px(t), py(b), ring ? 5 : 3, 0, Math.PI * 2); ring ? ((c.strokeStyle = color), (c.lineWidth = 1.5), c.stroke()) : ((c.fillStyle = color), c.fill()); };
+  dot(r.theta, r.beta, "#ff8a3c", true);
+  dot(r.theta, r.measured, "#7fb2ff", false);
+  c.fillStyle = "#8b939c";
+  c.fillText(`θ-β-M a Mach ${fmt(M, 1)} · β según θ`, 8, 12);
+  c.fillText("θ 0", 8, H - 4);
+  c.fillText(`${fmt(tmax, 0)}°`, W - 24, H - 4);
+}
+async function runCheck() {
+  if (checking) return;
+  checking = true;
+  const btn = $("checkRun");
+  btn.disabled = true;
+  $("checkOut").textContent = "Corriendo el tubo de Sod…";
+  try {
+    const sod = await checkSod(renderer);
+    if (!sod) { $("checkOut").textContent = "Esta GPU no deja leer texturas de coma flotante: no se puede comparar."; return; }
+    drawSod(sod);
+    // a Mach del panel si el choque de 10° queda pegado; si no, a Mach 2
+    const Mc = M >= 1.5 && M <= 6 ? M : 2;
+    $("checkOut").textContent = `Corriendo el choque oblicuo a Mach ${fmt(Mc, 1)}…`;
+    const ob = await checkOblique(renderer, { M: Mc, theta: 10 });
+    drawBeta(Mc, ob);
+    $("checkOut").innerHTML = `<b>Sod:</b> error medio de densidad ${fmt(sod.l1 * 100, 2)} % · choque en ${fmt(sod.shock / sod.x.length, 3)} (exacto ${fmt(sod.shockExact / sod.x.length, 3)}).<br><b>Choque oblicuo a Mach ${fmt(Mc, 1)}:</b> β medido ${fmt(ob.measured, 1)}° frente a ${fmt(ob.beta, 1)}° de la teoría; densidad × ${fmt(ob.rho2Measured, 3)} frente a × ${fmt(ob.rho2, 3)}.`;
+  } finally {
+    checking = false;
+    btn.disabled = false;
+  }
+}
+
+function setView(next) {
+  if (next === "tunel" && !tunnel) {
+    tunnel = createTunnel(renderer, TN);
+  }
+  view = next;
+  document.querySelectorAll("[data-view]").forEach((b) => b.toggleAttribute("aria-pressed", b.dataset.view === view));
+  $("tunnel").hidden = view !== "tunel";
+  controls.enabled = view === "3d";
+  if (view === "tunel") { buildMask(true); tunnelReadout(); }
+}
+
+if (supported(renderer)) {
+  document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+  document.querySelectorAll("[data-cut]").forEach((b) => b.addEventListener("click", () => {
+    cut = b.dataset.cut;
+    document.querySelectorAll("[data-cut]").forEach((x) => x.toggleAttribute("aria-pressed", x === b));
+    buildMask(true);
+  }));
+  document.querySelectorAll("[data-field]").forEach((b) => b.addEventListener("click", () => {
+    field = Number(b.dataset.field);
+    document.querySelectorAll("[data-field]").forEach((x) => x.toggleAttribute("aria-pressed", x === b));
+    tunnelReadout();
+  }));
+  // al cambiar α se cambia sólo la máscara: el flujo que ya había se adapta, como en un túnel de verdad
+  $("alpha").addEventListener("input", (e) => { alpha = Number(e.target.value); $("alphaOut").textContent = `${alpha}°`; buildMask(false); });
+  $("checkRun").addEventListener("click", runCheck);
+} else document.querySelector(".views").hidden = true;
+if (new URLSearchParams(location.search).has("prueba")) window.__tunel = { createTunnel, silhouette, checkSod, checkOblique, obliqueBeta, shockFit, renderer, THREE, model: () => models[current], box: () => box };
+
+function drawTunnel() {
+  // mientras corre la comprobación, el túnel se queda quieto para no repartir la GPU
+  if (!checking) tunnel.step(tunnel.flow.mode === "ns" ? (small ? 3 : 6) : small ? 6 : 12);
+  tunnel.macro();
+  renderer.getDrawingBufferSize(drawSize);
+  const aspect = tunnel.nx / tunnel.ny;
+  const w = Math.min(drawSize.x, drawSize.y * aspect);
+  const h = w / aspect;
+  tunnel.render(field, [(drawSize.x - w) / 2, (drawSize.y - h) / 2, w, h]);
+  if (++tick % 40 === 0) tunnelReadout();
 }
 
 // línea de corriente: el aire llega por delante (+x) y se va por detrás. Alrededor del cuerpo (un elipsoide con la
@@ -375,7 +563,7 @@ function resize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   marker();
-  renderer.render(scene, camera);
+  if (view === "3d") renderer.render(scene, camera);
 }
 addEventListener("resize", resize);
 visualViewport?.addEventListener("resize", resize);
@@ -384,13 +572,20 @@ $("mach").addEventListener("input", (e) => setMach(e.target.value));
 
 const clock = new THREE.Clock();
 function frame() {
-  const t = clock.getElapsedTime();
-  stepFlow(t);
-  controls.update();
-  renderer.render(scene, camera);
+  if (view === "tunel") drawTunnel();
+  else {
+    const t = clock.getElapsedTime();
+    stepFlow(t);
+    controls.update();
+    renderer.render(scene, camera);
+  }
   requestAnimationFrame(frame);
 }
 resize();
 const start = new URLSearchParams(location.search).get("avion");
 await show(AIRCRAFT[start] ? start : "sr71");
+// ?vista=tunel abre directamente el túnel de viento (también ?mach=…)
+const ask = new URLSearchParams(location.search);
+if (ask.has("mach")) setMach(Math.min(Number($("mach").max), Math.max(Number($("mach").min), Number(ask.get("mach")))));
+if (ask.get("vista") === "tunel" && supported(renderer)) setView("tunel");
 frame();

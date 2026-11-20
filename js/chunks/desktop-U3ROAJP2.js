@@ -1,4 +1,4 @@
-import{a as d}from"./chunk-XHWMCTPK.js";import{a as l}from"./chunk-H7ORG6BC.js";import"./chunk-6EYH4FWW.js";import{g as c}from"./chunk-RCVZQTZN.js";import"./chunk-3TB3DHVP.js";import"./chunk-QX7MHMCN.js";import"./chunk-VC46IEJQ.js";var o=r=>document.getElementById(r);async function u(r){document.body.insertAdjacentHTML("beforeend",`<div class="ui" id="controls">
+import{a as d}from"./chunk-7OIHZPZI.js";import{a as l}from"./chunk-M2CBD5LN.js";import"./chunk-63LQT2NW.js";import{g as c}from"./chunk-ISNVXISG.js";import"./chunk-N3CD2LUC.js";import"./chunk-V5OSS73Z.js";import"./chunk-VC46IEJQ.js";var o=r=>document.getElementById(r);async function u(r){document.body.insertAdjacentHTML("beforeend",`<div class="ui" id="controls">
       <button id="explode">Despiece</button>
       <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="60" aria-label="Palanca de gas"></label>

@@ -16,9 +16,21 @@
 .key span::before { content: ""; display: inline-block; width: 14px; height: 2px; margin-right: 6px; vertical-align: middle; }
 .key .ld::before { background: #7fb2ff; }
 .key .dr::before { background: #ff8a3c; }
-#data { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; margin: 18px 0 0; font-size: 13px; }
-#data dt { color: var(--muted); }
-#data dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.views, #tunnel .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.views .chip[aria-pressed], #tunnel .chip[aria-pressed] { box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
+#tunnel { margin: 0 0 4px; padding: 14px 0 0; }
+#tunnel[hidden] { display: none; }
+#tunnelInfo { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+#tunnelInfo b { color: var(--text); }
+#data, #tunnelData { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; margin: 18px 0 0; font-size: 13px; }
+#tunnelData { margin-top: 12px; }
+#check { margin-top: 14px; font-size: 13px; color: var(--muted); }
+#check summary { cursor: pointer; color: var(--text); }
+#check p { margin: 8px 0; }
+#check canvas { display: block; width: 100%; height: 130px; margin-top: 10px; border-radius: 8px; background: #0d0f12; }
+#checkOut b { color: var(--text); }
+#data dt, #tunnelData dt { color: var(--muted); }
+#data dd, #tunnelData dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 footer { display: none; }
 #panel .by { margin-top: 18px; font-size: 12px; color: var(--muted); }
 #panel .by a { color: var(--text); }
