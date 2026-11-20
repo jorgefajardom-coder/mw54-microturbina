@@ -602,7 +602,7 @@ export async function start(profile, cfg) {
       if (m === null) { motor.mission = null; notify(); }
       else motor.Mtarget = m;
     }
-    if (demo) Object.assign(surf, { roll: Math.sin(now * 1.1), pitch: Math.sin(now * 0.8) * 0.8, yaw: Math.sin(now * 0.6), flap: 0.5 + 0.5 * Math.sin(now * 0.5) });
+    if (demo) Object.assign(surf, { roll: Math.sin(now * 1.1), pitch: Math.sin(now * 0.8) * 0.8, yaw: Math.sin(now * 0.6), flap: 0.25 + 0.25 * Math.sin(now * 0.5) });
     const Mwant = motor.on ? motor.Mtarget : 0;
     motor.M += (Mwant - motor.M) * (1 - Math.exp(-dt / 1.8));
     motor.thr += ((motor.on ? motor.target : 0) - motor.thr) * (1 - Math.exp(-dt / 1.2));

@@ -27,7 +27,7 @@ export const HAWK = { AC, CL, CD, CM, CR, CN, WHEELS, SKIN, BELLY, world: 1, siz
 // Célula de un avión a escala real a partir de sus datos (los de Aerodinámica) y de su modelo 3D: ruedas, morro, cola,
 // deriva y puntas de ala salen de la caja de cada pieza, no de números a mano. Coeficientes de un ala de ese
 // alargamiento (pendiente de Helmbold, pérdida tardía en los deltas) y momentos de inercia de un caza de ese tamaño.
-export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy = [], thrust, hud, world = 10, flapDeg }) {
+export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy = [], thrust, hud, world = 10, flapDeg, autoFlap = false }) {
   const b = Math.sqrt(AR * S);
   const c = S / b;
   model.updateMatrixWorld(true);
@@ -95,14 +95,22 @@ export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy 
   ];
   const belly = [[0.75, 0], [0.3, 0], [0.45, 0.25], [0.45, -0.25]].map(([fx, fz]) => ({ p: new THREE.Vector3(all.min.x + fx * L, lowY + 0.15 * (all.max.y - lowY), fz * b * 0.5) }));
   const a = (2 * Math.PI * AR) / (2 + Math.sqrt(AR * AR + 4));
+  const stall = THREE.MathUtils.degToRad(AR < 3 ? 24 : 16);
+  // flaps automáticos (F-22): el piloto no tiene palanca; el mando de vuelo baja el borde de salida en despegue y
+  // aterrizaje según la velocidad y la configuración, lo vuelve a neutro al acelerar y lo recoge al subir el tren
+  // (manuales y descripciones públicas del sistema; ninguna fuente pública da los ángulos ni las velocidades exactas).
+  // Valores conservadores de este modelo: la mitad del recorrido (20°) con el tren abajo hasta 2 veces la velocidad de
+  // pérdida, que cubre la aproximación, y a neutro hacia 2,6 veces
+  const VS = Math.sqrt((2 * m * 9.81) / (1.225 * S * (a * stall + 0.35 * 0.4)));
+  const sched = (V, gearDown) => { const t = THREE.MathUtils.clamp((V - 2 * VS) / (0.6 * VS), 0, 1); return 0.5 * gearDown * (1 - t * t * (3 - 2 * t)); };
   return {
     AC: { m, S, b, c, I: new THREE.Vector3(m * (0.22 * b) ** 2, m * (0.32 * L) ** 2, m * (0.3 * L) ** 2) },
-    CL: { a, z: 0.02, flap: 0.35, de: 0.3, stall: THREE.MathUtils.degToRad(AR < 3 ? 24 : 16) },
+    CL: { a, z: 0.02, flap: 0.35, de: 0.3, stall },
     CD: { z: cd0, k: 1 / (Math.PI * e * AR), flap: 0.04, gear: 0.015 },
     CM: { z: 0, a: -0.55, q: -10, de: -0.8, flap: -0.04 },
     CR: { b: -0.06, p: -0.4, da: 0.12, r: 0.06 },
     CN: { b: 0.1, r: -0.15, dr: -0.07 },
-    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eyeY - cg.y], canopy, tips: [tipR, tipL], thrust, hud, cg, flapDeg,
+    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eyeY - cg.y], canopy, tips: [tipR, tipL], thrust, hud, cg, flapDeg, autoFlap: autoFlap ? sched : null,
   };
 }
 
@@ -277,7 +285,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
   const act = {
     // el tren sólo se recoge en el aire, con margen sobre la pista a la escala de cada avión
     gear() { if (!s.onGround && s.p.y > airframe.ground + 1.3 * Math.max(1, K * 0.4)) { s.gearUp = !s.gearUp; gearState.target = s.gearUp ? 1 : 0; } },
-    flap() { s.flap = s.flap > 0.6 ? 0 : s.flap + 0.5; },
+    flap() { if (!airframe.autoFlap) s.flap = s.flap > 0.6 ? 0 : s.flap + 0.5; },
     cam() { s.cam = s.cam === "chase" ? "cockpit" : "chase"; },
     reset,
     engine() { motor.on = !motor.on; },
@@ -360,8 +368,10 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     const de = -s.pitch * THREE.MathUtils.degToRad(16) * rate;
     const da = s.roll * THREE.MathUtils.degToRad(20) * rate;
     const dr = -s.yaw * THREE.MathUtils.degToRad(22) * Math.max(rate, 0.45);
-    const flap = s.flap * 0.8;
     const gearDown = 1 - gearState.t;
+    // los actuadores tardan un par de segundos en llevar la superficie a lo que pide el mando de vuelo
+    if (airframe.autoFlap) s.flap += (airframe.autoFlap(V, gearDown) - s.flap) * Math.min(1, dt * 0.8);
+    const flap = s.flap * 0.8;
     // sustentación con pérdida: por encima de ~15° de ataque cae hacia una placa plana
     let cl = CL.z + CL.a * alpha + CL.flap * flap - CL.de * de * 0.1;
     if (Math.abs(alpha) > CL.stall) cl = Math.sign(alpha) * (CL.a * CL.stall) * Math.max(0.35, 1 - (Math.abs(alpha) - CL.stall) * 3) + CL.flap * flap * 0.5;
@@ -551,7 +561,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     $hud(
       `<b>${kmh.toFixed(0)}</b> km/h · <b>${alt.toFixed(1)}</b> m · ${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s · α ${THREE.MathUtils.radToDeg(info.alpha).toFixed(0)}°<br>` +
       (airframe.hud ? airframe.hud(info, s, false) : `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : `apagada (${isTouch() ? "Motor" : "E"} para arrancar)`} · gas ${(s.throttle * 100).toFixed(0)} %`) + "<br>" +
-      `Viento ${wind.length().toFixed(1)} m/s · Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * (airframe.flapDeg ?? 40)).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${stall ? " · <b>PÉRDIDA</b>" : ""}`,
+      `Viento ${wind.length().toFixed(1)} m/s · Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${airframe.autoFlap ? "auto " : ""}${(s.flap * (airframe.flapDeg ?? 40)).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${stall ? " · <b>PÉRDIDA</b>" : ""}`,
     );
   }
   // la cúpula de los jets es opaca y su puesto una caja de relleno: desde dentro taparían la vista
