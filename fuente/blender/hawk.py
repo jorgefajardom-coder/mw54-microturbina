@@ -319,6 +319,14 @@ def set_pivot(ob, pivot):
     ob.location = pivot
 
 
+def hinge_nose(name, p0, r0, p1, r1, mat):
+    """Nariz redonda de una superficie de mando, como en el avión real: un cono sobre su línea de bisagra con el medio
+    espesor del perfil en ese punto. Al girar sobre su propio eje no cambia de forma, así que tapa la ranura entre el
+    corte recto del ala y el de la superficie a cualquier ángulo (sin ella el ala parece partirse al mover el mando)."""
+    p0, p1 = Vector(p0), Vector(p1)
+    return lathe(name, frame(p0, p1 - p0), [(0, 0), (0, r0 * 0.99), ((p1 - p0).length, r1 * 0.99), ((p1 - p0).length, 0)], mat, steps=32)
+
+
 def build_cockpit(M, part):
     """Cabina en tándem a escala, metida bajo la cúpula por encima de los equipos (suelo a z = 38): cubeta con consolas
     laterales, tablero delantero con visera, HUD y dos pantallas, tablero trasero sobre el respaldo del asiento
@@ -583,8 +591,11 @@ def build_hawk(M, root, log=lambda msg: None):
         tz = WZ + DZ(half)
         wing.append(cylinder_between(f"navlight{side}", (LE(half) - 0.35 * CH(half), side * half, tz), (LE(half) - 0.35 * CH(half), side * (half + 3), tz), 3.0, M["light_red" if side > 0 else "light_green"], steps=12))
         part(f"ala.{tagname}", wing, "airframe", 69, (0, side * 420, 0), f"Ala {tagname}", "airframe")
-        flap = part(f"flap.{tagname}", [loft(f"flap{side}", rows(HINGE_F + 0.004, 1, [110.3, 200, 329.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Flap {tagname}", "airframe", control="flap", range=[0, 40], sign=side)
-        ail = part(f"aleron.{tagname}", [loft(f"ail{side}", rows(HINGE_A + 0.004, 1, [380.5, 520, 640, half - 22.5]), M["paint"], caps=True)], "airframe", 70, (-160, 0, 0), f"Alerón {tagname}", "airframe", control="aileron", range=[-22, 22], sign=side)
+        hp = lambda y, frac: ((LE(y) - frac * CH(y), side * y, WZ + DZ(y)), naca_t(frac, TT(y)) * CH(y))
+        flap = part(f"flap.{tagname}", [loft(f"flap{side}", rows(HINGE_F + 0.004, 1, [110.3, 200, 329.5]), M["paint"], caps=True),
+                                        hinge_nose(f"flapn{side}", *hp(110.3, HINGE_F), *hp(329.5, HINGE_F), M["paint"])], "airframe", 70, (-160, 0, 0), f"Flap {tagname}", "airframe", control="flap", range=[0, 40], sign=side)
+        ail = part(f"aleron.{tagname}", [loft(f"ail{side}", rows(HINGE_A + 0.004, 1, [380.5, 520, 640, half - 22.5]), M["paint"], caps=True),
+                                         hinge_nose(f"ailn{side}", *hp(380.5, HINGE_A), *hp(half - 22.5, HINGE_A), M["paint"])], "airframe", 70, (-160, 0, 0), f"Alerón {tagname}", "airframe", control="aileron", range=[-22, 22], sign=side)
         for ob, (ya, yb), frac in ((flap, (110.3, 329.5), HINGE_F), (ail, (380.5, half - 22.5), HINGE_A)):
             pa = Vector((LE(ya) - frac * CH(ya), side * ya, WZ + DZ(ya)))
             pb = Vector((LE(yb) - frac * CH(yb), side * yb, WZ + DZ(yb)))
@@ -623,9 +634,9 @@ def build_hawk(M, root, log=lambda msg: None):
     fin = loft("fin", fin_rows(0, 0.7, FIN), [M["fin"]], uvmap=fin_uv)
     tipband = loft("finband", fin_rows(0, 1, ((248, -605, 150), (270, -620, 130))), M["glow"], caps=True)
     part("deriva", [fin, tipband], "airframe", 67, (0, 0, 300), "Deriva con la insignia del agujero negro", "airframe")
-    rud = part("timon", [loft("rudder", fin_rows(0.703, 1, FIN), M["paint"], caps=True)], "airframe", 68, (-300, 0, 300), "Timón de dirección", "airframe", control="rudder", range=[-25, 25])
     ra = Vector((-380 - 0.7 * 360, 0, skin_top(-380 - 0.7 * 360)))
     rb = Vector((-605 - 0.7 * 150, 0, 248))
+    rud = part("timon", [loft("rudder", fin_rows(0.703, 1, FIN), M["paint"], caps=True), hinge_nose("ruddern", ra, naca_t(0.7, 0.09) * 360, rb, naca_t(0.7, 0.09) * 150, M["paint"])], "airframe", 68, (-300, 0, 300), "Timón de dirección", "airframe", control="rudder", range=[-25, 25])
     rud["hinge"] = list((rb - ra).normalized())
     set_pivot(rud, ra)
 

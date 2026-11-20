@@ -7,7 +7,7 @@
 import math
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, boolean_cut, halves)
-from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
+from hawk import loft, naca_cut, naca_t, panel_textures, image_of, set_pivot, hinge_nose
 from sr72 import catmull, blade_ring, rect_duct, smooth
 
 GROUND = -2150.0
@@ -243,8 +243,10 @@ def build_f22(M, root, meta, log=lambda msg: None):
         for ob in [wing] + fill:
             boolean_cut(ob, [boom(side, None, 6)])   # el ala llega hasta el costado de la viga, no la atraviesa
         part(f"ala.{tagname}", [wing] + fill, "airframe", 4, (0, side * 3200, 0), f"Ala {tagname}")
+        hp = lambda y: ((LE(y) - HINGE * (LE(y) - TE(y)), side * y, DZ(y)), naca_t(HINGE, TT(y)) * (LE(y) - TE(y)))
         for k, (a, b, label) in enumerate(((2200, 4100, "Flaperón"), (4200, 6300, "Alerón"))):
-            ob = part(f"{'flaperon' if k == 0 else 'aleron'}.{tagname}", [loft(f"cs{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 15, b - 15)], M["skin"], caps=True, uvscale=4000)],
+            ob = part(f"{'flaperon' if k == 0 else 'aleron'}.{tagname}", [loft(f"cs{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 15, b - 15)], M["skin"], caps=True, uvscale=4000),
+                                                                          hinge_nose(f"csn{side}{k}", *hp(a + 15), *hp(b - 15), M["skin"])],
                       "airframe", 5, (-2000, 0, 0), f"{label} {tagname}", control="aileron", range=[-25, 25], sign=side)
             p0 = Vector((LE(a) - HINGE * (LE(a) - TE(a)), side * a, DZ(a)))
             p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, DZ(b)))
@@ -273,7 +275,9 @@ def build_f22(M, root, meta, log=lambda msg: None):
              "airframe", 7, (0, side * 1800, 2600), f"Deriva {tagname}")
         # el timón empieza un poco por encima de la viga para poder girar sin rozarla
         RUD = ((90, FIN[0][1] + (FIN[1][1] - FIN[0][1]) * 90 / 2400, FIN[0][2] + (FIN[1][2] - FIN[0][2]) * 90 / 2400), FIN[1])
-        rud = part(f"timon.{tagname}", [loft(f"rud{side}", [frow(h, le, c, 0.705, 1) for h, le, c in RUD], M["skin"], caps=True, uvscale=4000)],
+        rp = lambda h, le, c: ((le - 0.7 * c, side * 1900 + cant * h, base + h), naca_t(0.7, 0.045) * c)
+        rud = part(f"timon.{tagname}", [loft(f"rud{side}", [frow(h, le, c, 0.705, 1) for h, le, c in RUD], M["skin"], caps=True, uvscale=4000),
+                                        hinge_nose(f"rudn{side}", *rp(*RUD[0]), *rp(*RUD[1]), M["skin"])],
                    "airframe", 8, (-1200, side * 1800, 2600), f"Timón {tagname}", control="rudder", range=[-30, 30])
         a = Vector((FIN[0][1] - 0.7 * FIN[0][2], side * 1900, base))
         b = Vector((FIN[1][1] - 0.7 * FIN[1][2], side * 1900 + cant * 2400, base + 2400))

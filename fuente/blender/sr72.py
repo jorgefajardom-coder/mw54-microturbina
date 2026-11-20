@@ -11,7 +11,7 @@ import bmesh
 import bpy
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, to_object, empty, hull, boolean_cut, halves)
-from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
+from hawk import loft, naca_cut, panel_textures, image_of, set_pivot, hinge_nose
 
 GROUND = -2300.0
 NOSE, TAIL = 11000.0, -10200.0
@@ -337,8 +337,9 @@ def build_sr72(M, root, meta, log=lambda msg: None):
     part("fuselaje.morro", [loft("fwd", body(NOSE - 40, 3000), [M["skin"], M["edge"]], uvscale=4000, matof=edge)], "airframe", 2, (3500, 0, 0), "Morro de filo cortante y cabina")
     part("fuselaje.central", [loft("mid", body(3000, -4000), [M["skin"], M["edge"]], uvscale=4000, matof=edge)], "airframe", 0, (0, 0, 0), "Cuerpo central con el ala integrada")
     aft = loft("aft", body(-4000, TAIL), [M["skin"], M["edge"]], uvscale=4000, caps=True, matof=edge)
-    # hueco de cada elevón en el borde de salida (con holgura para que gire ±20° sin tocar la cola)
-    boolean_cut(aft, [hull(f"evcut{side}{k}", [(te(y) + dx, side * y, dz) for y in (y0 - 15, y1 + 15) for dx in (-200, 875) for dz in (-500, 500)])
+    # hueco de cada elevón en el borde de salida (con holgura para que gire ±20° sin tocar la cola); empieza 4 mm por
+    # delante de su nariz redonda (bisagra a 850 mm del borde, radio 56 mm)
+    boolean_cut(aft, [hull(f"evcut{side}{k}", [(te(y) + dx, side * y, dz) for y in (y0 - 15, y1 + 15) for dx in (-200, 910) for dz in (-500, 500)])
                       for side in (1, -1) for k, (y0, y1) in enumerate(ELEVONS)])
     part("fuselaje.trasero", [aft], "airframe", 1, (-3500, 0, 0), "Cola con las jorobas de los motores")
 
@@ -364,7 +365,11 @@ def build_sr72(M, root, meta, log=lambda msg: None):
                 xt = te(y) + 5
                 for dz in (-35, 35):
                     pts += [(p.x, side * y, dz * 1.6), (xt, side * y, dz * 0.3)]
-            ob = part(f"elevon.{tagname}.{k}", [hull(f"ev{side}{k}", pts, M["skin"])], "airframe", 4, (0, 0, 1400),
+            # la cara delantera mide ±56 mm sobre la bisagra: la nariz redonda tiene ese radio; la bisagra va en flecha,
+            # así que cada tapa se mete hacia dentro hasta que su borde queda en la holgura de 15 mm del hueco
+            d = (p1 - p0).normalized()
+            inset = d * max(0.0, (56 * abs(d.x) - 10) / abs(d.y))
+            ob = part(f"elevon.{tagname}.{k}", [hull(f"ev{side}{k}", pts, M["skin"]), hinge_nose(f"evn{side}{k}", p0 + inset, 56, p1 - inset, 56, M["skin"])], "airframe", 4, (0, 0, 1400),
                       f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
             ob["hinge"] = list((p1 - p0).normalized() * side)
             set_pivot(ob, p0)

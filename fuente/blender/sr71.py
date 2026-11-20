@@ -6,7 +6,7 @@
 import math
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, tube_path, boolean_cut, halves)
-from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
+from hawk import loft, naca_cut, naca_t, panel_textures, image_of, set_pivot, hinge_nose
 from sr72 import catmull, blade_ring, hinged_ring, attach
 
 GROUND = -2700.0
@@ -201,7 +201,9 @@ def build_sr71(M, root, meta, log=lambda msg: None):
             part(f"{key}.{tagname}", [wing] + fill, "airframe", order, explode, f"{title} {tagname}")
         # elevones: el interior sale hacia atrás y el exterior hacia fuera, ninguno pasa por la góndola ni por el otro
         for k, (a, b) in enumerate(((1500, 2300), (4300, 8100))):
-            ob = part(f"elevon.{tagname}.{k}", [loft(f"ev{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 20, b - 20)], M["skin"], caps=True, uvscale=4000)],
+            hp = lambda y: ((LE(y) - HINGE * (LE(y) - TE(y)), side * y, NAC_Z), naca_t(HINGE, 0.04) * (LE(y) - TE(y)))
+            ob = part(f"elevon.{tagname}.{k}", [loft(f"ev{side}{k}", [wrow(y, side, HINGE + 0.004, 1) for y in (a + 20, b - 20)], M["skin"], caps=True, uvscale=4000),
+                                                hinge_nose(f"evn{side}{k}", *hp(a + 20), *hp(b - 20), M["skin"])],
                       "airframe", 5, (-2600, 0, 0), f"Elevón {'interior' if k == 0 else 'exterior'} {tagname}", control="elevon", range=[-20, 20], sign=side)
             p0 = Vector((LE(a) - HINGE * (LE(a) - TE(a)), side * a, NAC_Z))
             p1 = Vector((LE(b) - HINGE * (LE(b) - TE(b)), side * b, NAC_Z))

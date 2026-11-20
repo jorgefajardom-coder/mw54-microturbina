@@ -8,7 +8,7 @@
 import math
 from mathutils import Vector
 from lib import (material, lathe, cylinder_between, box, join, tag, frame, point, TAU, empty, hull, boolean_cut, halves)
-from hawk import loft, naca_cut, panel_textures, image_of, set_pivot
+from hawk import loft, naca_cut, naca_t, panel_textures, image_of, set_pivot, hinge_nose
 from sr72 import catmull, blade_ring, rect_duct, smooth, hinged_ring, attach
 
 GROUND = -2150.0
@@ -226,7 +226,9 @@ def build_f14(M, root, meta, log=lambda msg: None):
         part(f"deriva.{tagname}", [loft(f"fin{side}", [frow(h, le, c, 0, 0.72) for h, le, c in FIN], M["skin"], caps=True, uvscale=4000)], "airframe", 9, (0, side * 1600, 2600), f"Deriva {tagname}", path="v")
         # el timón empieza por encima del lomo de la góndola para poder girar sin rozarla
         RUD = ((60, FIN[0][1] + (FIN[1][1] - FIN[0][1]) * 60 / 2350, FIN[0][2] + (FIN[1][2] - FIN[0][2]) * 60 / 2350), FIN[1])
-        rud = part(f"timon.{tagname}", [loft(f"rud{side}", [frow(h, le, c, 0.725, 1) for h, le, c in RUD], M["skin"], caps=True, uvscale=4000)], "airframe", 10, (-1200, side * 1600, 2600),
+        rp = lambda h, le, c: ((le - 0.72 * c, side * NAC_Y + cant * h, base + h), naca_t(0.72, 0.05) * c)
+        rud = part(f"timon.{tagname}", [loft(f"rud{side}", [frow(h, le, c, 0.725, 1) for h, le, c in RUD], M["skin"], caps=True, uvscale=4000),
+                                        hinge_nose(f"rudn{side}", *rp(*RUD[0]), *rp(*RUD[1]), M["skin"])], "airframe", 10, (-1200, side * 1600, 2600),
                    f"Timón {tagname}", control="rudder", range=[-30, 30])
         a = Vector((FIN[0][1] - 0.72 * FIN[0][2], side * NAC_Y, base))
         b = Vector((FIN[1][1] - 0.72 * FIN[1][2], side * NAC_Y + cant * 2350, base + 2350))
