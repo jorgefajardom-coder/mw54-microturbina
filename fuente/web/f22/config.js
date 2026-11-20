@@ -2,6 +2,8 @@
 import * as sim from "./sim.js";
 import { fmt } from "../js/jet/core.js";
 
+// recorrido de los flaperones con la palanca de flaps a fondo (el mismo que marca el HUD)
+const FLAP = 20;
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export default {
@@ -34,7 +36,9 @@ export default {
     return amb + 0.75 * (T0 - amb);
   },
   drive: {
-    aileron: (o, s, c) => -s.roll * c.sign * c.range[1],
+    // los flaperones (los de dentro) también bajan con los flaps, como en el avión real: FLAP grados con la palanca
+    // a fondo, sumados al alabeo y sin pasar del recorrido de la superficie
+    aileron: (o, s, c) => Math.max(-c.range[1], Math.min(c.range[1], -s.roll * c.sign * c.range[1] - (c.e.data.part.startsWith("flaperon") ? FLAP * (s.flap ?? 0) : 0))),
     stabilator: (o, s, c) => Math.max(-1, Math.min(1, s.pitch - 0.5 * s.roll * c.sign)) * c.range[1],
     rudder: (o, s, c) => s.yaw * c.range[1],
     // empuje vectorial: las dos aletas giran juntas con el cabeceo
@@ -56,7 +60,7 @@ export default {
   plumes: [620, -620].map((y) => ({ at: [-8660, y, -150], length: 10, r: 0.6, h: 0.8, w: 1.5, tail: 0.75 })),
   cut: { z: 0.62, pos: [-4.5, -1.3, 16], target: [-4.8, -0.2, 0.62] },
   // vuelo: superficie alar, masa en vuelo, alargamiento, Oswald y resistencia (los de Aerodinámica)
-  fly: { S: 78, m: 29000, AR: 2.4, e: 0.75, cd0: 0.016, engines: 2, vref: 72, length: 18.9 },
+  fly: { S: 78, m: 29000, AR: 2.4, e: 0.75, cd0: 0.016, engines: 2, vref: 72, length: 18.9, flapDeg: FLAP },
   flow: {
     paths: {
       core: [[1800, 0], [0, 0], [-900, 0], [-1700, 0], [-2300, 0], [-2700, 0], [-4300, 0], [-5160, 0], [-8000, 0]],

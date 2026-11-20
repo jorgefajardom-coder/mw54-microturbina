@@ -1,4 +1,4 @@
-import{a as s,b as u}from"./chunk-IWQCEKBX.js";import{a as d}from"./chunk-M2CBD5LN.js";import"./chunk-JUALDYDT.js";import{g as l}from"./chunk-ISNVXISG.js";import"./chunk-LQW7N7OQ.js";import"./chunk-UZSR6Q5S.js";import"./chunk-VC46IEJQ.js";var e=n=>document.getElementById(n);async function b(n,i){document.body.insertAdjacentHTML("beforeend",`<div class="ui" id="controls">
+import{a as s,b as u}from"./chunk-FNQ4UMMC.js";import{a as d}from"./chunk-H7ORG6BC.js";import"./chunk-6EYH4FWW.js";import{g as l}from"./chunk-RCVZQTZN.js";import"./chunk-3TB3DHVP.js";import"./chunk-QX7MHMCN.js";import"./chunk-VC46IEJQ.js";var e=n=>document.getElementById(n);async function b(n,i){document.body.insertAdjacentHTML("beforeend",`<div class="ui" id="controls">
       <button id="explode">Despiece</button>
       <button id="run"><span class="lamp"></span><span>Arrancar</span></button>
       <label class="chip">Gas <input id="throttle" type="range" min="0" max="100" value="${Math.round((i.throttle??.85)*100)}" aria-label="Palanca de gases"></label>

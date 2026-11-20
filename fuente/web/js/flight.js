@@ -27,7 +27,7 @@ export const HAWK = { AC, CL, CD, CM, CR, CN, WHEELS, SKIN, BELLY, world: 1, siz
 // Célula de un avión a escala real a partir de sus datos (los de Aerodinámica) y de su modelo 3D: ruedas, morro, cola,
 // deriva y puntas de ala salen de la caja de cada pieza, no de números a mano. Coeficientes de un ala de ese
 // alargamiento (pendiente de Helmbold, pérdida tardía en los deltas) y momentos de inercia de un caza de ese tamaño.
-export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy = [], thrust, hud, world = 10 }) {
+export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy = [], thrust, hud, world = 10, flapDeg }) {
   const b = Math.sqrt(AR * S);
   const c = S / b;
   model.updateMatrixWorld(true);
@@ -102,7 +102,7 @@ export function jetAirframe({ model, parts, S, m, AR, e, cd0, vref, eye, canopy 
     CM: { z: 0, a: -0.55, q: -10, de: -0.8, flap: -0.04 },
     CR: { b: -0.06, p: -0.4, da: 0.12, r: 0.06 },
     CN: { b: 0.1, r: -0.15, dr: -0.07 },
-    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eyeY - cg.y], canopy, tips: [tipR, tipL], thrust, hud, cg,
+    WHEELS: wheels, SKIN: skin, BELLY: belly, world, size: L / 1.6, vref, ground, eye: [eye[0] - cg.x, eyeY - cg.y], canopy, tips: [tipR, tipL], thrust, hud, cg, flapDeg,
   };
 }
 
@@ -551,7 +551,7 @@ export function createFlight({ scene, renderer, camera, model, op, motor, lite, 
     $hud(
       `<b>${kmh.toFixed(0)}</b> km/h · <b>${alt.toFixed(1)}</b> m · ${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s · α ${THREE.MathUtils.radToDeg(info.alpha).toFixed(0)}°<br>` +
       (airframe.hud ? airframe.hud(info, s, false) : `MW54 ${motor.on ? `<b>${Math.round(o.n * motor.spin).toLocaleString("es-ES")}</b> rpm · ${info.thrust.toFixed(0)} N · EGT ${Math.round(15 + (o.egt - 15) * motor.heat)} °C` : `apagada (${isTouch() ? "Motor" : "E"} para arrancar)`} · gas ${(s.throttle * 100).toFixed(0)} %`) + "<br>" +
-      `Viento ${wind.length().toFixed(1)} m/s · Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * 40).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${stall ? " · <b>PÉRDIDA</b>" : ""}`,
+      `Viento ${wind.length().toFixed(1)} m/s · Tren ${gearState.t < 0.05 ? "abajo" : gearState.t > 0.95 ? "arriba" : "en tránsito"} · flaps ${(s.flap * (airframe.flapDeg ?? 40)).toFixed(0)}° · giróscopo ${s.assist ? "sí" : "no"}${s.brake ? " · frenos" : ""}${stall ? " · <b>PÉRDIDA</b>" : ""}`,
     );
   }
   // la cúpula de los jets es opaca y su puesto una caja de relleno: desde dentro taparían la vista

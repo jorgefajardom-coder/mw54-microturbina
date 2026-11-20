@@ -232,7 +232,7 @@ export async function start(profile, cfg) {
   const settle = () => { if (parts.some((e) => e.t > 0.02)) { timeline = null; setExploded(0); } };
 
   // ── mandos y mecanismos: cada config dice cómo mueve el Mach (o la palanca) cada tipo de pieza ──
-  const surf = { roll: 0, pitch: 0, yaw: 0 };
+  const surf = { roll: 0, pitch: 0, yaw: 0, flap: 0 };
   function poseControls() {
     const D = Math.PI / 180;
     for (const c of controlParts) {
@@ -528,7 +528,7 @@ export async function start(profile, cfg) {
         return short ? `Mach <b>${flyState.M.toFixed(2)}</b> · ${(flyState.thrust / 1000).toFixed(0)} kN · ${gas}` : `${cfg.say.engines} · Mach <b>${flyState.M.toFixed(2)}</b> · <b>${(flyState.thrust / 1000).toFixed(0)}</b> kN · ${gas}`;
       },
     });
-    flight = createFlight({ scene, renderer, camera, model, op: () => ({}), motor, lite: profile.kind === "celular", setGear: (t) => (gearState.target = t), setSurfaces: (c) => Object.assign(surf, { roll: c.roll, pitch: c.pitch, yaw: c.yaw }), gearState, pad: profile.pad, airframe, envSize: envSize(profile) });
+    flight = createFlight({ scene, renderer, camera, model, op: () => ({}), motor, lite: profile.kind === "celular", setGear: (t) => (gearState.target = t), setSurfaces: (c) => Object.assign(surf, { roll: c.roll, pitch: c.pitch, yaw: c.yaw, flap: c.flap ?? 0 }), gearState, pad: profile.pad, airframe, envSize: envSize(profile) });
     return flight;
   }
   const camBack = { near: camera.near, far: camera.far, fov: camera.fov };
@@ -556,13 +556,13 @@ export async function start(profile, cfg) {
         flight.exit();
         Object.assign(camera, camBack); camera.updateProjectionMatrix();
         controls.enabled = true; floor.visible = true;
-        Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); motor.Mtarget = 0; gearState.target = 0;
+        Object.assign(surf, { roll: 0, pitch: 0, yaw: 0, flap: 0 }); motor.Mtarget = 0; gearState.target = 0;
         flyCamera("home");
       }
       notify();
     },
     gear() { gearState.target = gearState.target ? 0 : 1; notify(); },
-    surfaces() { demo = !demo; if (!demo) Object.assign(surf, { roll: 0, pitch: 0, yaw: 0 }); notify(); },
+    surfaces() { demo = !demo; if (!demo) Object.assign(surf, { roll: 0, pitch: 0, yaw: 0, flap: 0 }); notify(); },
   };
   window.__sim = { motor, gearState, camera, controls, model, op: () => o, get flight() { return flight; } };
 
@@ -602,7 +602,7 @@ export async function start(profile, cfg) {
       if (m === null) { motor.mission = null; notify(); }
       else motor.Mtarget = m;
     }
-    if (demo) Object.assign(surf, { roll: Math.sin(now * 1.1), pitch: Math.sin(now * 0.8) * 0.8, yaw: Math.sin(now * 0.6) });
+    if (demo) Object.assign(surf, { roll: Math.sin(now * 1.1), pitch: Math.sin(now * 0.8) * 0.8, yaw: Math.sin(now * 0.6), flap: 0.5 + 0.5 * Math.sin(now * 0.5) });
     const Mwant = motor.on ? motor.Mtarget : 0;
     motor.M += (Mwant - motor.M) * (1 - Math.exp(-dt / 1.8));
     motor.thr += ((motor.on ? motor.target : 0) - motor.thr) * (1 - Math.exp(-dt / 1.2));
