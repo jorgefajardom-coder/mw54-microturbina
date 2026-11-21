@@ -7,11 +7,16 @@ body[data-flying] #hud, body[data-flying] #keys { display: block; }
 body[data-flying] #card, body[data-flying] #legend, body[data-flying] #steps, body[data-flying] #assemble, body[data-flying] #explode, body[data-flying] #heat, body[data-flying] #cam, body[data-flying] #pip, body[data-flying] #surfaces, body[data-flying] #cockpit, body[data-flying] #mode, body[data-flying] #mission, body[data-flying] #cut, body[data-flying] #machchip { display: none !important; }
 #tip { display: none; }
 body[data-hover] #tip { display: block; }
-/* ventana de escritorio estrecha: la barra se desliza en una sola fila */
-@media (max-width: 900px) {
+/* el título no pasa por debajo de la navegación centrada: le queda la mitad izquierda menos media barra (unos 500 px
+   con el botón del idioma) y parte la línea si hace falta; por debajo de 1200 px la barra baja (regla siguiente) */
+header { right: auto; max-width: calc(50% - 260px); }
+/* ventana de escritorio estrecha: la barra se desliza en una sola fila y la navegación baja sobre ella */
+@media (max-width: 1199px) {
   #controls { left: 0; right: 0; bottom: 0; max-width: none; flex-wrap: nowrap; overflow-x: auto; padding: 10px 12px; background: linear-gradient(transparent, #0d0f12ee 35%); }
   #controls > * { flex: none; }
   header p, footer, header .wide { display: none; }
   nav.sections { top: auto; bottom: 62px; left: 12px; transform: none; }
-  #card { left: 12px; right: 12px; width: auto; top: auto; bottom: 110px; }
+  header { max-width: none; }
+  #steps, #keys { bottom: 98px; }
+  #card { left: 12px; right: 12px; width: auto; top: auto; bottom: 134px; }
 }

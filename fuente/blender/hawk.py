@@ -527,7 +527,19 @@ def build_hawk(M, root, log=lambda msg: None):
         intakes.append(loft(f"intake{side}", rows, [M["paint"], M["orange"]], matof=lambda i, j: 1 if i == 0 else 0))
         x, w, h, zc = 318, 30, 66, 4
         off = skin_y(x, zc) + w / 2 - 6
-        intakes.append(loft(f"mouth{side}", [superellipse(x, w - 1.5, h - 1.5, zc, n=32, p=2.2, y0=side * off), superellipse(x - 30, w - 3, h - 3, zc, n=32, p=2.2, y0=side * off)], M["paint_dark"]))
+        # conducto oscuro cerrado al fondo y con las caras hacia dentro: el visor dibuja solo la cara frontal, así que
+        # un tubo abierto con las normales hacia fuera dejaba ver el fondo a través de la toma
+        mouth = loft(f"mouth{side}", [superellipse(x - d, w - k, h - k, zc, n=32, p=2.2, y0=side * off) for d, k in ((0, 1.5), (30, 3), (110, 5))], M["paint_dark"])
+        bm = bmesh.new()
+        bm.from_mesh(mouth.data)
+        back = min(v.co.x for v in bm.verts)
+        ring = sorted((v for v in bm.verts if abs(v.co.x - back) < 1e-3), key=lambda v: math.atan2(v.co.z - zc, v.co.y - side * off))
+        bm.faces.new(ring)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bmesh.ops.reverse_faces(bm, faces=bm.faces)
+        bm.to_mesh(mouth.data)
+        bm.free()
+        intakes.append(mouth)
     # el fuselaje delantero se abre en dos mitades (como el molde de la maqueta) para dejar a la vista los equipos
     for half, (sgn, tagname) in enumerate(((1, "izquierda"), (-1, "derecha"))):
         piece = front.copy()
